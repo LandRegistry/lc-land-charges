@@ -1,0 +1,6 @@
+flask
+itsdangerous
+markupsafe
+requests
+gunicorn
+alembic
