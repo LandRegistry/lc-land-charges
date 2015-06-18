@@ -4,3 +4,4 @@ markupsafe
 requests
 gunicorn
 alembic
+psycopg2==2.6
