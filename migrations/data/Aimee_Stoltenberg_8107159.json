@@ -1,0 +1,47 @@
+{
+  "key_number": "6303436",
+  "application_type": "PA(B)",
+  "application_ref": "8107159",
+  "date": "2015-04-01",
+  "debtor_name": {
+    "forenames": [
+      "Aimee",
+      "Clifford"
+    ],
+    "surname": "Stoltenberg"
+  },
+  "debtor_alternative_name": [
+    {
+      "forenames": [
+        "Clifford",
+        "Aimee"
+      ],
+      "surname": "Stoltenberg"
+    }
+  ],
+  "gender": "N/A",
+  "occupation": "Childminder",
+  "residence": [
+    {
+      "address_lines": [
+        "456 Erdman Unions",
+        "Port Rosamouth",
+        "Derbyshire"
+      ],
+      "postcode": "AC42 3UU"
+    }
+  ],
+  "residence_withheld": false,
+  "business_address": {
+    "address_lines": [
+      "89255 Ernser Orchard",
+      "Lindgrenborough",
+      "Staffordshire"
+    ],
+    "postcode": "VT67 2PF"
+  },
+  "date_of_birth": "1956-11-19",
+  "investment_property": [
+
+  ]
+}
