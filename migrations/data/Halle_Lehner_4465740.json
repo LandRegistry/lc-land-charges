@@ -1,0 +1,53 @@
+{
+  "key_number": "2189361",
+  "application_type": "WO(B)",
+  "application_ref": "4465740",
+  "date": "2014-08-16",
+  "debtor_name": {
+    "forenames": [
+      "Halle",
+      "Kathlyn"
+    ],
+    "surname": "Lehner"
+  },
+  "debtor_alternative_name": [
+    {
+      "forenames": [
+        "Halle"
+      ],
+      "surname": "Huels"
+    },
+    {
+      "forenames": [
+        "Terrence"
+      ],
+      "surname": "Lehner"
+    }
+  ],
+  "gender": "N/A",
+  "occupation": "Special constable",
+  "trading_name": "Openlux",
+  "residence": [
+    {
+      "address_lines": [
+        "721 Margarett Light",
+        "New Janicemouth",
+        "Cornwall"
+      ],
+      "postcode": "VW18 1YV"
+    }
+  ],
+  "residence_withheld": false,
+  "business_address": {
+    "address_lines": [
+      "1172 Ethelyn Centers",
+      "Denesikburgh",
+      "Buckinghamshire"
+    ],
+    "postcode": "YJ60 3LE"
+  },
+  "date_of_birth": "1956-03-29",
+  "investment_property": [
+
+  ]
+}
