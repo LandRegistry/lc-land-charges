@@ -5,3 +5,7 @@ class Config(object):
 
 class DevelopmentConfig(object):
     DEBUG = True
+    DATABASE_NAME = 'landcharges'
+    DATABASE_USER = 'landcharges'
+    DATABASE_PASSWORD = 'lcalpha'
+    DATABASE_HOST = 'localhost'
