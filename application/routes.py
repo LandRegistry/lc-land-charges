@@ -32,10 +32,10 @@ def register():
     connection.commit()
     cursor.close()
     connection.close()
-    return Response(status=200)
+    return Response(status=202)
 
 
-@app.route('/registration/<int:id>', methods=["GET"])
+@app.route('/search/<int:id>', methods=["GET"])
 def get(id):
     try:
         connection = psycopg2.connect("dbname='{}' user='{}' host='{}' password='{}'".format(
