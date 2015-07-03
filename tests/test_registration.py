@@ -71,10 +71,3 @@ class TestWorking:
         headers = {'Content-Type': 'application/json'}
         response = self.app.post('/register', data=valid_data, headers=headers)
         assert response.status_code == 500
-
-
-
-
-#/register POST:
-#Test new registration OK
-
