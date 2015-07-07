@@ -20,16 +20,17 @@ from sqlalchemy.dialects import postgresql
 
 
 def upgrade():
+    #application_type = sa.Enum('PAB', 'WOB', name='application_type')
+    #application_type = postgresql.ENUM("PAB", "WOB", create_type=False, name="application_type")
+    #application_type.create(op.get_bind(), checkfirst=False)
+
     op.create_table('party_name',
-                    sa.Column('party_id', sa.Integer(), primary_key=True),
+                    sa.Column('id', sa.Integer(), primary_key=True),
                     sa.Column('party_name', sa.Unicode()),
                     sa.Column('gender', sa.CHAR()),
-                    sa.Column('occupation', sa.Unicode()),
-                    sa.Column('date_of_birth', sa.Date()),
                     sa.Column('forename', sa.Unicode()),
                     sa.Column('middle_names', sa.Unicode()),
                     sa.Column('surname', sa.Unicode()),
-                    sa.Column('residence_withheld', sa.Boolean()),
                     sa.Column('alias_name', sa.Boolean())
                     )
 
@@ -59,18 +60,27 @@ def upgrade():
                     sa.Column('request_id', sa.Integer(), sa.ForeignKey('request.id')),
                     sa.Column('registration_no', sa.String(), nullable=False),
                     sa.Column('registration_date', sa.Date(), nullable=False),
-                    sa.Column('application_type', sa.Enum('PAB', 'WOB', name='application_type')),
+                    sa.Column('application_type', sa.Enum('PAB', 'WOB', name='application_type_2')), #  TODO: sqlalchemy crap with types
                     sa.Column('bankruptcy_date', sa.Date(), nullable=False))
 
     op.create_table('party',
                     sa.Column('id', sa.Integer(), primary_key=True),
                     sa.Column('register_id', sa.Integer(), sa.ForeignKey('register.id'), nullable=False),
-                    sa.Column('party_name_id', sa.Integer(), sa.ForeignKey('party_name.id'), nullable=False),
-                    sa.Column('party_type', sa.Enum('Customer', 'Creditor', 'Debtor', name='party_type')))
+                    sa.Column('party_type', sa.Enum('Customer', 'Creditor', 'Debtor', name='party_type')),
+                    sa.Column('occupation', sa.Unicode()),
+                    sa.Column('date_of_birth', sa.Date()),
+                    sa.Column('residence_withheld', sa.Boolean()),
+                    )
+
+    op.create_table('party_name_rel',
+                    sa.Column('id', sa.Integer(), primary_key=True),
+                    sa.Column('party_name_id', sa.Integer(), sa.ForeignKey("party_name.id"), nullable=False),
+                    sa.Column('party_id', sa.Integer(), sa.ForeignKey("party.id"), nullable=False)
+                    )
 
     op.create_table('party_trading',
                     sa.Column('id', sa.Integer(), primary_key=True),
-                    sa.Column('party_id', sa.Integer(), sa.ForeignKey('party_name.id')),
+                    sa.Column('party_id', sa.Integer(), sa.ForeignKey('party.id')),
                     sa.Column('trading_name', sa.Unicode()))
 
     op.create_table('address_detail',
@@ -85,14 +95,15 @@ def upgrade():
 
     op.create_table('address',
                     sa.Column('id', sa.Integer(), primary_key=True),
-                    sa.Column('address_type', sa.Enum('Debtor Residence', 'Debtor Owned', 'Debtor Business', 'Customer', name='address_type')),
+                    sa.Column('address_type', sa.Enum('Debtor Residence', 'Debtor Owned', 'Debtor Business', 'Customer',
+                                                      'Investment', name='address_type')),
                     sa.Column('address_string', sa.Unicode()),
                     sa.Column('detail_id', sa.Integer(), sa.ForeignKey('address_detail.id'), nullable=False))
 
     op.create_table('party_address',
                     sa.Column('id', sa.Integer(), primary_key=True),
                     sa.Column('address_id', sa.Integer(), sa.ForeignKey('address.id'), nullable=False),
-                    sa.Column('party_id', sa.Integer(), sa.ForeignKey('party_name.id'), nullable=False))
+                    sa.Column('party_id', sa.Integer(), sa.ForeignKey('party.id'), nullable=False))
 
 
 def downgrade():
