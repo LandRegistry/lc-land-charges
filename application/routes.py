@@ -131,8 +131,9 @@ def insert_record(data):
     # Nx party_address             (req: party.id, address.id)
     # Nx address        (req: address_detail.id)
     # Nx address_detail (req: )
-    for address in data['residence']:
-        insert_address(cursor, address, "Debtor Residence", party_id)
+    if 'residence' in data:
+        for address in data['residence']:
+            insert_address(cursor, address, "Debtor Residence", party_id)
 
     if "business_address" in data:
         insert_address(cursor, data["business_address"], "Debtor Business", party_id)
@@ -162,7 +163,67 @@ def insert_record(data):
 
     complete(cursor)
 
-    pass
+
+def get_registration_from_name(cursor, forenames, surname):
+    fn_list = forenames.split(" ")
+    forename = fn_list[0]
+    middle_name = ""
+    if len(forenames) > 1:
+        middle_name = " ".join(fn_list[1:])
+
+    cursor.execute("SELECT p.register_id " +
+                   "FROM party_name n, party_name_rel pr, party p " +
+                   "where n.alias_name=False and n.forename=%(forename)s and n.surname=%(surname)s " +
+                   "and n.middle_names=%(midname)s and n.id = pr.party_name_id and pr.party_id = p.id",
+                   {
+                       'forename': forename, 'midname': middle_name, 'surname': surname
+                   })
+
+    rows = cursor.fetchall()
+    result = []
+    for row in rows:
+        result.append(row[0])
+
+    return result
+
+
+def get_registration(cursor, reg_id):
+    cursor.execute("select registration_date, application_type, registration_no, bankruptcy_date " +
+                   "from register where id=%(id)s", {"id": reg_id})
+    rows = cursor.fetchall()
+    row = rows[0]
+    result = {
+        "registration_date": str(row[0]),
+        "application_type": row[1],
+        "registration_no": row[2],
+        "bankruptcy_date": str(row[3])
+    }
+    return result
+
+
+@app.route('/retrieve', methods=['POST'])
+def retrieve():
+    if request.headers['Content-Type'] != "application/json":
+        return Response(status=415)
+
+    cursor = connect()
+    data = request.get_json(force=True)
+    reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'])
+
+    if len(reg_ids) == 0:
+        return Response(status=404)
+
+    regs = []
+    for id in reg_ids:
+        regs.append(get_registration(cursor, id))
+
+    
+
+
+    complete(cursor)
+    data = json.dumps(regs, ensure_ascii=False)
+    return Response(data, status=200, mimetype='application/json')
+
 
 
 @app.route('/dev', methods=['POST'])
@@ -174,11 +235,12 @@ def dev():
     insert_record(json_data)
     return Response(status=200)
 
+
 @app.route('/register', methods=["POST"])
 def register():
     if request.headers['Content-Type'] != "application/json":
         return Response(status=415)
-    
+
     data = (request.get_json(force=True))
     forenames = data['debtor_name']['forenames']
     surname = data['debtor_name']['surname']
@@ -234,9 +296,6 @@ def get(id):
         return Response(status=404)
 
     data = json.dumps(rows[0][0], ensure_ascii=False)
-    print(type(data))
-    print(data)
-
     return Response(data, status=200, mimetype='application/json')
 
 

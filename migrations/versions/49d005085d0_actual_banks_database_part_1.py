@@ -8,7 +8,7 @@ Create Date: 2015-07-03 11:54:26.787882
 
 # revision identifiers, used by Alembic.
 revision = '49d005085d0'
-down_revision = '3caf1276395'
+down_revision = '4166aee97e'
 branch_labels = None
 depends_on = None
 
@@ -20,10 +20,6 @@ from sqlalchemy.dialects import postgresql
 
 
 def upgrade():
-    #application_type = sa.Enum('PAB', 'WOB', name='application_type')
-    #application_type = postgresql.ENUM("PAB", "WOB", create_type=False, name="application_type")
-    #application_type.create(op.get_bind(), checkfirst=False)
-
     op.create_table('party_name',
                     sa.Column('id', sa.Integer(), primary_key=True),
                     sa.Column('party_name', sa.Unicode()),
@@ -111,9 +107,16 @@ def downgrade():
     op.drop_table('address')
     op.drop_table('address_detail')
     op.drop_table('party_trading')
+    op.drop_table('party_name_rel')
     op.drop_table('party')
     op.drop_table('register')
     op.drop_table('audit_log')
     op.drop_table('request')
     op.drop_table('ins_bankruptcy_request')
     op.drop_table('party_name')
+    # At this point give up trying to delete the types in a database-agnostic manner and just issue DDL...
+    op.execute("DROP TYPE address_type")
+    op.execute("DROP TYPE activity")
+    op.execute("DROP TYPE party_type")
+    op.execute("DROP TYPE application_type")
+    op.execute("DROP TYPE application_type_2")
