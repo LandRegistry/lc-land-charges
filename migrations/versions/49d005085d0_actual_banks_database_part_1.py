@@ -16,8 +16,6 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-# TODO: hack this so down_revision points at Rob's amendments...
-
 
 def upgrade():
     op.create_table('party_name',
@@ -56,7 +54,7 @@ def upgrade():
                     sa.Column('request_id', sa.Integer(), sa.ForeignKey('request.id')),
                     sa.Column('registration_no', sa.String(), nullable=False),
                     sa.Column('registration_date', sa.Date(), nullable=False),
-                    sa.Column('application_type', sa.Enum('PAB', 'WOB', name='application_type_2')), #  TODO: sqlalchemy crap with types
+                    sa.Column('application_type', sa.Enum('PAB', 'WOB', name='application_type_2')), #  TODO: this is a rubbish hack.
                     sa.Column('bankruptcy_date', sa.Date(), nullable=False))
 
     op.create_table('party',
