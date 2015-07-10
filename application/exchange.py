@@ -23,4 +23,3 @@ def setup_messaging():
 def publish_new_bankruptcy(producer, data):
     print("Sending: {}".format(data))
     producer.publish(data)
-    pass

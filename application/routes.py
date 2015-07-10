@@ -4,6 +4,7 @@ from flask import Response, request
 import psycopg2
 import json
 import re
+import sys
 
 
 @app.route('/', methods=["GET"])
@@ -196,20 +197,25 @@ def retrieve():
     if request.headers['Content-Type'] != "application/json":
         return Response(status=415)
 
-    cursor = connect()
-    data = request.get_json(force=True)
-    reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'])
+    try:
+        cursor = connect()
+        data = request.get_json(force=True)
+        reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'])
 
-    if len(reg_ids) == 0:
-        return Response(status=404)
+        if len(reg_ids) == 0:
+            return Response(status=404)
 
-    regs = []
-    for reg_id in reg_ids:
-        regs.append(get_registration(cursor, reg_id))
+        regs = []
+        for reg_id in reg_ids:
+            regs.append(get_registration(cursor, reg_id))
 
-    complete(cursor)
-    data = json.dumps(regs, ensure_ascii=False)
-    return Response(data, status=200, mimetype='application/json')
+        complete(cursor)
+        data = json.dumps(regs, ensure_ascii=False)
+        return Response(data, status=200, mimetype='application/json')
+    except Exception as error:
+        print(error, file=sys.stderr)
+        return Response("Error: " + str(error), status=500)
+
 
 
 @app.route('/register', methods=['POST'])
@@ -217,12 +223,15 @@ def register():
     if request.headers['Content-Type'] != "application/json":
         return Response(status=415)
 
-    json_data = request.get_json(force=True)
-    insert_record(json_data)
+    try:
+        json_data = request.get_json(force=True)
+        insert_record(json_data)
 
-    publish_new_bankruptcy(producer, json_data)
-    return Response(status=200)
-
+        publish_new_bankruptcy(producer, json_data)
+        return Response(status=200)
+    except Exception as error:
+        print(error, file=sys.stderr)
+        return Response("Error: " + str(error), status=500)
 
 
 
