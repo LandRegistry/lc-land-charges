@@ -12,3 +12,4 @@ cov-core==1.14.0
 coverage==3.7.1
 pytest-cov==1.8.0
 responses==0.3.0
+kombu==3.0.24

@@ -1,4 +1,5 @@
-from application import app
+from application import app, producer
+from application.exchange import setup_messaging, publish_new_bankruptcy
 from flask import Response, request
 import psycopg2
 import json
@@ -212,12 +213,14 @@ def retrieve():
 
 
 @app.route('/register', methods=['POST'])
-def dev():
+def register():
     if request.headers['Content-Type'] != "application/json":
         return Response(status=415)
 
     json_data = request.get_json(force=True)
     insert_record(json_data)
+
+    publish_new_bankruptcy(producer, json_data)
     return Response(status=200)
 
 
