@@ -341,7 +341,7 @@ def register():
         new_regns = insert_record(json_data)
 
         publish_new_bankruptcy(producer, new_regns)
-        return Response(status=200)
+        return Response(json.dumps({'new_registrations': new_regns}), status=200)
     except Exception as error:
         print(error, file=sys.stderr)
         return Response("Error: " + str(error), status=500)
