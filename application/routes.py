@@ -225,6 +225,8 @@ def get_registration_details(cursor, reg_no):
                    "from register r, register_details rd " +
                    "where r.registration_no = %(reg_no)s and r.details_id = rd.id", {'reg_no': reg_no})
     rows = cursor.fetchall()
+    if len(rows) == 0:
+        return None
     data = {
         'registration_no': rows[0][0],
         'registration_date': str(rows[0][2]),
@@ -255,7 +257,7 @@ def get_registration_details(cursor, reg_no):
 
     cursor.execute("select trading_name from party_trading where party_id = %(id)s", {'id': party_id})
     rows = cursor.fetchall()
-    if rows[0][0] is not None:
+    if len(rows) != 0:
         data['trading_name'] = rows[0][0]
 
     cursor.execute("select r.application_reference from request r, register_details d " +
@@ -291,12 +293,15 @@ def get_registration_details(cursor, reg_no):
     return data
 
 
-@app.route('/dev/<int:reg_no>', methods=['GET'])
-def dev(reg_no):
+@app.route('/registration/<int:reg_no>', methods=['GET'])
+def registration(reg_no):
     cursor = connect()
     d = get_registration_details(cursor, reg_no)
     complete(cursor)
-    return Response(json.dumps(d), status=200, mimetype='application/json')
+    if d is None:
+        return Response(status=404)
+    else:
+        return Response(json.dumps(d), status=200, mimetype='application/json')
 
 
 
