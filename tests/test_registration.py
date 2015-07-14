@@ -40,6 +40,7 @@ valid_data = open(os.path.join(dir, 'data/valid_data.json'), 'r').read()
 name_data = '{"forenames": "Bob Oscar Francis", "surname": "Howard"}'
 mock_connection = MockConnection([valid_data])
 mock_empty_connection = MockConnection([])
+mock_insert_connection = MockConnection(["50001", "50002"])
 
 class TestWorking:
     def setup_method(self, method):
@@ -73,7 +74,7 @@ class TestWorking:
         response = self.app.post('/register', data=valid_data, headers=headers)
         assert response.status_code == 415
 
-    @mock.patch('psycopg2.connect', return_value=mock_connection)
+    @mock.patch('psycopg2.connect', return_value=mock_insert_connection)
     @mock.patch('kombu.Producer.publish')
     def test_new_registration(self, mock_connect, mock_publish):
         headers = {'Content-Type': 'application/json'}

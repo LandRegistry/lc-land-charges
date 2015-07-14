@@ -26,7 +26,6 @@ def complete(cursor):
 
 
 def insert_address(cursor, address, address_type, party_id):
-    print(address)
     lines = address['address_lines'][0:4]   # First four lines
     remaining = ", ".join(address['address_lines'][4:])
     if remaining != '':
@@ -89,7 +88,8 @@ def insert_name(cursor, name, party_id, is_alias=False):
 
 def insert_registration(cursor, details_id, name_id):
     # Get the next registration number
-    cursor.execute("SELECT MAX(registration_no) FROM register")
+    cursor.execute("SELECT MAX(registration_no) FROM register", {})
+
     rows = cursor.fetchall()
     if rows[0][0] is None:
         reg_no = 50000
@@ -177,9 +177,9 @@ def insert_record(data):
         reg_no = insert_registration(cursor, register_details_id, name_id)
         reg_nos.append(reg_no)
 
-
     # TODO: audit-log not done. Not sure it belongs here?
     complete(cursor)
+
     return reg_nos
 
 
@@ -339,7 +339,6 @@ def register():
     try:
         json_data = request.get_json(force=True)
         new_regns = insert_record(json_data)
-
         publish_new_bankruptcy(producer, new_regns)
         return Response(json.dumps({'new_registrations': new_regns}), status=200)
     except Exception as error:
