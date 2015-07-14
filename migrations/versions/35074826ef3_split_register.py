@@ -1,14 +1,14 @@
-"""Actual Banks Database Part 1
+"""split register
 
-Revision ID: 49d005085d0
-Revises: 3caf1276395
-Create Date: 2015-07-03 11:54:26.787882
+Revision ID: 35074826ef3
+Revises: 31cae288f4e
+Create Date: 2015-07-13 11:51:48.169462
 
 """
 
 # revision identifiers, used by Alembic.
-revision = '49d005085d0'
-down_revision = '4166aee97e'
+revision = '35074826ef3'
+down_revision = None
 branch_labels = None
 depends_on = None
 
@@ -18,6 +18,7 @@ from sqlalchemy.dialects import postgresql
 
 
 def upgrade():
+    # FK constraints make it tricky to make this change. Therefore, burn the whole thing down and redo...
     op.create_table('party_name',
                     sa.Column('id', sa.Integer(), primary_key=True),
                     sa.Column('party_name', sa.Unicode()),
@@ -49,17 +50,30 @@ def upgrade():
                     sa.Column('ip_address', postgresql.INET()),
                     sa.Column('application_ref', sa.Integer()))
 
-    op.create_table('register',
+    op.create_table('register_details',
                     sa.Column('id', sa.Integer(), primary_key=True),
                     sa.Column('request_id', sa.Integer(), sa.ForeignKey('request.id')),
-                    sa.Column('registration_no', sa.String(), nullable=False),
                     sa.Column('registration_date', sa.Date(), nullable=False),
-                    sa.Column('application_type', sa.Enum('PAB', 'WOB', name='application_type_2')), #  TODO: this is a rubbish hack.
+                    sa.Column('application_type', sa.Enum('PAB', 'WOB', name='application_type_2')), #  TODO: this is a hack.
                     sa.Column('bankruptcy_date', sa.Date(), nullable=False))
+
+    op.create_table('register',
+                    sa.Column('id', sa.Integer(), primary_key=True),
+                    sa.Column('registration_no', sa.Integer(), nullable=False, unique=True),
+                    sa.Column('debtor_reg_name_id', sa.Integer(), sa.ForeignKey('party_name.id')),
+                    sa.Column('details_id', sa.Integer(), sa.ForeignKey('register_details.id'))
+                    )
+
+    op.create_table('migration_status',
+                    sa.Column('id', sa.Integer(), primary_key=True),
+                    sa.Column('register_id', sa.Integer(), sa.ForeignKey('register.id'), nullable=False),
+                    sa.Column('original_regn_no', sa.Integer()),
+                    sa.Column('migration_complete', sa.Boolean, nullable=False, default=False),
+                    sa.Column('extra_data', postgresql.JSON()))
 
     op.create_table('party',
                     sa.Column('id', sa.Integer(), primary_key=True),
-                    sa.Column('register_id', sa.Integer(), sa.ForeignKey('register.id'), nullable=False),
+                    sa.Column('register_detl_id', sa.Integer(), sa.ForeignKey('register_details.id'), nullable=False),
                     sa.Column('party_type', sa.Enum('Customer', 'Creditor', 'Debtor', name='party_type')),
                     sa.Column('occupation', sa.Unicode()),
                     sa.Column('date_of_birth', sa.Date()),
@@ -107,11 +121,14 @@ def downgrade():
     op.drop_table('party_trading')
     op.drop_table('party_name_rel')
     op.drop_table('party')
+    op.drop_table('migration_status')
     op.drop_table('register')
+    op.drop_table('register_details')
     op.drop_table('audit_log')
     op.drop_table('request')
     op.drop_table('ins_bankruptcy_request')
     op.drop_table('party_name')
+
     # At this point give up trying to delete the types in a database-agnostic manner and just issue DDL...
     op.execute("DROP TYPE address_type")
     op.execute("DROP TYPE activity")
