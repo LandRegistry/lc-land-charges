@@ -190,7 +190,7 @@ def get_registration_from_name(cursor, forenames, surname):
     if len(forenames) > 1:
         middle_name = " ".join(fn_list[1:])
 
-    cursor.execute("SELECT p.register_id " +
+    cursor.execute("SELECT p.register_detl_id " +
                    "FROM party_name n, party_name_rel pr, party p " +
                    "where n.alias_name=False and n.forename=%(forename)s and n.surname=%(surname)s " +
                    "and n.middle_names=%(midname)s and n.id = pr.party_name_id and pr.party_id = p.id",
