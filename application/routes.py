@@ -2,9 +2,11 @@ from application import app, producer
 from application.exchange import setup_messaging, publish_new_bankruptcy
 from flask import Response, request
 import psycopg2
+import psycopg2.extras
 import json
 import re
 import sys
+from log.logger import logger
 
 
 @app.route('/', methods=["GET"])
@@ -12,11 +14,11 @@ def index():
     return Response(status=200)
 
 
-def connect():
+def connect(cursor_factory=None):
     connection = psycopg2.connect("dbname='{}' user='{}' host='{}' password='{}'".format(
         app.config['DATABASE_NAME'], app.config['DATABASE_USER'], app.config['DATABASE_HOST'],
         app.config['DATABASE_PASSWORD']))
-    return connection.cursor()
+    return connection.cursor(cursor_factory=cursor_factory)
 
 
 def complete(cursor):
@@ -46,9 +48,11 @@ def insert_address(cursor, address, address_type, party_id):
         detail_id = cursor.fetchone()[0]
 
         address_string = "{}, {}".format(", ".join(address['address_lines']), address["postcode"])
-    else:
+    elif 'text' in address:
         address_string = address['text']
         detail_id = None
+    else:
+        raise Exception('Invalid address object')
 
     cursor.execute("INSERT INTO address (address_type, address_string, detail_id) " +
                    "VALUES( %(type)s, %(string)s, %(detail)s ) " +
@@ -231,49 +235,53 @@ def get_registration_from_name(cursor, forenames, surname):
     rows = cursor.fetchall()
     result = []
     for row in rows:
-        result.append(row[0])
+        result.append(row['register_detl_id'])
 
     return result
 
 
 def get_registration(cursor, reg_id):
-    cursor.execute("select registration_date, application_type, registration_no, bankruptcy_date " +
-                   "from register where id=%(id)s", {"id": reg_id})
+    cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
+                   "r.id as register_id from register r, register_details rd " +
+                   "where r.details_id = rd.id " +
+                   "and r.id=%(id)s", {'id': reg_id})
     rows = cursor.fetchall()
     row = rows[0]
+    print(row)
     result = {
-        "registration_date": str(row[0]),
-        "application_type": row[1],
-        "registration_no": row[2],
-        "bankruptcy_date": str(row[3])
+        "registration_date": str(row['registration_date']),
+        "application_type": row['application_type'],
+        "registration_no": row['registration_no'],
     }
     return result
 
 
 def get_registration_details(cursor, reg_no):
-    cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id " +
-                   "from register r, register_details rd " +
+    cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
+                   "r.id as register_id from register r, register_details rd " +
                    "where r.registration_no = %(reg_no)s and r.details_id = rd.id", {'reg_no': reg_no})
     rows = cursor.fetchall()
     if len(rows) == 0:
         return None
     data = {
-        'registration_no': rows[0][0],
-        'registration_date': str(rows[0][2]),
-        'application_type': rows[0][3]
+        'registration_no': rows[0]['registration_no'],
+        'registration_date': str(rows[0]['registration_date']),
+        'application_type': rows[0]['application_type']
     }
-    details_id = rows[0][4]
-    name_id = rows[0][1]
+    details_id = rows[0]['id']
+    name_id = rows[0]['debtor_reg_name_id']
+    register_id = rows[0]['register_id']
 
     cursor.execute("select forename, middle_names, surname from party_name where id = %(id)s", {'id': name_id})
     rows = cursor.fetchall()
-    data['debtor_name'] = {'forename': rows[0][0], 'middle_names': rows[0][1], 'surname': rows[0][2]}
+    forenames = [rows[0]['forename']] + rows[0]['middle_names'].split(" ")
+    data['debtor_name'] = {'forenames': forenames, 'surname': rows[0]['surname']}
 
     cursor.execute("select occupation, id from party where party_type='Debtor' and register_detl_id=%(id)s",
                    {'id': details_id})
     rows = cursor.fetchall()
-    data['occupation'] = rows[0][0]
-    party_id = rows[0][1]
+    data['occupation'] = rows[0]['occupation']
+    party_id = rows[0]['id']
 
     cursor.execute("select n.forename, n.middle_names, n.surname from party_name n, party_name_rel r " +
                    "where n.id = r.party_name_id and r.party_id = %(party_id)s and n.id != %(id)s ",
@@ -281,51 +289,68 @@ def get_registration_details(cursor, reg_no):
     rows = cursor.fetchall()
     data['debtor_alias'] = []
     for row in rows:
+        forenames = [row['forename']] + row['middle_names'].split(" ")
         data['debtor_alias'].append({
-            'forename': row[0], 'middle_names': row[1], 'surname': row[2]
+            'forename': forenames, 'surname': row['surname']
         })
 
     cursor.execute("select trading_name from party_trading where party_id = %(id)s", {'id': party_id})
     rows = cursor.fetchall()
     if len(rows) != 0:
-        data['trading_name'] = rows[0][0]
+        data['trading_name'] = rows[0]['trading_name']
 
     cursor.execute("select r.application_reference from request r, register_details d " +
                    "where r.id = d.request_id and d.id = %(id)s", {'id': details_id})
     rows = cursor.fetchall()
-    data['application_ref'] = rows[0][0]
+    data['application_ref'] = rows[0]['application_reference']
 
-    cursor.execute("select a.line_1, a.line_2, a.line_3, a.line_4, a.line_5, a.line_6, d.address_type " +
-                   "from address_detail a, address d, party_address pa " +
-                   "where d.address_type = 'Debtor Residence' and  a.id = d.detail_id " +
-                   "and pa.address_id = d.detail_id and pa.party_id = %(id)s", {'id': party_id})
+    cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, a.address_string " +
+                   "from address a " +
+                   "left outer join address_detail d on a.detail_id = d.id " +
+                   "inner join party_address pa on a.id = pa.address_id " +
+                   "where a.address_type='Debtor Residence' and pa.party_id = %(id)s", {'id': party_id})
+
     rows = cursor.fetchall()
     data['residence'] = []
     for row in rows:
-        address = []
-        if row[0] != "":
-            address.append(row[0])
-        if row[1] != "":
-            address.append(row[1])
-        if row[2] != "":
-            address.append(row[2])
-        if row[3] != "":
-            address.append(row[3])
-        if row[4] != "":
-            address.append(row[4])
-        if row[5] != "":
-            address.append(row[5])
+        if row['line_1'] is None:  # Unstructured address stored as text
+            text = row['address_string']
+            data['residence'].append({'text': text})
 
-        data['residence'].append({
-            'address_lines': address
-        })
+        else:
+            address = []
+            if row['line_1'] != "":
+                address.append(row[0])
+            if row['line_2'] != "":
+                address.append(row[1])
+            if row['line_3'] != "":
+                address.append(row[2])
+            if row['line_4'] != "":
+                address.append(row[3])
+            if row['line_5'] != "":
+                address.append(row[4])
+            if row['line_6'] != "":
+                address.append(row[5])
+
+            data['residence'].append({
+                'address_lines': address
+            })
+
+    cursor.execute("SELECT original_regn_no, extra_data FROM migration_status WHERE register_id=%(id)s",
+                   {'id': register_id})
+    rows = cursor.fetchall()
+    if len(rows) > 0:
+        data['legacy'] = {
+            'original_registration': rows[0]['original_regn_no'],
+            'extra': rows[0]['extra_data']
+        }
 
     return data
 
 
 @app.route('/registration/<int:reg_no>', methods=['GET'])
 def registration(reg_no):
-    cursor = connect()
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     d = get_registration_details(cursor, reg_no)
     complete(cursor)
     if d is None:
@@ -337,31 +362,31 @@ def registration(reg_no):
 @app.route('/search', methods=['POST'])
 def retrieve():
     if request.headers['Content-Type'] != "application/json":
+        logger.error('Content-Type is not JSON')
         return Response(status=415)
 
     try:
-        cursor = connect()
+        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         data = request.get_json(force=True)
         reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'])
-
         if len(reg_ids) == 0:
             return Response(status=404)
 
         regs = []
         for reg_id in reg_ids:
             regs.append(get_registration(cursor, reg_id))
-
         complete(cursor)
         data = json.dumps(regs, ensure_ascii=False)
         return Response(data, status=200, mimetype='application/json')
     except Exception as error:
-        print(error, file=sys.stderr)
+        logger.error(error)
         return Response("Error: " + str(error), status=500)
 
 
 @app.route('/register', methods=['POST'])
 def register():
     if request.headers['Content-Type'] != "application/json":
+        logger.error('Content-Type is not JSON')
         return Response(status=415)
 
     try:
@@ -370,29 +395,19 @@ def register():
         publish_new_bankruptcy(producer, new_regns)
         return Response(json.dumps({'new_registrations': new_regns}), status=200)
     except Exception as error:
-        print(error, file=sys.stderr)
-        print(dir(error))
-        print(sys.exc_info())
-
-        exc_type, exc_obj, tb = sys.exc_info()
-        f = tb.tb_frame
-        lineno = tb.tb_lineno
-        filename = f.f_code.co_filename
-        print(filename, lineno)
-
-
+        logger.error(error)
         return Response("Error: " + str(error), status=500)
 
 
-@app.route('/registration', methods=['POST'])
+@app.route('/migrated_record', methods=['POST'])
 def insert():
     if request.headers['Content-Type'] != "application/json":
+        logger.error('Content-Type is not JSON')
         return Response(status=415)
 
     try:
         data = request.get_json(force=True)
 
-        # request -> application_reference
         app_type = re.sub(r"\(|\)", "", data["application_type"])
         cursor = connect()
 
@@ -401,10 +416,8 @@ def insert():
         party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
         name_id = insert_name(cursor, data['debtor_name'], party_id)
 
-        # TODO: migrator seems to jam it all into line 1. Let's do something different to be distinct
-        #       Here, we'll assume it looks like "residence": [ {"text": "blah"} ]
         for address in data['residence']:
-            insert_address(cursor, {"text": address['text']}, "Debtor Residence", party_id)
+            insert_address(cursor, address, "Debtor Residence", party_id)
 
         registration_no, registration_id = insert_registration(cursor, details_id, name_id)
         insert_migration_status(cursor, registration_id, data['migration_data']['registration_no'],
@@ -414,55 +427,6 @@ def insert():
         return Response(json.dumps({'new_registrations': [registration_no]}), status=200)
 
     except Exception as error:
-        print(error, file=sys.stderr)
+        logger.error(error)
         return Response("Error: " + str(error), status=500)
 
-
-
-
-        # migration_status -> additional_data
-
-
-        # def insert_address(cursor, address, address_type, party_id):
-        # def insert_register_details(cursor, request_id, date, application_type):
-        # def insert_request(cursor, key_number, application_type, reference, date, insolvency_id):
-
-
-# Also, have a bit of a restructure
-
-
-#
-# application_type
-# application_ref
-# date
-# debtor_name { forenames :[], surname }
-# occupation <blank>
-# residence {structured or not}
-# additional_data {
-#     registration_no: <num>
-#     extra: {}
-# }
-
-
-
-
-
-
-
-    #     registration = {
-    #     "key_number": "2244095",
-    #     "application_type": rows['class_type'],
-    #     "application_ref": " ",
-    #     "date": rows['registration_date'],
-    #     "debtor_name": {
-    #         "forenames": forenames,
-    #         "surname": surname
-    #     },
-    #     "debtor_alternative_name": [],
-    #     "occupation": rows['occupation'],
-    #     "residence": addresses,
-    #     "residence_withheld": False,
-    #     "date_of_birth": "1975-10-07",
-    #     "investment_property": []
-    # }
-    pass
