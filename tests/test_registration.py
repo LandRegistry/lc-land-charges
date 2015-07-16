@@ -2,13 +2,14 @@ from unittest import mock
 from application.routes import app
 import os
 import json
+import datetime
 
 
 class MockConnection:
     def __init__(self, results):
         self.results = results
 
-    def cursor(self):
+    def cursor(self, cursor_factory=None):
         return MockCursor(self.results, self)
 
     def commit(self):
@@ -35,12 +36,18 @@ class MockCursor:
     def fetchone(self):
         return [1]
 
-dir = os.path.dirname(__file__)
-valid_data = open(os.path.join(dir, 'data/valid_data.json'), 'r').read()
+directory = os.path.dirname(__file__)
+valid_data = open(os.path.join(directory, 'data/valid_data.json'), 'r').read()
+migration_data = open(os.path.join(directory, 'data/migrator.json'), 'r').read()
 name_data = '{"forenames": "Bob Oscar Francis", "surname": "Howard"}'
 mock_connection = MockConnection([valid_data])
 mock_empty_connection = MockConnection([])
 mock_insert_connection = MockConnection(["50001", "50002"])
+mock_migrate_connection = MockConnection(["50001"])
+
+search_data = [{"register_detl_id": 1, "registration_date": datetime.date(2005, 12, 2), "application_type": "PAB",
+                "registration_no": "50135"}]
+mock_search_connection = MockConnection(search_data)
 
 class TestWorking:
     def setup_method(self, method):
@@ -50,7 +57,7 @@ class TestWorking:
         response = self.app.get("/")
         assert response.status_code == 200
 
-    @mock.patch('psycopg2.connect', return_value=mock_connection)
+    @mock.patch('psycopg2.connect', return_value=mock_search_connection)
     def test_item_found(self, mock_connect):
         headers = {'Content-Type': 'application/json'}
         response = self.app.post('/search', data=name_data, headers=headers)
@@ -93,3 +100,19 @@ class TestWorking:
         headers = {'Content-Type': 'application/json'}
         response = self.app.post('/search', data=name_data, headers=headers)
         assert response.status_code == 500
+
+    @mock.patch('psycopg2.connect', return_value=mock_migrate_connection)
+    def test_migration_success(self, mc):
+        headers = {'Content-Type': 'application/json'}
+        response = self.app.post('/migrated_record', data=migration_data, headers=headers)
+        assert response.status_code == 200
+
+    @mock.patch('psycopg2.connect', return_value=mock_migrate_connection)
+    def test_migration_invalid(self, mc):
+        headers = {'Content-Type': 'application/json'}
+        response = self.app.post('/migrated_record', data='{"cheese": "brie"}', headers=headers)
+        assert response.status_code == 400
+        pass
+
+    def test_get_registration(self):
+        pass
