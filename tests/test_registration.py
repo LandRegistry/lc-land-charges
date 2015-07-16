@@ -44,6 +44,22 @@ mock_connection = MockConnection([valid_data])
 mock_empty_connection = MockConnection([])
 mock_insert_connection = MockConnection(["50001", "50002"])
 mock_migrate_connection = MockConnection(["50001"])
+mock_query_connection = MockConnection([{"registration_no": "50000", "registration_date": "2012-08-09",
+                                         "application_type": "PAB", "id": "56", "debtor_reg_name_id": "12",
+                                         "forename": "Bob", "register_id": "2",
+                                         "middle_names": "Oscar Francis",
+                                         "surname": "Howard",
+                                         "occupation": "Civil Servant",
+                                         "trading_name": "Bob",
+                                         "application_reference": "123456789",
+                                         "line_1": "123 The Street",
+                                         "line_2": "Somewhere",
+                                         "line_3": "",
+                                         "line_4": "",
+                                         "line_5": "",
+                                         "line_6": "",
+                                         "original_regn_no": "7",
+                                         "extra_data": {}}])
 
 search_data = [{"register_detl_id": 1, "registration_date": datetime.date(2005, 12, 2), "application_type": "PAB",
                 "registration_no": "50135"}]
@@ -112,7 +128,10 @@ class TestWorking:
         headers = {'Content-Type': 'application/json'}
         response = self.app.post('/migrated_record', data='{"cheese": "brie"}', headers=headers)
         assert response.status_code == 400
-        pass
 
-    def test_get_registration(self):
-        pass
+    @mock.patch('psycopg2.connect', return_value=mock_query_connection)
+    def test_get_registration(self, mc):
+        response = self.app.get("/registration/50000")
+        data = json.loads(response.data.decode('utf-8'))
+        assert data['debtor_name']['surname'] == 'Howard'
+        # TODO: test several other fields
