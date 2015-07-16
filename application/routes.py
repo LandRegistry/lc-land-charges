@@ -7,7 +7,8 @@ import json
 import re
 import sys
 from log.logger import logger
-
+from jsonschema import validate
+from jsonschema.exceptions import ValidationError
 
 @app.route('/', methods=["GET"])
 def index():
@@ -320,17 +321,17 @@ def get_registration_details(cursor, reg_no):
         else:
             address = []
             if row['line_1'] != "":
-                address.append(row[0])
+                address.append(row['line_1'])
             if row['line_2'] != "":
-                address.append(row[1])
+                address.append(row['line_2'])
             if row['line_3'] != "":
-                address.append(row[2])
+                address.append(row['line_3'])
             if row['line_4'] != "":
-                address.append(row[3])
+                address.append(row['line_4'])
             if row['line_5'] != "":
-                address.append(row[4])
+                address.append(row['line_5'])
             if row['line_6'] != "":
-                address.append(row[5])
+                address.append(row['line_6'])
 
             data['residence'].append({
                 'address_lines': address
@@ -399,6 +400,33 @@ def register():
         return Response("Error: " + str(error), status=500)
 
 
+migrated_schema = {
+    "type": "object",
+    "properties": {
+        "application_type": {"type": "string"},
+        "application_ref": {"type": "string"},
+        "date": {"type": "string", "pattern": "^([0-9]{4}-[0-9]{2}-[0-9]{2})$"},
+        "debtor_name": {
+            "type": "object",
+            "properties": {
+                "forenames": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1
+                },
+                "surname": {"type": "string"}
+            },
+            "required": ["forenames", "surname"]
+        },
+        "occupation": {"type": "string"},
+        "residence": {
+            "type": "array",
+            "items": {"type": "object"}
+        }
+    },
+    "required": ["application_type", "application_ref", "date", "debtor_name", "residence"]
+}
+
 @app.route('/migrated_record', methods=['POST'])
 def insert():
     if request.headers['Content-Type'] != "application/json":
@@ -407,6 +435,11 @@ def insert():
 
     try:
         data = request.get_json(force=True)
+        try:
+            validate(data, migrated_schema)
+        except ValidationError as error:
+            message = "{}\n{}".format(error.message, error.path)
+            return Response(message, status=400)
 
         app_type = re.sub(r"\(|\)", "", data["application_type"])
         cursor = connect()
