@@ -26,25 +26,30 @@ def complete(cursor):
 
 
 def insert_address(cursor, address, address_type, party_id):
-    lines = address['address_lines'][0:4]   # First four lines
-    remaining = ", ".join(address['address_lines'][4:])
-    if remaining != '':
-        lines.append(remaining)             # Remaining lines into 5th line
-    lines.append(address['postcode'])       # Postcode in the last
+    if 'address_lines' in address:
+        lines = address['address_lines'][0:4]   # First four lines
+        remaining = ", ".join(address['address_lines'][4:])
+        if remaining != '':
+            lines.append(remaining)             # Remaining lines into 5th line
+        lines.append(address['postcode'])       # Postcode in the last
 
-    while len(lines) < 6:
-        lines.append("")                    # Pad to 6 lines for avoidance of horrible if statements later
+        while len(lines) < 6:
+            lines.append("")                    # Pad to 6 lines for avoidance of horrible if statements later
 
-    cursor.execute("INSERT INTO address_detail ( line_1, line_2, line_3, line_4, line_5, line_6 ) " +
-                   "VALUES( %(line1)s, %(line2)s, %(line3)s, %(line4)s, %(line5)s, %(line6)s ) " +
-                   "RETURNING id",
-                   {
-                       "line1": lines[0], "line2": lines[1], "line3": lines[2],
-                       "line4": lines[3], "line5": lines[4], "line6": lines[5],
-                   })
-    detail_id = cursor.fetchone()[0]
+        cursor.execute("INSERT INTO address_detail ( line_1, line_2, line_3, line_4, line_5, line_6 ) " +
+                       "VALUES( %(line1)s, %(line2)s, %(line3)s, %(line4)s, %(line5)s, %(line6)s ) " +
+                       "RETURNING id",
+                       {
+                           "line1": lines[0], "line2": lines[1], "line3": lines[2],
+                           "line4": lines[3], "line5": lines[4], "line6": lines[5],
+                       })
+        detail_id = cursor.fetchone()[0]
 
-    address_string = "{}, {}".format(", ".join(address['address_lines']), address["postcode"])
+        address_string = "{}, {}".format(", ".join(address['address_lines']), address["postcode"])
+    else:
+        address_string = address['text']
+        detail_id = None
+
     cursor.execute("INSERT INTO address (address_type, address_string, detail_id) " +
                    "VALUES( %(type)s, %(string)s, %(detail)s ) " +
                    "RETURNING id",
@@ -98,13 +103,58 @@ def insert_registration(cursor, details_id, name_id):
 
     # Cap it all off with the actual legal "one registration per name":
     cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id) " +
-                   "VALUES( %(regno)s, %(debtor)s, %(details)s )",
+                   "VALUES( %(regno)s, %(debtor)s, %(details)s ) RETURNING id",
                    {
                        "regno": reg_no,
                        "debtor": name_id,
                        "details": details_id
                    })
-    return reg_no
+    id = cursor.fetchone()[0]
+    return reg_no, id
+
+
+def insert_register_details(cursor, request_id, date, application_type):
+    cursor.execute("INSERT INTO register_details (request_id, registration_date, application_type, " +
+                   "bankruptcy_date) " +
+                   "VALUES ( %(req_id)s, %(reg_date)s, %(app_type)s, %(bank_date)s ) " +
+                   "RETURNING id",
+                   {
+                       "req_id": request_id, "reg_date": date,
+                       "app_type": application_type, "bank_date": date
+                   })   # TODO: Seems probable we won't need both dates
+    return cursor.fetchone()[0]
+
+
+def insert_request(cursor, key_number, application_type, reference, date, insolvency_id):
+    cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
+                   "ins_request_id) " +
+                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s ) RETURNING id",
+                   {
+                       "key": key_number, "app_type": application_type, "app_ref": reference,
+                       "app_date": date, "ins_id": insolvency_id
+                   })
+    return cursor.fetchone()[0]
+
+
+def insert_party(cursor, details_id, party_type, occupation, date_of_birth, residence_withheld):
+    cursor.execute("INSERT INTO party (register_detl_id, party_type, occupation, date_of_birth, residence_withheld) " +
+                   "VALUES( %(reg_id)s, %(type)s, %(occupation)s, %(dob)s, %(rw)s ) RETURNING id",
+                   {
+                       "reg_id": details_id, "type": party_type, "occupation": occupation,
+                       "dob": date_of_birth, "rw": residence_withheld
+                   })
+    return cursor.fetchone()[0]
+
+
+def insert_migration_status(cursor, register_id, registration_number, additional_data):
+    cursor.execute("INSERT INTO migration_status (register_id, original_regn_no, migration_complete, extra_data ) " +
+                   "VALUES( %(register_id)s, %(reg_no)s, True, %(extra)s ) RETURNING id",
+                   {
+                       "register_id": register_id,
+                       "reg_no": registration_number,
+                       "extra": json.dumps(additional_data)
+                   })
+    return cursor.fetchone()[0]
 
 
 def insert_record(data):
@@ -118,35 +168,15 @@ def insert_record(data):
     app_type = re.sub(r"\(|\)", "", data["application_type"])
 
     # request
-    cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
-                   "ins_request_id) " +
-                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s ) RETURNING id",
-                   {
-                       "key": data["key_number"], "app_type": app_type,
-                       "app_ref": data["application_ref"], "app_date": data["date"], "ins_id": ins_request_id
-                   })
-    request_id = cursor.fetchone()[0]
+    request_id = insert_request(cursor, data['key_number'], app_type, data['application_ref'], data['date'],
+                                ins_request_id)
 
     # register details
-    cursor.execute("INSERT INTO register_details (request_id, registration_date, application_type, " +
-                   "bankruptcy_date) " +
-                   "VALUES ( %(req_id)s, %(reg_date)s, %(app_type)s, %(bank_date)s ) " +
-                   "RETURNING id",
-                   {
-                       "req_id": request_id, "reg_date": data["date"],
-                       "app_type": app_type, "bank_date": data["date"]
-                   })   # TODO: dates being the same is wrong; reg_no probably shouldn't be 7...
-                        # Seems probable we won't need both dates
-    register_details_id = cursor.fetchone()[0]
+    register_details_id = insert_register_details(cursor, request_id, data['date'], app_type)
 
     # party
-    cursor.execute("INSERT INTO party (register_detl_id, party_type, occupation, date_of_birth, residence_withheld) " +
-                   "VALUES( %(reg_id)s, %(type)s, %(occupation)s, %(dob)s, %(rw)s ) RETURNING id",
-                   {
-                       "reg_id": register_details_id, "type": "Debtor", "occupation": data["occupation"],
-                       "dob": data["date_of_birth"], "rw": data["residence_withheld"]
-                   })
-    party_id = cursor.fetchone()[0]
+    party_id = insert_party(cursor, register_details_id, "Debtor", data['occupation'], data['date_of_birth'],
+                            data['residence_withheld'])
 
     # party_address, address, address_detail
     if 'residence' in data:
@@ -174,7 +204,7 @@ def insert_record(data):
     # insert_registration(cursor, details_id, name_id)
     reg_nos = []
     for name_id in name_ids:
-        reg_no = insert_registration(cursor, register_details_id, name_id)
+        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id)
         reg_nos.append(reg_no)
 
     # TODO: audit-log not done. Not sure it belongs here?
@@ -304,7 +334,6 @@ def registration(reg_no):
         return Response(json.dumps(d), status=200, mimetype='application/json')
 
 
-
 @app.route('/search', methods=['POST'])
 def retrieve():
     if request.headers['Content-Type'] != "application/json":
@@ -330,7 +359,6 @@ def retrieve():
         return Response("Error: " + str(error), status=500)
 
 
-
 @app.route('/register', methods=['POST'])
 def register():
     if request.headers['Content-Type'] != "application/json":
@@ -343,7 +371,98 @@ def register():
         return Response(json.dumps({'new_registrations': new_regns}), status=200)
     except Exception as error:
         print(error, file=sys.stderr)
+        print(dir(error))
+        print(sys.exc_info())
+
+        exc_type, exc_obj, tb = sys.exc_info()
+        f = tb.tb_frame
+        lineno = tb.tb_lineno
+        filename = f.f_code.co_filename
+        print(filename, lineno)
+
+
+        return Response("Error: " + str(error), status=500)
+
+
+@app.route('/registration', methods=['POST'])
+def insert():
+    if request.headers['Content-Type'] != "application/json":
+        return Response(status=415)
+
+    try:
+        data = request.get_json(force=True)
+
+        # request -> application_reference
+        app_type = re.sub(r"\(|\)", "", data["application_type"])
+        cursor = connect()
+
+        request_id = insert_request(cursor, None, app_type, data['application_ref'], data['date'], None)
+        details_id = insert_register_details(cursor, request_id, data['date'], app_type)
+        party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
+        name_id = insert_name(cursor, data['debtor_name'], party_id)
+
+        # TODO: migrator seems to jam it all into line 1. Let's do something different to be distinct
+        #       Here, we'll assume it looks like "residence": [ {"text": "blah"} ]
+        for address in data['residence']:
+            insert_address(cursor, {"text": address['text']}, "Debtor Residence", party_id)
+
+        registration_no, registration_id = insert_registration(cursor, details_id, name_id)
+        insert_migration_status(cursor, registration_id, data['migration_data']['registration_no'],
+                                data['migration_data']['extra'])
+
+        complete(cursor)
+        return Response(json.dumps({'new_registrations': [registration_no]}), status=200)
+
+    except Exception as error:
+        print(error, file=sys.stderr)
         return Response("Error: " + str(error), status=500)
 
 
 
+
+        # migration_status -> additional_data
+
+
+        # def insert_address(cursor, address, address_type, party_id):
+        # def insert_register_details(cursor, request_id, date, application_type):
+        # def insert_request(cursor, key_number, application_type, reference, date, insolvency_id):
+
+
+# Also, have a bit of a restructure
+
+
+#
+# application_type
+# application_ref
+# date
+# debtor_name { forenames :[], surname }
+# occupation <blank>
+# residence {structured or not}
+# additional_data {
+#     registration_no: <num>
+#     extra: {}
+# }
+
+
+
+
+
+
+
+    #     registration = {
+    #     "key_number": "2244095",
+    #     "application_type": rows['class_type'],
+    #     "application_ref": " ",
+    #     "date": rows['registration_date'],
+    #     "debtor_name": {
+    #         "forenames": forenames,
+    #         "surname": surname
+    #     },
+    #     "debtor_alternative_name": [],
+    #     "occupation": rows['occupation'],
+    #     "residence": addresses,
+    #     "residence_withheld": False,
+    #     "date_of_birth": "1975-10-07",
+    #     "investment_property": []
+    # }
+    pass
