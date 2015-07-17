@@ -275,7 +275,9 @@ def get_registration_details(cursor, reg_no):
 
     cursor.execute("select forename, middle_names, surname from party_name where id = %(id)s", {'id': name_id})
     rows = cursor.fetchall()
-    forenames = [rows[0]['forename']] + rows[0]['middle_names'].split(" ")
+    forenames = [rows[0]['forename']]
+    if rows[0]['middle_names'] != "":
+        forenames += rows[0]['middle_names'].split(" ")
     data['debtor_name'] = {'forenames': forenames, 'surname': rows[0]['surname']}
 
     cursor.execute("select occupation, id from party where party_type='Debtor' and register_detl_id=%(id)s",
@@ -290,9 +292,11 @@ def get_registration_details(cursor, reg_no):
     rows = cursor.fetchall()
     data['debtor_alias'] = []
     for row in rows:
-        forenames = [row['forename']] + row['middle_names'].split(" ")
+        forenames = [row['forename']]
+        if row['middle_names'] != "":
+            forenames += row['middle_names'].split(" ")
         data['debtor_alias'].append({
-            'forename': forenames, 'surname': row['surname']
+            'forenames': forenames, 'surname': row['surname']
         })
 
     cursor.execute("select trading_name from party_trading where party_id = %(id)s", {'id': party_id})
