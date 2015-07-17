@@ -101,8 +101,9 @@ end
 Then(/^the data is recorded on DB2$/) do
 	sleep(1)
 	PostgreSQL.connect('db2')
-	registration_api.data["new_registrations"].each do |reg_no|		
-		result = PostgreSQL.query("SELECT * FROM lc_mock WHERE registration_no='#{reg_no}'")
+	registration_api.data["new_registrations"].each do |reg_no|
+		reg_str = reg_no.to_s.rjust(8)
+		result = PostgreSQL.query("SELECT * FROM lc_mock WHERE registration_no='#{reg_str}'")
 		expect(result.values.length).to eq 1		
 	end
 	PostgreSQL.disconnect
