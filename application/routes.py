@@ -227,10 +227,10 @@ def get_registration_from_name(cursor, forenames, surname):
 
     cursor.execute("SELECT p.register_detl_id " +
                    "FROM party_name n, party_name_rel pr, party p " +
-                   "where n.alias_name=False and n.forename=%(forename)s and n.surname=%(surname)s " +
-                   "and n.middle_names=%(midname)s and n.id = pr.party_name_id and pr.party_id = p.id",
+                   "where n.alias_name=False and UPPER(n.forename)=%(forename)s and UPPER(n.surname)=%(surname)s " +
+                   "and UPPER(n.middle_names)=%(midname)s and n.id = pr.party_name_id and pr.party_id = p.id",
                    {
-                       'forename': forename, 'midname': middle_name, 'surname': surname
+                       'forename': forename.upper(), 'midname': middle_name.upper(), 'surname': surname.upper()
                    })
 
     rows = cursor.fetchall()
@@ -248,13 +248,24 @@ def get_registration(cursor, reg_id):
                    "and r.id=%(id)s", {'id': reg_id})
     rows = cursor.fetchall()
     row = rows[0]
-    print(row)
     result = {
         "registration_date": str(row['registration_date']),
         "application_type": row['application_type'],
         "registration_no": row['registration_no'],
     }
     return result
+
+
+def get_new_registration_number(cursor, db2_reg_no):
+    cursor.execute("select r.registration_no from register r, migration_status ms where r.id = ms.id"
+                   " and ms.original_regn_no = %(reg_no)s", {'reg_no': db2_reg_no})
+    rows = cursor.fetchall()
+    # row = rows[0]
+    reg_nos = []
+    for n in rows:
+        reg_nos.append(n['registration_no'])
+
+    return reg_nos
 
 
 def get_registration_details(cursor, reg_no):
@@ -364,6 +375,24 @@ def registration(reg_no):
         return Response(json.dumps(d), status=200, mimetype='application/json')
 
 
+@app.route('/migrated_registration/<int:db2_reg_no>', methods=['GET'])
+def migrated_registration(db2_reg_no):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    new_reg_no = get_new_registration_number(cursor, db2_reg_no)
+
+    registrations = []
+    for n in new_reg_no:
+        registrations.append(get_registration_details(cursor, n))
+
+    complete(cursor)
+
+    if len(registrations) > 0:
+        return Response(json.dumps(registrations), status=200, mimetype='application/json')
+    else:
+        return Response(status=404)
+
+
+
 @app.route('/search', methods=['POST'])
 def retrieve():
     if request.headers['Content-Type'] != "application/json":
@@ -373,6 +402,7 @@ def retrieve():
     try:
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         data = request.get_json(force=True)
+
         reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'])
         if len(reg_ids) == 0:
             return Response(status=404)
