@@ -434,6 +434,19 @@ def register():
         return Response("Error: " + str(error), status=500)
 
 
+# Route exists purely for testing purposes - need to get something invalid onto
+# the synchroniser's queue!
+@app.route('/synchronise', methods=["POST"])
+def synchronise():
+    if request.headers['Content-Type'] != "application/json":
+        logger.error('Content-Type is not JSON')
+        return Response(status=415)
+
+    json_data = request.get_json(force=True)
+    publish_new_bankruptcy(producer, json_data)
+    return Response(status=200)
+
+
 migrated_schema = {
     "type": "object",
     "properties": {
