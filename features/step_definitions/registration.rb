@@ -24,12 +24,23 @@ class RestAPI
         @http = Net::HTTP.new(@uri.host, @uri.port)
     end
     
-    def post_data(url, data)    
+    def post_data(url, data)
+		puts(data)
         request = Net::HTTP::Post.new(url)
         request.body = data
         request["Content-Type"] = "application/json"
         @response = @http.request(request)
-        @data = JSON.parse(@response.body)
+        if @response.body == ""
+			nil
+        else
+			@data = JSON.parse(@response.body)
+		end
+    end
+    
+    def get_data(url)
+		request = Net::HTTP::Get.new(url)
+		@response = @http.request(request)
+		@data = JSON.parse(@response.body)
     end
 end
 
@@ -138,4 +149,21 @@ Then(/^the class of bankruptcy is correctly recorded$/) do
 		expect(row[0]).to eq "PA(B)"
 	end
 	PostgreSQL.disconnect  
+end
+
+Given(/^I have registered a bankruptcy$/) do
+end
+
+When(/^Invalid registration numbers are sent to the synchroniser$/) do
+	registration_api = RestAPI.new("http://localhost:5004")
+	registration_api.post_data("/synchronise", '["42"]')
+	sleep(1)
+end
+
+Then(/^it posts an error message to its error queue$/) do
+	error_api = RestAPI.new("http://localhost:5008")
+	result = error_api.get_data("/queue/error").last
+	expect(result['registration_no']).to eq '42'
+	expect(result['status_code']).to eq 404
+	expect(result['uri']).to eq '/registration'	
 end
