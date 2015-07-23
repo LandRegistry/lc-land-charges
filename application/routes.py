@@ -6,7 +6,8 @@ import psycopg2.extras
 import json
 import re
 import sys
-from log.logger import logger
+import logging
+#from log.logger import logger
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 
@@ -366,10 +367,12 @@ def get_registration_details(cursor, reg_no):
 
 @app.route('/registration/<int:reg_no>', methods=['GET'])
 def registration(reg_no):
+    logging.debug("GET registration")
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     d = get_registration_details(cursor, reg_no)
     complete(cursor)
     if d is None:
+        logging.warning("Returning 404")
         return Response(status=404)
     else:
         return Response(json.dumps(d), status=200, mimetype='application/json')
@@ -396,7 +399,7 @@ def migrated_registration(db2_reg_no):
 @app.route('/search', methods=['POST'])
 def retrieve():
     if request.headers['Content-Type'] != "application/json":
-        logger.error('Content-Type is not JSON')
+        logging.error('Content-Type is not JSON')
         return Response(status=415)
 
     try:
@@ -414,14 +417,14 @@ def retrieve():
         data = json.dumps(regs, ensure_ascii=False)
         return Response(data, status=200, mimetype='application/json')
     except Exception as error:
-        logger.error(error)
+        logging.error(error)
         return Response("Error: " + str(error), status=500)
 
 
 @app.route('/register', methods=['POST'])
 def register():
     if request.headers['Content-Type'] != "application/json":
-        logger.error('Content-Type is not JSON')
+        logging.error('Content-Type is not JSON')
         return Response(status=415)
 
     try:
@@ -430,7 +433,7 @@ def register():
         publish_new_bankruptcy(producer, new_regns)
         return Response(json.dumps({'new_registrations': new_regns}), status=200)
     except Exception as error:
-        logger.error(error)
+        logging.error(error)
         return Response("Error: " + str(error), status=500)
 
 
@@ -439,7 +442,7 @@ def register():
 @app.route('/synchronise', methods=["POST"])
 def synchronise():
     if request.headers['Content-Type'] != "application/json":
-        logger.error('Content-Type is not JSON')
+        logging.error('Content-Type is not JSON')
         return Response(status=415)
 
     json_data = request.get_json(force=True)
@@ -477,7 +480,7 @@ migrated_schema = {
 @app.route('/migrated_record', methods=['POST'])
 def insert():
     if request.headers['Content-Type'] != "application/json":
-        logger.error('Content-Type is not JSON')
+        logging.error('Content-Type is not JSON')
         return Response(status=415)
 
     try:
@@ -507,6 +510,6 @@ def insert():
         return Response(json.dumps({'new_registrations': [registration_no]}), status=200)
 
     except Exception as error:
-        logger.error(error)
+        logging.error(error)
         return Response("Error: " + str(error), status=500)
 
