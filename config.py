@@ -5,7 +5,7 @@ class Config(object):
     DEBUG = False
 
 
-class DevelopmentConfig(object):
+class DevelopmentConfig(Config):
     DEBUG = True
     DATABASE_NAME = 'landcharges'
     DATABASE_USER = 'landcharges'
@@ -17,7 +17,7 @@ class DevelopmentConfig(object):
     MQ_PORT = '5672'
 
 
-class PreviewConfig(object):
+class PreviewConfig(Config):
     DEBUG = False
     DATABASE_NAME = 'landcharges'
     DATABASE_USER = 'landcharges'
