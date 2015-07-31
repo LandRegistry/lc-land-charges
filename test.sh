@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 export SETTINGS="config.DevelopmentConfig"
-py.test --cov application tests/ --cov-report=term --cov-report=html
+py.test --cov application tests/ --cov-report=term --cov-report=html --junit-xml=junit.xml
