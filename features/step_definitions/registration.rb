@@ -161,9 +161,10 @@ When(/^Invalid registration numbers are sent to the synchroniser$/) do
 end
 
 Then(/^it posts an error message to its error queue$/) do
-	error_api = RestAPI.new("http://localhost:5008")
-	result = error_api.get_data("/queue/error").last
-	expect(result['registration_no']).to eq '42'
-	expect(result['status_code']).to eq 404
-	expect(result['uri']).to eq '/registration'	
+	error_api = RestAPI.new("http://localhost:5006")
+	result = error_api.get_data("/errors").last
+	expect(result['source']).to eq 'Synchroniser'
+	expect(result['data']['registration_no']).to eq '42'
+	expect(result['data']['status_code']).to eq 404
+	expect(result['data']['uri']).to eq '/registration'
 end
