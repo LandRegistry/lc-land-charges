@@ -402,23 +402,23 @@ def retrieve():
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
-    #try:
-    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    data = request.get_json(force=True)
+    try:
+        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+        data = request.get_json(force=True)
 
-    reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'])
-    if len(reg_ids) == 0:
-        return Response(status=404)
+        reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'])
+        if len(reg_ids) == 0:
+            return Response(status=404)
 
-    regs = []
-    for reg_id in reg_ids:
-        regs.append(get_registration(cursor, reg_id))
-    complete(cursor)
-    data = json.dumps(regs, ensure_ascii=False)
-    return Response(data, status=200, mimetype='application/json')
-    #except Exception as error:
-    #    logging.error(error)
-    #    return Response("Error: " + str(error), status=500)
+        regs = []
+        for reg_id in reg_ids:
+            regs.append(get_registration(cursor, reg_id))
+        complete(cursor)
+        data = json.dumps(regs, ensure_ascii=False)
+        return Response(data, status=200, mimetype='application/json')
+    except Exception as error:
+        logging.error(error)
+        return Response("Error: " + str(error), status=500)
 
 
 @app.route('/register', methods=['POST'])

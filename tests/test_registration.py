@@ -61,7 +61,7 @@ mock_query_connection = MockConnection([{"registration_no": "50000", "registrati
                                          "original_regn_no": "7",
                                          "extra_data": {}}])
 
-search_data = [{"register_detl_id": 1, "registration_date": datetime.date(2005, 12, 2), "application_type": "PAB",
+search_data = [{"id": 1, "registration_date": datetime.date(2005, 12, 2), "application_type": "PAB",
                 "registration_no": "50135"}]
 mock_search_connection = MockConnection(search_data)
 
