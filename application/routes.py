@@ -226,10 +226,10 @@ def get_registration_from_name(cursor, forenames, surname):
     if len(forenames) > 1:
         middle_name = " ".join(fn_list[1:])
 
-    cursor.execute("SELECT p.register_detl_id " +
-                   "FROM party_name n, party_name_rel pr, party p " +
+    cursor.execute("SELECT r.id " +
+                   "FROM party_name n, register r " +
                    "where n.alias_name=False and UPPER(n.forename)=%(forename)s and UPPER(n.surname)=%(surname)s " +
-                   "and UPPER(n.middle_names)=%(midname)s and n.id = pr.party_name_id and pr.party_id = p.id",
+                   "and UPPER(n.middle_names)=%(midname)s and r.debtor_reg_name_id=n.id",
                    {
                        'forename': forename.upper(), 'midname': middle_name.upper(), 'surname': surname.upper()
                    })
@@ -237,7 +237,7 @@ def get_registration_from_name(cursor, forenames, surname):
     rows = cursor.fetchall()
     result = []
     for row in rows:
-        result.append(row['register_detl_id'])
+        result.append(row['id'])
 
     return result
 
@@ -258,7 +258,7 @@ def get_registration(cursor, reg_id):
 
 
 def get_new_registration_number(cursor, db2_reg_no):
-    cursor.execute("select r.registration_no from register r, migration_status ms where r.id = ms.id"
+    cursor.execute("select r.registration_no from register r, migration_status ms where r.id = ms.register_id"
                    " and ms.original_regn_no = %(reg_no)s", {'reg_no': db2_reg_no})
     rows = cursor.fetchall()
     # row = rows[0]
@@ -402,23 +402,23 @@ def retrieve():
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
-    try:
-        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-        data = request.get_json(force=True)
+    #try:
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    data = request.get_json(force=True)
 
-        reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'])
-        if len(reg_ids) == 0:
-            return Response(status=404)
+    reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'])
+    if len(reg_ids) == 0:
+        return Response(status=404)
 
-        regs = []
-        for reg_id in reg_ids:
-            regs.append(get_registration(cursor, reg_id))
-        complete(cursor)
-        data = json.dumps(regs, ensure_ascii=False)
-        return Response(data, status=200, mimetype='application/json')
-    except Exception as error:
-        logging.error(error)
-        return Response("Error: " + str(error), status=500)
+    regs = []
+    for reg_id in reg_ids:
+        regs.append(get_registration(cursor, reg_id))
+    complete(cursor)
+    data = json.dumps(regs, ensure_ascii=False)
+    return Response(data, status=200, mimetype='application/json')
+    #except Exception as error:
+    #    logging.error(error)
+    #    return Response("Error: " + str(error), status=500)
 
 
 @app.route('/register', methods=['POST'])
