@@ -1,0 +1,20 @@
+26|10318 Bill Crossing|Brakuston|Leopoldshire|Essex|UN48 7XX|""|
+27|4357 Hillard Springs|Buckridgemouth|Lothian|DU31 3JD|""|""|
+28|691 Swaniawski Branch|South Joel|Grampian|PQ63 3PW|""|""|
+29|7817 Osinski Path|Port Jerelfort|Somerset|XD16 9EF|""|""|
+30|926 Parisian Throughway|North Emmy|Wiltshire|CR75 8KI|""|""|
+31|69013 Emilie Vista|Schambergerview|Weberchester|Cleveland|LJ77 7EW|""|
+32|7574 Koelpin Springs|Port Lourdes|New Brandyn|Borders|UY88 2NT|""|
+33|916 Padberg Union|Emiliaview|Port Alexander|County Antrim|AD72 0ME|""|
+34|90248 Kaitlyn Dam|South Kira|West Gisselleville|Powys|SX47 3WK|""|
+35|49172 King Port|West Diamondmouth|Eunicefurt|Lothian|BB47 8BM|""|
+36|875 Libby Cliff|North Montana|Dorset|LQ45 8MD|""|""|
+37|81074 Edd Gateway|Port Valeriechester|Lancashire|AB13 9LW|""|""|
+38|422 Thompson Radial|West Hermannview|Grampian|FX91 6CS|""|""|
+39|7895 McKenzie Flat|Boganchester|Dorisville|Staffordshire|RR50 7GV|""|
+40|6088 Alex Villages|Bergeshire|Herefordshire|KK62 6QM|""|""|
+41|9687 Conroy Trail|New Pearlineborough|Lake Minerva|Tyne and Wear|RK42 5JD|""|
+42|1575 Runolfsdottir Lodge|Eddieville|Devon|SK25 8MS|""|""|
+43|76474 Schoen Summit|Sonnymouth|Metzport|Avon|IP76 6IA|""|
+44|27211 Breanne Fort|Luciouschester|Jaclynchester|Grampian|EF37 1YR|""|
+45|53179 Balistreri Villages|Auroremouth|County Londonderry|FT73 7LB|""|""|

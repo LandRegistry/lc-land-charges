@@ -1,0 +1,20 @@
+18|18|Debtor|||f
+19|19|Debtor|||f
+20|20|Debtor|||f
+21|21|Debtor|||f
+22|22|Debtor|||f
+23|23|Debtor|||f
+24|24|Debtor|||f
+25|25|Debtor|||f
+26|26|Debtor|||f
+27|27|Debtor|||f
+28|28|Debtor|Psychiatrist|1952-09-01|f
+29|29|Debtor|Interpreter|1978-07-04|f
+30|30|Debtor|Dental hygienist|1984-12-07|f
+31|31|Debtor|School meals supervisor|1996-01-11|f
+32|32|Debtor|Sailor|1965-10-04|f
+33|33|Debtor|Horticulturalist|1976-05-20|f
+34|34|Debtor|Caretaker|1993-07-14|f
+35|35|Debtor|Pathologist|1953-06-23|f
+36|36|Debtor|Butcher|1991-09-23|f
+37|37|Debtor|Refuse collector|1952-09-29|f
