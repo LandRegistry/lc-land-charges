@@ -22,5 +22,5 @@ def upgrade():
 
 
 def downgrade():
-    op.execute('ALTER TABLE address ALTER COLUMN detail_id SET NOT NULL')
+    #op.execute('ALTER TABLE address ALTER COLUMN detail_id SET NOT NULL')
     pass
