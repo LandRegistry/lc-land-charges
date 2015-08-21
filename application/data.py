@@ -107,14 +107,16 @@ def insert_registration(cursor, details_id, name_id):
     return reg_no, id
 
 
-def insert_register_details(cursor, request_id, date, application_type):
+def insert_register_details(cursor, request_id, date, application_type, legal_body, legal_body_ref):
     cursor.execute("INSERT INTO register_details (request_id, registration_date, application_type, " +
-                   "bankruptcy_date) " +
-                   "VALUES ( %(req_id)s, %(reg_date)s, %(app_type)s, %(bank_date)s ) " +
+                   "bankruptcy_date, legal_body, legal_body_ref) " +
+                   "VALUES ( %(req_id)s, %(reg_date)s, %(app_type)s, %(bank_date)s, " +
+                   " %(lbody)s, %(lbodyref)s ) " +
                    "RETURNING id",
                    {
                        "req_id": request_id, "reg_date": date,
-                       "app_type": application_type, "bank_date": date
+                       "app_type": application_type, "bank_date": date,
+                       "lbody": "", "lbodyref": ""
                    })   # TODO: Seems probable we won't need both dates
     return cursor.fetchone()[0]
 
@@ -166,7 +168,10 @@ def insert_record(data):
                                 ins_request_id)
 
     # register details
-    register_details_id = insert_register_details(cursor, request_id, data['date'], app_type)
+    legal_body = data["legal_body"] if "legal_body" in data else ""
+    legal_body_ref = data["legal_body_ref"] if "legal_body_ref" in data else ""
+    register_details_id = insert_register_details(cursor, request_id, data['date'], app_type,
+                                                  legal_body, legal_body_ref)
 
     # party
     party_id = insert_party(cursor, register_details_id, "Debtor", data['occupation'], data['date_of_birth'],
@@ -259,7 +264,7 @@ def get_new_registration_number(cursor, db2_reg_no):
 
 def get_registration_details(cursor, reg_no):
     cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
-                   "r.id as register_id from register r, register_details rd " +
+                   "r.id as register_id, rd.legal_body, rd.legal_body_ref from register r, register_details rd " +
                    "where r.registration_no = %(reg_no)s and r.details_id = rd.id", {'reg_no': reg_no})
     rows = cursor.fetchall()
     if len(rows) == 0:
@@ -267,7 +272,9 @@ def get_registration_details(cursor, reg_no):
     data = {
         'registration_no': rows[0]['registration_no'],
         'registration_date': str(rows[0]['registration_date']),
-        'application_type': rows[0]['application_type']
+        'application_type': rows[0]['application_type'],
+        'legal_body': rows[0]['legal_body'],
+        'legal_body_ref': rows[0]['legal_body_ref']
     }
     details_id = rows[0]['id']
     name_id = rows[0]['debtor_reg_name_id']

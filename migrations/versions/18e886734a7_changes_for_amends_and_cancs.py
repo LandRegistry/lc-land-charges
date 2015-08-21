@@ -26,5 +26,5 @@ def upgrade():
 def downgrade():
     with op.batch_alter_table("register") as batch_op:
         batch_op.create_unique_constraint(None, ['registration_no'])
-        batch_op.add_column(sa.Column('amends', sa.Integer()))
-        batch_op.add_column(sa.Column('cancelled_on', sa.DateTime()))
+        batch_op.drop_column(sa.Column('amends'))
+        batch_op.drop_column(sa.Column('cancelled_on'))
