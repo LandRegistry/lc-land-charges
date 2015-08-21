@@ -75,22 +75,6 @@ def retrieve():
         return Response("Error: " + str(error), status=500)
 
 
-@app.route('/register', methods=['POST'])
-def register():
-    if request.headers['Content-Type'] != "application/json":
-        logging.error('Content-Type is not JSON')
-        return Response(status=415)
-
-    try:
-        json_data = request.get_json(force=True)
-        new_regns = insert_record(json_data)
-        publish_new_bankruptcy(producer, new_regns)
-        return Response(json.dumps({'new_registrations': new_regns}), status=200)
-    except Exception as error:
-        logging.error(error)
-        return Response("Error: " + str(error), status=500)
-
-
 # Route exists purely for testing purposes - need to get something invalid onto
 # the synchroniser's queue!
 @app.route('/synchronise', methods=["POST"])
@@ -156,3 +140,26 @@ def insert():
         return Response("Error: " + str(error), status=500)
 
 
+@app.route('/registration', methods=['POST'])
+def register():
+    if request.headers['Content-Type'] != "application/json":
+        logging.error('Content-Type is not JSON')
+        return Response(status=415)
+
+    try:
+        json_data = request.get_json(force=True)
+        new_regns = insert_record(json_data)
+        publish_new_bankruptcy(producer, new_regns)
+        return Response(json.dumps({'new_registrations': new_regns}), status=200)
+    except Exception as error:
+        logging.error(error)
+        return Response("Error: " + str(error), status=500)
+
+
+@app.route('/registration/<reg_no>', methods=["PUT"])
+def amend_registration():
+    return Response(status=501)
+
+@app.route('/registration/<reg_no>', methods=["DELETE"])
+def cancel_registration():
+    return Response(status=501)
