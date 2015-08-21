@@ -36,7 +36,7 @@ def upgrade():
     op.create_table('request',
                     sa.Column('id', sa.Integer(), primary_key=True),
                     sa.Column('key_number', sa.String()),
-                    sa.Column('application_type', sa.Enum('PAB', 'WOB', name='application_type')),
+                    sa.Column('application_type', sa.String()),
                     sa.Column('application_reference', sa.String()),
                     sa.Column('application_date', sa.Date()),
                     sa.Column('ins_request_id', sa.Integer(), sa.ForeignKey('ins_bankruptcy_request.id')))
@@ -54,7 +54,7 @@ def upgrade():
                     sa.Column('id', sa.Integer(), primary_key=True),
                     sa.Column('request_id', sa.Integer(), sa.ForeignKey('request.id')),
                     sa.Column('registration_date', sa.Date(), nullable=False),
-                    sa.Column('application_type', sa.Enum('PAB', 'WOB', name='application_type_2')), #  TODO: this is a hack.
+                    sa.Column('application_type', sa.String()),
                     sa.Column('bankruptcy_date', sa.Date(), nullable=False))
 
     op.create_table('register',
@@ -133,5 +133,3 @@ def downgrade():
     op.execute("DROP TYPE address_type")
     op.execute("DROP TYPE activity")
     op.execute("DROP TYPE party_type")
-    op.execute("DROP TYPE application_type")
-    op.execute("DROP TYPE application_type_2")

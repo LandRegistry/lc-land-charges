@@ -24,5 +24,5 @@ def upgrade():
 
 def downgrade():
     with op.batch_alter_table("register_details") as batch_op:
-        batch_op.drop_column(sa.Column('legal_body'))
-        batch_op.drop_column(sa.Column('legal_body_ref'))
+        batch_op.drop_column('legal_body')
+        batch_op.drop_column('legal_body_ref')

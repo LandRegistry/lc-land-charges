@@ -2,6 +2,8 @@ from application import app
 import psycopg2
 import json
 import re
+import datetime
+import logging
 
 
 def connect(cursor_factory=None):
@@ -85,7 +87,7 @@ def insert_name(cursor, name, party_id, is_alias=False):
     return name['id']
 
 
-def insert_registration(cursor, details_id, name_id):
+def insert_registration(cursor, details_id, name_id, amends=None):
     # Get the next registration number
     cursor.execute("SELECT MAX(registration_no) FROM register", {})
 
@@ -96,12 +98,13 @@ def insert_registration(cursor, details_id, name_id):
         reg_no = int(rows[0][0]) + 1
 
     # Cap it all off with the actual legal "one registration per name":
-    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id) " +
-                   "VALUES( %(regno)s, %(debtor)s, %(details)s ) RETURNING id",
+    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, amends) " +
+                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(amends)s ) RETURNING id",
                    {
                        "regno": reg_no,
                        "debtor": name_id,
-                       "details": details_id
+                       "details": details_id,
+                       "amends": amends
                    })
     id = cursor.fetchone()[0]
     return reg_no, id
@@ -121,13 +124,20 @@ def insert_register_details(cursor, request_id, date, application_type, legal_bo
     return cursor.fetchone()[0]
 
 
-def insert_request(cursor, key_number, application_type, reference, date, insolvency_id):
+def insert_request(cursor, key_number, application_type, reference, date, insolvency_data=None):
+    if insolvency_data is not None:
+        cursor.execute("INSERT INTO ins_bankruptcy_request (request_data) VALUES (%(json)s) RETURNING id",
+                       {"json": json.dumps(insolvency_data)})
+        ins_request_id = cursor.fetchone()[0]
+    else:
+        ins_request_id = None
+
     cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
                    "ins_request_id) " +
                    "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s ) RETURNING id",
                    {
                        "key": key_number, "app_type": application_type, "app_ref": reference,
-                       "app_date": date, "ins_id": insolvency_id
+                       "app_date": date, "ins_id": ins_request_id
                    })
     return cursor.fetchone()[0]
 
@@ -153,24 +163,12 @@ def insert_migration_status(cursor, register_id, registration_number, additional
     return cursor.fetchone()[0]
 
 
-def insert_record(data):
-    cursor = connect()
-
-    # ins_bankruptcy_request
-    cursor.execute("INSERT INTO ins_bankruptcy_request (request_data) VALUES (%(json)s) RETURNING id",
-                   {"json": json.dumps(data)})
-    ins_request_id = cursor.fetchone()[0]
-
-    app_type = re.sub(r"\(|\)", "", data["application_type"])
-
-    # request
-    request_id = insert_request(cursor, data['key_number'], app_type, data['application_ref'], data['date'],
-                                ins_request_id)
-
+def insert_details(cursor, request_id, data):
+    logging.debug("Insert details")
     # register details
     legal_body = data["legal_body"] if "legal_body" in data else ""
     legal_body_ref = data["legal_body_ref"] if "legal_body_ref" in data else ""
-    register_details_id = insert_register_details(cursor, request_id, data['date'], app_type,
+    register_details_id = insert_register_details(cursor, request_id, data['date'], data['application_type'],
                                                   legal_body, legal_body_ref)
 
     # party
@@ -199,17 +197,40 @@ def insert_record(data):
         cursor.execute("INSERT INTO party_trading (party_id, trading_name) " +
                        "VALUES ( %(party)s, %(trading)s ) RETURNING id",
                        {"party": party_id, "trading": data['trading_name']})
+    return name_ids, register_details_id
 
+
+def insert_record(cursor, data, amends=None):
+    # request
+    request_id = insert_request(cursor, data['key_number'], data["application_type"], data['application_ref'],
+                                data['date'], data)
+
+    name_ids, register_details_id = insert_details(cursor, request_id, data)
     # insert_registration(cursor, details_id, name_id)
     reg_nos = []
     for name_id in name_ids:
-        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id)
+        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id, amends)
         reg_nos.append(reg_no)
 
     # TODO: audit-log not done. Not sure it belongs here?
-    complete(cursor)
-
     return reg_nos
+
+
+def insert_amendment(cursor, amend_reg_no, data):
+    # For now, always insert a new record
+    now = datetime.datetime.now()
+    request_id = insert_request(cursor, None, "AMEND", None, now, None)
+
+    reg_nos = insert_record(cursor, data, amend_reg_no)
+
+    # Update old registration
+    cursor.execute("UPDATE register SET cancelled_on = %(canc)s, amend_request_id = %(amend)s WHERE " +
+                   "registration_no = %(regn_no)s AND cancelled_on IS NULL",
+                   {
+                       "canc": now, "amend": request_id, "regn_no": amend_reg_no
+                   })
+    rows = cursor.rowcount
+    return reg_nos, rows
 
 
 def get_registration_from_name(cursor, forenames, surname):
@@ -363,7 +384,7 @@ def get_registration_details(cursor, reg_no):
 def insert_migrated_record(cursor, data):
     app_type = re.sub(r"\(|\)", "", data["application_type"])
     request_id = insert_request(cursor, None, app_type, data['application_ref'], data['date'], None)
-    details_id = insert_register_details(cursor, request_id, data['date'], app_type)
+    details_id = insert_register_details(cursor, request_id, data['date'], app_type, "", "")  # TODO get court
     party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
     name_id = insert_name(cursor, data['debtor_name'], party_id)
 
@@ -374,3 +395,21 @@ def insert_migrated_record(cursor, data):
     insert_migration_status(cursor, registration_id, data['migration_data']['registration_no'],
                             data['migration_data']['extra'])
     return registration_no
+
+
+def insert_cancellation(registration_no):
+    cursor = connect()
+
+    # Insert a row with application info
+    now = datetime.datetime.now()
+    request_id = insert_request(cursor, None, "CAN", None, now, None)
+
+    # Set cancelled_on to now
+    cursor.execute("UPDATE register SET cancelled_on = %(canc)s, amend_request_id = %(amend)s WHERE " +
+                   "registration_no = %(regn_no)s AND cancelled_on IS NULL",
+                   {
+                       "canc": now, "amend": request_id, "regn_no": registration_no
+                   })
+    rows = cursor.rowcount
+    complete(cursor)
+    return rows

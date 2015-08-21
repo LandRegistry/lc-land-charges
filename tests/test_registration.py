@@ -52,6 +52,7 @@ mock_query_connection = MockConnection([{"registration_no": "50000", "registrati
                                          "occupation": "Civil Servant",
                                          "trading_name": "Bob",
                                          "application_reference": "123456789",
+                                         "legal_body": "LB", "legal_body_ref": "Moo",
                                          "line_1": "123 The Street",
                                          "line_2": "Somewhere",
                                          "line_3": "",
@@ -94,21 +95,21 @@ class TestWorking:
     @mock.patch('psycopg2.connect', return_value=mock_connection)
     def test_not_json(self, mock_connect):
         headers = {'Content-Type': 'application/xml'}
-        response = self.app.post('/register', data=valid_data, headers=headers)
+        response = self.app.post('/registration', data=valid_data, headers=headers)
         assert response.status_code == 415
 
     @mock.patch('psycopg2.connect', return_value=mock_insert_connection)
     @mock.patch('kombu.Producer.publish')
     def test_new_registration(self, mock_connect, mock_publish):
         headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/register', data=valid_data, headers=headers)
+        response = self.app.post('/registration', data=valid_data, headers=headers)
         assert response.status_code == 200
         assert mock_publish.called
 
     @mock.patch('psycopg2.connect', side_effect=Exception('Fail'))
     def test_database_failure(self, mock_connect):
         headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/register', data=valid_data, headers=headers)
+        response = self.app.post('/registration', data=valid_data, headers=headers)
         assert response.status_code == 500
 
     @mock.patch('psycopg2.connect', side_effect=Exception('Fail'))

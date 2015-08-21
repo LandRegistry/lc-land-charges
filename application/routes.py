@@ -9,14 +9,12 @@ import logging
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, get_new_registration_number, \
-    get_registration_from_name, get_registration, insert_record, insert_migrated_record
+    get_registration_from_name, get_registration, insert_record, insert_migrated_record, insert_cancellation, \
+    insert_amendment
 
 @app.route('/', methods=["GET"])
 def index():
     return Response(status=200)
-
-
-
 
 
 @app.route('/registration/<int:reg_no>', methods=['GET'])
@@ -148,7 +146,9 @@ def register():
 
     try:
         json_data = request.get_json(force=True)
-        new_regns = insert_record(json_data)
+        cursor = connect()
+        new_regns = insert_record(cursor, json_data)
+        complete(cursor)
         publish_new_bankruptcy(producer, new_regns)
         return Response(json.dumps({'new_registrations': new_regns}), status=200)
     except Exception as error:
@@ -157,9 +157,28 @@ def register():
 
 
 @app.route('/registration/<reg_no>', methods=["PUT"])
-def amend_registration():
-    return Response(status=501)
+def amend_registration(reg_no):
+    # Amendment... we're being given the replacement data
+    if request.headers['Content-Type'] != "application/json":
+        logging.error('Content-Type is not JSON')
+        return Response(status=415)
+
+    json_data = request.get_json(force=True)
+    cursor = connect()
+    reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
+    if rows == 0:
+        cursor.connection.rollback()
+        cursor.close()
+        cursor.connection.close()
+        return Response(status=404)
+    else:
+        complete(cursor)
+        return Response(json.dumps({'amended_registrations': reg_nos}), status=200)
 
 @app.route('/registration/<reg_no>', methods=["DELETE"])
-def cancel_registration():
-    return Response(status=501)
+def cancel_registration(reg_no):
+    r = insert_cancellation(reg_no)
+    if r == 0:
+        return Response(status=404)
+    else:
+        return Response(status=204)
