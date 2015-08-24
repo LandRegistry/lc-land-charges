@@ -312,7 +312,7 @@ def get_new_registration_number(cursor, db2_reg_no):
 
 def get_registration_details(cursor, reg_no):
     cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
-                   "r.id as register_id, rd.legal_body, rd.legal_body_ref from register r, register_details rd " +
+                   "r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_on from register r, register_details rd " +
                    "where r.registration_no = %(reg_no)s and r.details_id = rd.id", {'reg_no': reg_no})
     rows = cursor.fetchall()
     if len(rows) == 0:
@@ -322,11 +322,21 @@ def get_registration_details(cursor, reg_no):
         'registration_date': str(rows[0]['registration_date']),
         'application_type': rows[0]['application_type'],
         'legal_body': rows[0]['legal_body'],
-        'legal_body_ref': rows[0]['legal_body_ref']
+        'legal_body_ref': rows[0]['legal_body_ref'],
+        'status': "current" #if rows[0]['cancelled_on'] is None else "cancelled"
     }
     details_id = rows[0]['id']
     name_id = rows[0]['debtor_reg_name_id']
     register_id = rows[0]['register_id']
+
+    if rows[0]['cancelled_on'] is not None:
+        cursor.execute("select amends from register_details where amends=%(id)s",
+                       {"id": details_id})
+        rows = cursor.fetchall()
+        if len(rows) > 0:
+            data['status'] = 'superseded'
+        else:
+            data['status'] = 'cancelled'
 
     cursor.execute("select forename, middle_names, surname from party_name where id = %(id)s", {'id': name_id})
     rows = cursor.fetchall()
