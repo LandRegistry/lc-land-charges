@@ -147,7 +147,7 @@ def register():
     try:
         json_data = request.get_json(force=True)
         cursor = connect()
-        new_regns = insert_record(cursor, json_data)
+        new_regns, details = insert_record(cursor, json_data)
         complete(cursor)
         publish_new_bankruptcy(producer, new_regns)
         return Response(json.dumps({'new_registrations': new_regns}), status=200)
@@ -165,7 +165,7 @@ def amend_registration(reg_no):
 
     json_data = request.get_json(force=True)
     cursor = connect()
-    reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
+    originals, reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
     if rows == 0:
         cursor.connection.rollback()
         cursor.close()
@@ -173,7 +173,11 @@ def amend_registration(reg_no):
         return Response(status=404)
     else:
         complete(cursor)
-        return Response(json.dumps({'amended_registrations': reg_nos}), status=200)
+        data = {
+            "new_registrations": reg_nos,
+            "amended_registrations": originals
+        }
+        return Response(json.dumps(data), status=200)
 
 @app.route('/registration/<reg_no>', methods=["DELETE"])
 def cancel_registration(reg_no):

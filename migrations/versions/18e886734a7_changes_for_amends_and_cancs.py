@@ -18,15 +18,17 @@ import sqlalchemy as sa
 
 def upgrade():
     op.execute("ALTER TABLE register DROP CONSTRAINT IF EXISTS register_registration_no_key")
-    with op.batch_alter_table("register") as batch_op:
+    with op.batch_alter_table("register_details") as batch_op:
         batch_op.add_column(sa.Column('amends', sa.Integer()))
         batch_op.add_column(sa.Column('cancelled_on', sa.DateTime()))
-        batch_op.add_column(sa.Column('amend_request_id', sa.Integer()))
+        # batch_op.add_column(sa.Column('amend_request_id', sa.Integer()))
 
 
 def downgrade():
     with op.batch_alter_table("register") as batch_op:
         batch_op.create_unique_constraint(None, ['registration_no'])
+
+    with op.batch_alter_table("register_details") as batch_op:
         batch_op.drop_column('amends')
         batch_op.drop_column('cancelled_on')
-        batch_op.drop_column('amend_request_id')
+        # batch_op.drop_column('amend_request_id')

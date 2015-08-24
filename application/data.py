@@ -87,7 +87,7 @@ def insert_name(cursor, name, party_id, is_alias=False):
     return name['id']
 
 
-def insert_registration(cursor, details_id, name_id, amends=None):
+def insert_registration(cursor, details_id, name_id):
     # Get the next registration number
     cursor.execute("SELECT MAX(registration_no) FROM register", {})
 
@@ -98,28 +98,28 @@ def insert_registration(cursor, details_id, name_id, amends=None):
         reg_no = int(rows[0][0]) + 1
 
     # Cap it all off with the actual legal "one registration per name":
-    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, amends) " +
-                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(amends)s ) RETURNING id",
+    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id) " +
+                   "VALUES( %(regno)s, %(debtor)s, %(details)s ) RETURNING id",
                    {
                        "regno": reg_no,
                        "debtor": name_id,
-                       "details": details_id,
-                       "amends": amends
+                       "details": details_id
                    })
     id = cursor.fetchone()[0]
     return reg_no, id
 
 
-def insert_register_details(cursor, request_id, date, application_type, legal_body, legal_body_ref):
+def insert_register_details(cursor, request_id, date, application_type, legal_body, legal_body_ref, amends):
     cursor.execute("INSERT INTO register_details (request_id, registration_date, application_type, " +
-                   "bankruptcy_date, legal_body, legal_body_ref) " +
+                   "bankruptcy_date, legal_body, legal_body_ref, amends) " +
                    "VALUES ( %(req_id)s, %(reg_date)s, %(app_type)s, %(bank_date)s, " +
-                   " %(lbody)s, %(lbodyref)s ) " +
+                   " %(lbody)s, %(lbodyref)s, %(amends)s ) " +
                    "RETURNING id",
                    {
                        "req_id": request_id, "reg_date": date,
                        "app_type": application_type, "bank_date": date,
-                       "lbody": "", "lbodyref": ""
+                       "lbody": legal_body, "lbodyref": legal_body_ref,
+                       "amends": amends
                    })   # TODO: Seems probable we won't need both dates
     return cursor.fetchone()[0]
 
@@ -163,13 +163,13 @@ def insert_migration_status(cursor, register_id, registration_number, additional
     return cursor.fetchone()[0]
 
 
-def insert_details(cursor, request_id, data):
+def insert_details(cursor, request_id, data, amends_id):
     logging.debug("Insert details")
     # register details
     legal_body = data["legal_body"] if "legal_body" in data else ""
     legal_body_ref = data["legal_body_ref"] if "legal_body_ref" in data else ""
     register_details_id = insert_register_details(cursor, request_id, data['date'], data['application_type'],
-                                                  legal_body, legal_body_ref)
+                                                  legal_body, legal_body_ref, amends_id)
 
     # party
     party_id = insert_party(cursor, register_details_id, "Debtor", data['occupation'], data['date_of_birth'],
@@ -205,15 +205,15 @@ def insert_record(cursor, data, amends=None):
     request_id = insert_request(cursor, data['key_number'], data["application_type"], data['application_ref'],
                                 data['date'], data)
 
-    name_ids, register_details_id = insert_details(cursor, request_id, data)
+    name_ids, register_details_id = insert_details(cursor, request_id, data, amends)
     # insert_registration(cursor, details_id, name_id)
     reg_nos = []
     for name_id in name_ids:
-        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id, amends)
+        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id)
         reg_nos.append(reg_no)
 
     # TODO: audit-log not done. Not sure it belongs here?
-    return reg_nos
+    return reg_nos, register_details_id
 
 
 def insert_amendment(cursor, amend_reg_no, data):
@@ -221,16 +221,43 @@ def insert_amendment(cursor, amend_reg_no, data):
     now = datetime.datetime.now()
     request_id = insert_request(cursor, None, "AMEND", None, now, None)
 
-    reg_nos = insert_record(cursor, data, amend_reg_no)
+    original_detl_id = get_register_details_id(cursor, amend_reg_no)
+    original_regs = get_all_registration_nos(cursor, original_detl_id)
+    amend_detl_id = get_register_details_id(cursor, amend_reg_no)
+    reg_nos, details = insert_record(cursor, data, amend_detl_id)
 
     # Update old registration
-    cursor.execute("UPDATE register SET cancelled_on = %(canc)s, amend_request_id = %(amend)s WHERE " +
-                   "registration_no = %(regn_no)s AND cancelled_on IS NULL",
+    cursor.execute("UPDATE register_details SET cancelled_on = %(canc)s WHERE " +
+                   "id = %(id)s AND cancelled_on IS NULL",
                    {
-                       "canc": now, "amend": request_id, "regn_no": amend_reg_no
+                       "canc": now, "amend": request_id, "id": original_detl_id
                    })
     rows = cursor.rowcount
-    return reg_nos, rows
+    return original_regs, reg_nos, rows
+
+
+def get_register_details_id(cursor, reg_no):
+    cursor.execute("SELECT details_id FROM register WHERE registration_no = %(regno)s",
+                   {
+                       "regno": reg_no
+                   })
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        return None
+    elif len(rows) > 1:
+        raise RuntimeError("Too many rows retrieved")
+    else:
+        return rows[0][0]
+
+
+def get_all_registration_nos(cursor, details_id):
+    cursor.execute("SELECT registration_no FROM register WHERE details_id = %(details)s",
+                   {"details": details_id})
+    rows = cursor.fetchall();
+    results = []
+    for row in rows:
+        results.append(row[0])
+    return results;
 
 
 def get_registration_from_name(cursor, forenames, surname):
@@ -384,7 +411,7 @@ def get_registration_details(cursor, reg_no):
 def insert_migrated_record(cursor, data):
     app_type = re.sub(r"\(|\)", "", data["application_type"])
     request_id = insert_request(cursor, None, app_type, data['application_ref'], data['date'], None)
-    details_id = insert_register_details(cursor, request_id, data['date'], app_type, "", "")  # TODO get court
+    details_id = insert_register_details(cursor, request_id, data['date'], app_type, "", "", None)  # TODO get court
     party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
     name_id = insert_name(cursor, data['debtor_name'], party_id)
 
