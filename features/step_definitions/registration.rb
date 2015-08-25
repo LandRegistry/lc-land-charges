@@ -67,7 +67,7 @@ registration_api = nil
 
 When(/^I submit valid data to the registration system$/) do
 	registration_api = RestAPI.new("http://localhost:5004")
-	registration_api.post_data("/register", no_alias)
+	registration_api.post_data("/registration", no_alias)
 end
 
 Then(/^it returns a 200 OK response$/) do
@@ -90,7 +90,7 @@ end
 
 When(/^I submit valid data with an alias to the registration system$/) do
 	registration_api = RestAPI.new("http://localhost:5004")
-	registration_api.post_data("/register", one_alias)
+	registration_api.post_data("/registration", one_alias)
 end
 
 Then(/^it returns the (\d+) new registration numbers$/) do |arg1|
@@ -122,7 +122,7 @@ end
 
 When(/^I submit Bob Howard to the registration system$/) do
 	registration_api = RestAPI.new("http://localhost:5004")
-	registration_api.post_data("/register", bob_howard)
+	registration_api.post_data("/registration", bob_howard)
 end
 
 Then(/^the name has been correctly transformed$/) do

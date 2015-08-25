@@ -218,10 +218,13 @@ def insert_record(cursor, data, amends=None):
 
 def insert_amendment(cursor, amend_reg_no, data):
     # For now, always insert a new record
+    original_detl_id = get_register_details_id(cursor, amend_reg_no)
+    if original_detl_id is None:
+        return None, None, None
+
     now = datetime.datetime.now()
     request_id = insert_request(cursor, None, "AMEND", None, now, None)
 
-    original_detl_id = get_register_details_id(cursor, amend_reg_no)
     original_regs = get_all_registration_nos(cursor, original_detl_id)
     amend_detl_id = get_register_details_id(cursor, amend_reg_no)
     reg_nos, details = insert_record(cursor, data, amend_detl_id)
@@ -253,11 +256,12 @@ def get_register_details_id(cursor, reg_no):
 def get_all_registration_nos(cursor, details_id):
     cursor.execute("SELECT registration_no FROM register WHERE details_id = %(details)s",
                    {"details": details_id})
-    rows = cursor.fetchall();
+    rows = cursor.fetchall()
+    print(rows)
     results = []
     for row in rows:
-        results.append(row[0])
-    return results;
+        results.append(str(row[0]))
+    return results
 
 
 def get_registration_from_name(cursor, forenames, surname):
@@ -328,7 +332,7 @@ def get_registration_details(cursor, reg_no):
     details_id = rows[0]['id']
     name_id = rows[0]['debtor_reg_name_id']
     register_id = rows[0]['register_id']
-
+    print(rows[0])
     if rows[0]['cancelled_on'] is not None:
         cursor.execute("select amends from register_details where amends=%(id)s",
                        {"id": details_id})
@@ -444,6 +448,7 @@ def insert_cancellation(registration_no):
     # Set cancelled_on to now
     original_detl_id = get_register_details_id(cursor, registration_no)
     original_regs = get_all_registration_nos(cursor, original_detl_id)
+    print(original_regs)
     cursor.execute("UPDATE register_details SET cancelled_on = %(canc)s WHERE " +
                    "id = %(id)s AND cancelled_on IS NULL",
                    {
