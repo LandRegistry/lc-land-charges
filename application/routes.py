@@ -166,7 +166,7 @@ def amend_registration(reg_no):
     json_data = request.get_json(force=True)
     cursor = connect()
     originals, reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
-    if rows == 0:
+    if rows is None or rows == 0:
         cursor.connection.rollback()
         cursor.close()
         cursor.connection.close()
@@ -188,4 +188,5 @@ def cancel_registration(reg_no):
         data = {
             "cancelled": nos
         }
+        print(data)
         return Response(json.dumps(data), status=200)
