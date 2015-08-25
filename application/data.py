@@ -124,20 +124,20 @@ def insert_register_details(cursor, request_id, date, application_type, legal_bo
     return cursor.fetchone()[0]
 
 
-def insert_request(cursor, key_number, application_type, reference, date, insolvency_data=None):
+def insert_request(cursor, key_number, application_type, reference, date, document=None, insolvency_data=None):
     if insolvency_data is not None:
         cursor.execute("INSERT INTO ins_bankruptcy_request (request_data) VALUES (%(json)s) RETURNING id",
                        {"json": json.dumps(insolvency_data)})
         ins_request_id = cursor.fetchone()[0]
     else:
-        ins_request_id = None
+        ins_request_id = None  # TODO: consider when ins data should be added...
 
     cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
-                   "ins_request_id) " +
-                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s ) RETURNING id",
+                   "ins_request_id, document_ref) " +
+                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s, %(doc)s ) RETURNING id",
                    {
                        "key": key_number, "app_type": application_type, "app_ref": reference,
-                       "app_date": date, "ins_id": ins_request_id
+                       "app_date": date, "ins_id": ins_request_id, "doc": document
                    })
     return cursor.fetchone()[0]
 
@@ -200,11 +200,7 @@ def insert_details(cursor, request_id, data, amends_id):
     return name_ids, register_details_id
 
 
-def insert_record(cursor, data, amends=None):
-    # request
-    request_id = insert_request(cursor, data['key_number'], data["application_type"], data['application_ref'],
-                                data['date'], data)
-
+def insert_record(cursor, data, request_id, amends=None):
     name_ids, register_details_id = insert_details(cursor, request_id, data, amends)
     # insert_registration(cursor, details_id, name_id)
     reg_nos = []
@@ -216,24 +212,40 @@ def insert_record(cursor, data, amends=None):
     return reg_nos, register_details_id
 
 
+def insert_new_registration(cursor, data):
+    document = None
+    if 'document_id' in data:
+        document = data['document_id']
+
+    # request
+    request_id = insert_request(cursor, data['key_number'], data["application_type"], data['application_ref'],
+                                data['date'], document, data)
+    reg_nos, details_id = insert_record(cursor, data, request_id)
+    return reg_nos, details_id
+
+
 def insert_amendment(cursor, amend_reg_no, data):
     # For now, always insert a new record
     original_detl_id = get_register_details_id(cursor, amend_reg_no)
     if original_detl_id is None:
         return None, None, None
 
+    document = None
+    if 'document_id' in data:
+        document = data['document_id']
+
     now = datetime.datetime.now()
-    request_id = insert_request(cursor, None, "AMEND", None, now, None)
+    request_id = insert_request(cursor, None, "AMENDMENT", None, now, document, None)
 
     original_regs = get_all_registration_nos(cursor, original_detl_id)
     amend_detl_id = get_register_details_id(cursor, amend_reg_no)
-    reg_nos, details = insert_record(cursor, data, amend_detl_id)
+    reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id)
 
     # Update old registration
-    cursor.execute("UPDATE register_details SET cancelled_on = %(canc)s WHERE " +
-                   "id = %(id)s AND cancelled_on IS NULL",
+    cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+                   "id = %(id)s AND cancelled_by IS NULL",
                    {
-                       "canc": now, "amend": request_id, "id": original_detl_id
+                       "canc": request_id, "id": original_detl_id
                    })
     rows = cursor.rowcount
     return original_regs, reg_nos, rows
@@ -316,7 +328,7 @@ def get_new_registration_number(cursor, db2_reg_no):
 
 def get_registration_details(cursor, reg_no):
     cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
-                   "r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_on from register r, register_details rd " +
+                   "r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by from register r, register_details rd " +
                    "where r.registration_no = %(reg_no)s and r.details_id = rd.id", {'reg_no': reg_no})
     rows = cursor.fetchall()
     if len(rows) == 0:
@@ -327,13 +339,13 @@ def get_registration_details(cursor, reg_no):
         'application_type': rows[0]['application_type'],
         'legal_body': rows[0]['legal_body'],
         'legal_body_ref': rows[0]['legal_body_ref'],
-        'status': "current" #if rows[0]['cancelled_on'] is None else "cancelled"
+        'status': "current"
     }
     details_id = rows[0]['id']
     name_id = rows[0]['debtor_reg_name_id']
     register_id = rows[0]['register_id']
     print(rows[0])
-    if rows[0]['cancelled_on'] is not None:
+    if rows[0]['cancelled_by'] is not None:
         cursor.execute("select amends from register_details where amends=%(id)s",
                        {"id": details_id})
         rows = cursor.fetchall()
@@ -438,21 +450,25 @@ def insert_migrated_record(cursor, data):
     return registration_no
 
 
-def insert_cancellation(registration_no):
+def insert_cancellation(registration_no, data):
     cursor = connect()
 
     # Insert a row with application info
     now = datetime.datetime.now()
-    request_id = insert_request(cursor, None, "CAN", None, now, None)
+    document = None
+    if 'document_id' in data:
+        document = data['document_id']
+
+    request_id = insert_request(cursor, None, "CANCELLATION", None, now, document, None)
 
     # Set cancelled_on to now
     original_detl_id = get_register_details_id(cursor, registration_no)
     original_regs = get_all_registration_nos(cursor, original_detl_id)
     print(original_regs)
-    cursor.execute("UPDATE register_details SET cancelled_on = %(canc)s WHERE " +
-                   "id = %(id)s AND cancelled_on IS NULL",
+    cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+                   "id = %(id)s AND cancelled_by IS NULL",
                    {
-                       "canc": now, "id": original_detl_id
+                       "canc": request_id, "id": original_detl_id
                    })
     rows = cursor.rowcount
     complete(cursor)

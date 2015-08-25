@@ -10,7 +10,7 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, get_new_registration_number, \
     get_registration_from_name, get_registration, insert_record, insert_migrated_record, insert_cancellation, \
-    insert_amendment
+    insert_amendment, insert_new_registration
 
 @app.route('/', methods=["GET"])
 def index():
@@ -147,7 +147,7 @@ def register():
     try:
         json_data = request.get_json(force=True)
         cursor = connect()
-        new_regns, details = insert_record(cursor, json_data)
+        new_regns, details = insert_new_registration(cursor, json_data)
         complete(cursor)
         publish_new_bankruptcy(producer, new_regns)
         return Response(json.dumps({'new_registrations': new_regns}), status=200)
@@ -181,7 +181,12 @@ def amend_registration(reg_no):
 
 @app.route('/registration/<reg_no>', methods=["DELETE"])
 def cancel_registration(reg_no):
-    r, nos = insert_cancellation(reg_no)
+    if request.headers['Content-Type'] != "application/json":
+        logging.error('Content-Type is not JSON')
+        return Response(status=415)
+
+    json_data = request.get_json(force=True)
+    r, nos = insert_cancellation(reg_no, json_data)
     if r == 0:
         return Response(status=404)
     else:

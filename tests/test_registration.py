@@ -56,7 +56,7 @@ all_queries_data = [{
     "line_4": "",
     "line_5": "",
     "line_6": "",
-    "cancelled_on": None,
+    "cancelled_by": None,
     "original_regn_no": "7",
     "extra_data": {}
 }]
@@ -133,7 +133,7 @@ class TestWorking:
 
     @mock.patch('psycopg2.connect', **mock_cancellation)
     def test_cancellation(self, mc):
-        response = self.app.delete('/registration/50001')
+        response = self.app.delete('/registration/50001', data='{}', headers={'Content-Type': 'application/json'})
         data = json.loads(response.data.decode('utf-8'))
         assert(data['cancelled'][0] == '50001')
 
