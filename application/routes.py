@@ -181,8 +181,11 @@ def amend_registration(reg_no):
 
 @app.route('/registration/<reg_no>', methods=["DELETE"])
 def cancel_registration(reg_no):
-    r = insert_cancellation(reg_no)
+    r, nos = insert_cancellation(reg_no)
     if r == 0:
         return Response(status=404)
     else:
-        return Response(status=204)
+        data = {
+            "cancelled": nos
+        }
+        return Response(json.dumps(data), status=200)

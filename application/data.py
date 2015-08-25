@@ -442,11 +442,13 @@ def insert_cancellation(registration_no):
     request_id = insert_request(cursor, None, "CAN", None, now, None)
 
     # Set cancelled_on to now
-    cursor.execute("UPDATE register SET cancelled_on = %(canc)s, amend_request_id = %(amend)s WHERE " +
-                   "registration_no = %(regn_no)s AND cancelled_on IS NULL",
+    original_detl_id = get_register_details_id(cursor, registration_no)
+    original_regs = get_all_registration_nos(cursor, original_detl_id)
+    cursor.execute("UPDATE register_details SET cancelled_on = %(canc)s WHERE " +
+                   "id = %(id)s AND cancelled_on IS NULL",
                    {
-                       "canc": now, "amend": request_id, "regn_no": registration_no
+                       "canc": now, "id": original_detl_id
                    })
     rows = cursor.rowcount
     complete(cursor)
-    return rows
+    return rows, original_regs
