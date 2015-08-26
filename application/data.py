@@ -376,12 +376,12 @@ def get_registration_details(cursor, reg_no):
                    "where n.id = r.party_name_id and r.party_id = %(party_id)s and n.id != %(id)s ",
                    {'party_id': party_id, 'id': name_id})
     rows = cursor.fetchall()
-    data['debtor_alias'] = []
+    data['debtor_alternative_name'] = []
     for row in rows:
         forenames = [row['forename']]
         if row['middle_names'] != "":
             forenames += row['middle_names'].split(" ")
-        data['debtor_alias'].append({
+        data['debtor_alternative_name'].append({
             'forenames': forenames, 'surname': row['surname']
         })
 
