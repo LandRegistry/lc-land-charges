@@ -25,7 +25,8 @@ def insert_address(cursor, address, address_type, party_id):
         remaining = ", ".join(address['address_lines'][4:])
         if remaining != '':
             lines.append(remaining)             # Remaining lines into 5th line
-        lines.append(address['postcode'])       # Postcode in the last
+        if 'postcode' in address:
+            lines.append(address['postcode'])   # Postcode in the last
 
         while len(lines) < 6:
             lines.append("")                    # Pad to 6 lines for avoidance of horrible if statements later
@@ -39,7 +40,11 @@ def insert_address(cursor, address, address_type, party_id):
                        })
         detail_id = cursor.fetchone()[0]
 
-        address_string = "{}, {}".format(", ".join(address['address_lines']), address["postcode"])
+        if 'postcode' in address:
+            address_string = "{}, {}".format(", ".join(address['address_lines']), address["postcode"])
+        else:
+            address_string = "{}, {}".format(", ".join(address['address_lines']))
+            
     elif 'text' in address:
         address_string = address['text']
         detail_id = None
