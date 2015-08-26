@@ -56,6 +56,8 @@ all_queries_data = [{
     "line_4": "",
     "line_5": "",
     "line_6": "",
+    "county": "Devon",
+    "postcode": "PL1 1AA",
     "cancelled_by": None,
     "original_regn_no": "7",
     "extra_data": {}
