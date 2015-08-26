@@ -395,7 +395,7 @@ def get_registration_details(cursor, reg_no):
     rows = cursor.fetchall()
     data['application_ref'] = rows[0]['application_reference']
 
-    cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, d.county" +
+    cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, d.county, " +
                    "d.postcode, a.address_string " +
                    "from address a " +
                    "left outer join address_detail d on a.detail_id = d.id " +
