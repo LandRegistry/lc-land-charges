@@ -21,29 +21,29 @@ def complete(cursor):
 
 def insert_address(cursor, address, address_type, party_id):
     if 'address_lines' in address:
-        lines = address['address_lines'][0:4]   # First four lines
-        remaining = ", ".join(address['address_lines'][4:])
+        lines = address['address_lines'][0:5]   # First five lines
+        remaining = ", ".join(address['address_lines'][5:])
         if remaining != '':
-            lines.append(remaining)             # Remaining lines into 5th line
-        if 'postcode' in address:
-            lines.append(address['postcode'])   # Postcode in the last
+            lines.append(remaining)             # Remaining lines into 6th line
 
         while len(lines) < 6:
             lines.append("")                    # Pad to 6 lines for avoidance of horrible if statements later
 
-        cursor.execute("INSERT INTO address_detail ( line_1, line_2, line_3, line_4, line_5, line_6 ) " +
-                       "VALUES( %(line1)s, %(line2)s, %(line3)s, %(line4)s, %(line5)s, %(line6)s ) " +
+        county = address['county']
+        postcode = address['postcode']       # Postcode in the last
+        cursor.execute("INSERT INTO address_detail ( line_1, line_2, line_3, line_4, line_5, line_6 ,county, postcode) " +
+                       "VALUES( %(line1)s, %(line2)s, %(line3)s, %(line4)s, %(line5)s, %(line6)s, %(county)s, %(postcode)s ) " +
                        "RETURNING id",
                        {
                            "line1": lines[0], "line2": lines[1], "line3": lines[2],
                            "line4": lines[3], "line5": lines[4], "line6": lines[5],
+                           "county": county, "postcode": postcode,
                        })
         detail_id = cursor.fetchone()[0]
 
-        if 'postcode' in address:
-            address_string = "{}, {}".format(", ".join(address['address_lines']), address["postcode"])
-        else:
-            address_string = "{}, {}".format(", ".join(address['address_lines']))
+
+        address_string = "{}, {}, {}".format(", ".join(address['address_lines']), address["county"], address["postcode"])
+
             
     elif 'text' in address:
         address_string = address['text']
@@ -395,7 +395,8 @@ def get_registration_details(cursor, reg_no):
     rows = cursor.fetchall()
     data['application_ref'] = rows[0]['application_reference']
 
-    cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, a.address_string " +
+    cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, d.county" +
+                   "d.postcode, a.address_string " +
                    "from address a " +
                    "left outer join address_detail d on a.detail_id = d.id " +
                    "inner join party_address pa on a.id = pa.address_id " +
@@ -424,7 +425,7 @@ def get_registration_details(cursor, reg_no):
                 address.append(row['line_6'])
 
             data['residence'].append({
-                'address_lines': address
+                'address_lines': address, 'county': row['county'], 'postcode': row['postcode']
             })
 
     cursor.execute("SELECT original_regn_no, extra_data FROM migration_status WHERE register_id=%(id)s",
