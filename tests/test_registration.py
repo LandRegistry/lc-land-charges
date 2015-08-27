@@ -57,6 +57,7 @@ all_queries_data = [{
     "line_5": "",
     "line_6": "",
     "county": "Devon",
+    "document_ref": 22,
     "postcode": "PL1 1AA",
     "cancelled_by": None,
     "original_regn_no": "7",
@@ -137,15 +138,23 @@ class TestWorking:
     def test_cancellation(self, mc):
         response = self.app.delete('/registration/50001', data='{}', headers={'Content-Type': 'application/json'})
         data = json.loads(response.data.decode('utf-8'))
-        assert(data['cancelled'][0] == '50001')
+        assert data['cancelled'][0] == '50001'
 
     @mock.patch('psycopg2.connect', **mock_cancellation)
     @mock.patch('kombu.Producer.publish')
     def test_amendment(self, mc, kombu):
         response = self.app.put('/registration/50001', data=valid_data, headers={'Content-Type': 'application/json'})
         data = json.loads(response.data.decode('utf-8'))
-        assert(data['new_registrations'][0] == 50002)
-        assert(data['amended_registrations'][0] == '50001')
+        amendment_call = mock_cancellation['return_value'].mock_calls[-4].call_list()
+
+        # Because the DB is mocked, we can't check to ensure the indicator's gone on
+        # But we can check that the correct SQL call has been issued...
+        sql_call = str(amendment_call[0])
+        assert "UPDATE register_details SET cancelled_by" in sql_call  # Ensure we're looking at the right call
+        assert "'canc': '50001'" in sql_call  # mock_cancellation returns 50001 for all the queries
+        assert "'id': '50001'" in sql_call
+        assert data['new_registrations'][0] == 50002
+        assert data['amended_registrations'][0] == '50001'
 
     @mock.patch('psycopg2.connect', **mock_search_not_found)
     def test_amendment_not_found(self, mc):
@@ -157,10 +166,10 @@ class TestWorking:
         response = self.app.get("/registration/50000")
         data = json.loads(response.data.decode('utf-8'))
         assert data['debtor_name']['surname'] == 'Howard'
+        assert "document_id" in data
 
     @mock.patch('psycopg2.connect', **mock_retrieve)
     def test_get_migrated_registration(self, mc):
         response = self.app.get("/migrated_registration/500")
         data = json.loads(response.data.decode('utf-8'))
-        print(data)
         assert data[0]['debtor_name']['surname'] == 'Howard'
