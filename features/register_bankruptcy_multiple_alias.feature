@@ -1,3 +1,4 @@
+@reg_bank_multiple_alias
 Feature: Register a Bankruptcy With Aliases
 
 Scenario: Register a bankruptcy with an alias

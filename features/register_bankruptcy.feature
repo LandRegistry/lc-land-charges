@@ -1,3 +1,5 @@
+@reg_bank
+
 Feature: Register a Bankruptcy
 
 Scenario: Register a standard bankruptcy
