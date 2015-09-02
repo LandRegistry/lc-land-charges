@@ -1,3 +1,4 @@
+@register_convert
 Feature: Register a Bankruptcy & Synchronise/Convert
 
 Scenario: Register a standard bankruptcy & sync/convert
