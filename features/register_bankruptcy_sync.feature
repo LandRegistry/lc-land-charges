@@ -1,3 +1,5 @@
+@register_sync
+
 Feature: Register a Bankruptcy & Synchronise
 
 Scenario: Register a standard bankruptcy & sync
