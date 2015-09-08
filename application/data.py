@@ -92,15 +92,18 @@ def insert_name(cursor, name, party_id, is_alias=False):
     return name['id']
 
 
-def insert_registration(cursor, details_id, name_id):
-    # Get the next registration number
-    cursor.execute("SELECT MAX(registration_no) FROM register", {})
+def insert_registration(cursor, details_id, name_id, orig_reg_no=None):
+    if orig_reg_no is None:
+        # Get the next registration number
+        cursor.execute("SELECT MAX(registration_no) FROM register", {})
 
-    rows = cursor.fetchall()
-    if rows[0][0] is None:
-        reg_no = 50000
+        rows = cursor.fetchall()
+        if rows[0][0] is None:
+            reg_no = 50000
+        else:
+            reg_no = int(rows[0][0]) + 1
     else:
-        reg_no = int(rows[0][0]) + 1
+        reg_no = orig_reg_no
 
     # Cap it all off with the actual legal "one registration per name":
     cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id) " +
@@ -205,12 +208,12 @@ def insert_details(cursor, request_id, data, amends_id):
     return name_ids, register_details_id
 
 
-def insert_record(cursor, data, request_id, amends=None):
+def insert_record(cursor, data, request_id, amends=None, orig_reg_no=None):
     name_ids, register_details_id = insert_details(cursor, request_id, data, amends)
     # insert_registration(cursor, details_id, name_id)
     reg_nos = []
     for name_id in name_ids:
-        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id)
+        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id, orig_reg_no)
         reg_nos.append(reg_no)
 
     # TODO: audit-log not done. Not sure it belongs here?
@@ -229,9 +232,9 @@ def insert_new_registration(cursor, data):
     return reg_nos, details_id
 
 
-def insert_amendment(cursor, amend_reg_no, data):
+def insert_amendment(cursor, orig_reg_no, data):
     # For now, always insert a new record
-    original_detl_id = get_register_details_id(cursor, amend_reg_no)
+    original_detl_id = get_register_details_id(cursor, orig_reg_no)
     if original_detl_id is None:
         return None, None, None
 
@@ -243,8 +246,35 @@ def insert_amendment(cursor, amend_reg_no, data):
     request_id = insert_request(cursor, None, "AMENDMENT", None, now, document, None)
 
     original_regs = get_all_registration_nos(cursor, original_detl_id)
-    amend_detl_id = get_register_details_id(cursor, amend_reg_no)
+    amend_detl_id = get_register_details_id(cursor, orig_reg_no)
     reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id)
+
+    # Update old registration
+    cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+                   "id = %(id)s AND cancelled_by IS NULL",
+                   {
+                       "canc": request_id, "id": original_detl_id
+                   })
+    rows = cursor.rowcount
+    return original_regs, reg_nos, rows
+
+
+def insert_rectification(cursor, orig_reg_no, data):
+    # For now, always insert a new record
+    original_detl_id = get_register_details_id(cursor, orig_reg_no)
+    if original_detl_id is None:
+        return None, None, None
+
+    document = None
+    if 'document_id' in data:
+        document = data['document_id']
+
+    now = datetime.datetime.now()
+    request_id = insert_request(cursor, None, "RECTIFICATION", None, now, document, None)
+
+    original_regs = get_all_registration_nos(cursor, original_detl_id)
+    amend_detl_id = get_register_details_id(cursor, orig_reg_no)
+    reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id, orig_reg_no)
 
     # Update old registration
     cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
