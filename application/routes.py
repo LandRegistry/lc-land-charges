@@ -10,7 +10,7 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, get_new_registration_number, \
     get_registration_from_name, get_registration, insert_record, insert_migrated_record, insert_cancellation, \
-    insert_amendment, insert_new_registration
+    insert_amendment, insert_new_registration, insert_rectification
 
 @app.route('/', methods=["GET"])
 def index():
@@ -156,8 +156,8 @@ def register():
         return Response("Error: " + str(error), status=500)
 
 
-@app.route('/registration/<reg_no>', methods=["PUT"])
-def amend_registration(reg_no):
+@app.route('/registration/<reg_no>/<appn_type>', methods=["PUT"])
+def amend_registration(reg_no, appn_type):
     # Amendment... we're being given the replacement data
     if request.headers['Content-Type'] != "application/json":
         logging.error('Content-Type is not JSON')
@@ -165,7 +165,10 @@ def amend_registration(reg_no):
 
     json_data = request.get_json(force=True)
     cursor = connect()
-    originals, reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
+    if appn_type == 'amend':
+        originals, reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
+    else:
+        originals, reg_nos, rows = insert_rectification(cursor, reg_no, json_data)
     if rows is None or rows == 0:
         cursor.connection.rollback()
         cursor.close()
