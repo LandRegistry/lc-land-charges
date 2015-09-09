@@ -59,6 +59,14 @@ class PostgreSQL
 
 end
 
+Before do |scenario|
+    `vagrant ssh -c reset-data 2> /dev/null`
+end
+
+After do |scenario|
+    `vagrant ssh -c reset-data 2> /dev/null`
+end
+
 
 Given(/^anything$/) do
 end
