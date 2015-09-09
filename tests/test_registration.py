@@ -143,7 +143,7 @@ class TestWorking:
     @mock.patch('psycopg2.connect', **mock_cancellation)
     @mock.patch('kombu.Producer.publish')
     def test_amendment(self, mc, kombu):
-        response = self.app.put('/registration/50001', data=valid_data, headers={'Content-Type': 'application/json'})
+        response = self.app.put('/registration/50001/amend', data=valid_data, headers={'Content-Type': 'application/json'})
         data = json.loads(response.data.decode('utf-8'))
         amendment_call = mock_cancellation['return_value'].mock_calls[-4].call_list()
 
@@ -158,7 +158,7 @@ class TestWorking:
 
     @mock.patch('psycopg2.connect', **mock_search_not_found)
     def test_amendment_not_found(self, mc):
-        response = self.app.put('/registration/50001', data=valid_data, headers={'Content-Type': 'application/json'})
+        response = self.app.put('/registration/50001/amend', data=valid_data, headers={'Content-Type': 'application/json'})
         assert(response.status_code == 404)
 
     @mock.patch('psycopg2.connect', **mock_retrieve)

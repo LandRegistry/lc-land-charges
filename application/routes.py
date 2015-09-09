@@ -165,10 +165,13 @@ def amend_registration(reg_no, appn_type):
 
     json_data = request.get_json(force=True)
     cursor = connect()
-    if appn_type == 'amend':
-        originals, reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
-    else:
-        originals, reg_nos, rows = insert_rectification(cursor, reg_no, json_data)
+
+    # TODO: may need to revisit if business rules for rectification differs to amendment
+    # if appn_type == 'amend':
+    originals, reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
+    # else:
+    # originals, reg_nos, rows = insert_rectification(cursor, reg_no, json_data)
+
     if rows is None or rows == 0:
         cursor.connection.rollback()
         cursor.close()
