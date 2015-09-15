@@ -311,19 +311,26 @@ def get_all_registration_nos(cursor, details_id):
     return results
 
 
-def get_registration_from_name(cursor, forenames, surname):
-    fn_list = forenames.split(" ")
-    forename = fn_list[0]
-    middle_name = ""
-    if len(forenames) > 1:
-        middle_name = " ".join(fn_list[1:])
+def get_registration_from_name(cursor, forenames=None, surname=None, full_name=None):
+    if full_name is None:
+        full_name = " "
+        fn_list = forenames.split(" ")
+        forename = fn_list[0]
+        middle_name = ""
+        if len(forenames) > 1:
+            middle_name = " ".join(fn_list[1:])
+    else:
+        forename = " "
+        middle_name = " "
+        surname = " "
 
     cursor.execute("SELECT r.id " +
                    "FROM party_name n, register r " +
-                   "where n.alias_name=False and UPPER(n.forename)=%(forename)s and UPPER(n.surname)=%(surname)s " +
-                   "and UPPER(n.middle_names)=%(midname)s and r.debtor_reg_name_id=n.id",
+                   "where ((UPPER(n.forename)=%(forename)s and UPPER(n.surname)=%(surname)s " +
+                   "and UPPER(n.middle_names)=%(midname)s) or (UPPER(n.party_name)=%(fullname)s)) " +
+                   "and r.debtor_reg_name_id=n.id",
                    {
-                       'forename': forename.upper(), 'midname': middle_name.upper(), 'surname': surname.upper()
+                       'forename': forename.upper(), 'midname': middle_name.upper(), 'surname': surname.upper(), 'fullname': full_name.upper()
                    })
 
     rows = cursor.fetchall()

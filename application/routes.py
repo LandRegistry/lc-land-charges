@@ -58,7 +58,10 @@ def retrieve():
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         data = request.get_json(force=True)
 
-        reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'])
+        if data['full_name'] == ' ':
+            reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'], None)
+        else:
+            reg_ids = get_registration_from_name(cursor, None, None, data['full_name'])
         if len(reg_ids) == 0:
             return Response(status=404)
 
