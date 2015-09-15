@@ -330,8 +330,45 @@ def get_registration_from_name(cursor, forenames=None, surname=None, full_name=N
                    "and UPPER(n.middle_names)=%(midname)s) or (UPPER(n.party_name)=%(fullname)s)) " +
                    "and r.debtor_reg_name_id=n.id",
                    {
-                       'forename': forename.upper(), 'midname': middle_name.upper(), 'surname': surname.upper(), 'fullname': full_name.upper()
+                       'forename': forename.upper(), 'midname': middle_name.upper(), 'surname': surname.upper(),
+                       'fullname': full_name.upper()
                    })
+
+    rows = cursor.fetchall()
+    result = []
+    for row in rows:
+        result.append(row['id'])
+
+    return result
+
+
+def get_registration_from_full_search(cursor, full_name, counties, year_from, year_to):
+    if counties[0] == 'all':
+        print("all counties search")
+        cursor.execute("SELECT DISTINCT(r.id) " +
+                       "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd " +
+                       "Where UPPER(pn.party_name)=%(fullname)s and r.debtor_reg_name_id=pn.id " +
+                       "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
+                       "and p.register_detl_id=rd.id " +
+                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s",
+                       {
+                           'fullname': full_name.upper(), 'from_date': year_from, 'to_date': year_to
+                       })
+    else:
+        print("not all counties search")
+
+        cursor.execute("SELECT DISTINCT(r.id) " +
+                       "FROM party_name pn, register r, party_name_rel pnr, party p, party_address pa, address a, " +
+                       "address_detail ad, register_details rd " +
+                       "Where UPPER(pn.party_name)=%(fullname)s and r.debtor_reg_name_id=pn.id " +
+                       "and pnr.party_name_id = pn.id and pnr.party_id=p.id and p.id=pa.party_id " +
+                       "and pa.address_id=a.id and a.detail_id=ad.id " +
+                       "and UPPER(ad.county) in ('" + "', '".join((str(n) for n in counties)) + "') " +
+                       "and p.register_detl_id=rd.id " +
+                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s",
+                       {
+                           'fullname': full_name.upper(), 'from_date': year_from, 'to_date': year_to
+                       })
 
     rows = cursor.fetchall()
     result = []
