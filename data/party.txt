@@ -6,7 +6,7 @@
 23|23|Debtor|||f
 24|24|Debtor|||f
 25|25|Debtor|||f
-26|26|Debtor|||f
+26|26|Debtor|Pilot||f
 27|27|Debtor|||f
 28|28|Debtor|Psychiatrist|1952-09-01|f
 29|29|Debtor|Interpreter|1978-07-04|f
