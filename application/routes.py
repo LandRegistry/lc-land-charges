@@ -1,16 +1,16 @@
 from application import app, producer
-from application.exchange import setup_messaging, publish_new_bankruptcy
+from application.exchange import publish_new_bankruptcy
 from flask import Response, request
 import psycopg2
 import psycopg2.extras
 import json
-import re
 import logging
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, get_new_registration_number, \
     get_registration_from_name, get_registration, insert_record, insert_migrated_record, insert_cancellation, \
     insert_amendment, insert_new_registration, insert_rectification
+
 
 @app.route('/', methods=["GET"])
 def index():
@@ -45,7 +45,6 @@ def migrated_registration(db2_reg_no):
         return Response(json.dumps(registrations), status=200, mimetype='application/json')
     else:
         return Response(status=404)
-
 
 
 @app.route('/search', methods=['POST'])
@@ -115,6 +114,7 @@ migrated_schema = {
     },
     "required": ["application_type", "application_ref", "date", "debtor_name", "residence"]
 }
+
 
 @app.route('/migrated_record', methods=['POST'])
 def insert():
@@ -187,6 +187,7 @@ def amend_registration(reg_no, appn_type):
             "amended_registrations": originals
         }
         return Response(json.dumps(data), status=200)
+
 
 @app.route('/registration/<reg_no>', methods=["DELETE"])
 def cancel_registration(reg_no):

@@ -40,11 +40,7 @@ def insert_address(cursor, address, address_type, party_id):
                            "county": county, "postcode": postcode,
                        })
         detail_id = cursor.fetchone()[0]
-
-
         address_string = "{}, {}, {}".format(", ".join(address['address_lines']), address["county"], address["postcode"])
-
-            
     elif 'text' in address:
         address_string = address['text']
         detail_id = None

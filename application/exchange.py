@@ -1,14 +1,12 @@
-from application import app
 import kombu
 from kombu.common import maybe_declare
 import sys
 import logging
 
 
-def setup_messaging():
-    host = "amqp://{}:{}@{}:{}".format(
-        app.config['MQ_USERNAME'], app.config['MQ_PASSWORD'], app.config['MQ_HOSTNAME'],
-        app.config['MQ_PORT'])
+def setup_messaging(config):
+    host = "amqp://{}:{}@{}:{}".format(config['MQ_USERNAME'], config['MQ_PASSWORD'], config['MQ_HOSTNAME'],
+                                       config['MQ_PORT'])
     logging.debug("Connect to " + host)
     connection = kombu.Connection(hostname=host)
     channel = connection.channel()
