@@ -343,7 +343,7 @@ def get_registration_from_name(cursor, forenames=None, surname=None, full_name=N
 
 
 def get_registration_from_full_search(cursor, full_name, counties, year_from, year_to):
-    if counties[0] == 'all':
+    if counties[0] == 'ALL':
         print("all counties search")
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd " +
@@ -356,14 +356,14 @@ def get_registration_from_full_search(cursor, full_name, counties, year_from, ye
                        })
     else:
         print("not all counties search")
-
+        # TODO: remove the code within the sql when we know how to pass a list as parameter
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, party_address pa, address a, " +
                        "address_detail ad, register_details rd " +
                        "Where UPPER(pn.party_name)=%(fullname)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id and p.id=pa.party_id " +
                        "and pa.address_id=a.id and a.detail_id=ad.id " +
-                       "and UPPER(ad.county) in ('" + "', '".join((str(n) for n in counties)) + "') " +
+                       "and UPPER(ad.county) IN ('" + "', '".join((str(n) for n in counties)) + "') " +
                        "and p.register_detl_id=rd.id " +
                        "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s",
                        {
