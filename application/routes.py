@@ -9,7 +9,7 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, get_new_registration_number, \
     get_registration_from_name, get_registration, insert_record, insert_migrated_record, insert_cancellation, \
-    insert_amendment, insert_new_registration, insert_rectification
+    insert_amendment, insert_new_registration, insert_rectification, get_registration_from_full_search
 
 
 @app.route('/', methods=["GET"])
@@ -57,10 +57,17 @@ def retrieve():
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         data = request.get_json(force=True)
 
-        if data['full_name'] == ' ':
-            reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'], None)
+        if data['search_type'] == 'full':
+            print("full search requested")
+            reg_ids = get_registration_from_full_search(cursor, data['full_name'], data['counties'],
+                                                        data['year_from'], data['year_to'])
         else:
-            reg_ids = get_registration_from_name(cursor, None, None, data['full_name'])
+            print("banks search wanted")
+            if data['name']['full_name'] == ' ':
+                reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'], None)
+            else:
+                reg_ids = get_registration_from_name(cursor, None, None, data['full_name'])
+
         if len(reg_ids) == 0:
             return Response(status=404)
 
