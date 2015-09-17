@@ -35,7 +35,8 @@ def fetchboth_mock(data_one, data_all):
 directory = os.path.dirname(__file__)
 valid_data = open(os.path.join(directory, 'data/valid_data.json'), 'r').read()
 migration_data = open(os.path.join(directory, 'data/migrator.json'), 'r').read()
-name_data = '{"forenames": "Bob Oscar Francis", "surname": "Howard", "full_name": " "}'
+name_data = '{"forenames": "Bob Oscar Francis", "surname": "Howard", "full_name": "Bob Oscar Francis Howard", ' \
+            '"search_type": "banks"}'
 
 search_data = [{"id": 1, "registration_date": datetime.date(2005, 12, 2), "application_type": "PAB",
                 "registration_no": "50135"}]

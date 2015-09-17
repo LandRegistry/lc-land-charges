@@ -63,7 +63,7 @@ def retrieve():
                                                         data['year_from'], data['year_to'])
         else:
             print("banks search wanted")
-            if data['name']['full_name'] == ' ':
+            if data['full_name'] == ' ':
                 reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'], None)
             else:
                 reg_ids = get_registration_from_name(cursor, None, None, data['full_name'])
