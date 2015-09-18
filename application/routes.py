@@ -8,9 +8,10 @@ import logging
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, get_new_registration_number, \
-    get_registration_from_name, get_registration, insert_record, insert_migrated_record, insert_cancellation, \
-    insert_amendment, insert_new_registration, insert_rectification, get_registration_from_full_search
-
+    get_registration, insert_record, insert_migrated_record, insert_cancellation, insert_rectification, \
+    insert_amendment, insert_new_registration
+from application.schema import SEARCH_SCHEMA
+from application.search import store_search_request, perform_search
 
 @app.route('/', methods=["GET"])
 def index():
@@ -53,31 +54,39 @@ def retrieve():
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
+    data = request.get_json(force=True)
+    try:
+        validate(data, SEARCH_SCHEMA)
+    except ValidationError as error:
+        message = "{}\n{}".format(error.message, error.path)
+        logging.error(message)
+        return Response(message, status=400)
+
+    if data['parameters']['search_type'] not in ['full', 'bankruptcy']:
+        message = "Invalid search type supplied"
+        logging.error(message)
+        return Response(message, status=400)
+
+
     try:
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-        data = request.get_json(force=True)
+        # Store the search request
+        store_search_request(cursor, data)
 
-        if data['search_type'] == 'full':
-            print("full search requested")
-            reg_ids = get_registration_from_full_search(cursor, data['full_name'], data['counties'],
-                                                        data['year_from'], data['year_to'])
-        else:
-            print("banks search wanted")
-            if data['full_name'] == ' ':
-                reg_ids = get_registration_from_name(cursor, data['forenames'], data['surname'], None)
-            else:
-                reg_ids = get_registration_from_name(cursor, None, None, data['full_name'])
-
-        if len(reg_ids) == 0:
-            return Response(status=404)
-
-        regs = []
+        # Run the queries
+        reg_ids = perform_search(cursor, data['parameters'])
+        logging.info(reg_ids)
+        results = []
         for reg_id in reg_ids:
-            regs.append(get_registration(cursor, reg_id))
+            results.append(get_registration(cursor, reg_id))
+
         complete(cursor)
-        data = json.dumps(regs, ensure_ascii=False)
-        return Response(data, status=200, mimetype='application/json')
-    except Exception as error:
+        if len(results) == 0:
+            return Response(status=404)
+        else:
+            return Response(json.dumps(results, ensure_ascii=False), status=200, mimetype='application/json')
+
+    except psycopg2.OperationalError as error:
         logging.error(error)
         return Response("Error: " + str(error), status=500)
 

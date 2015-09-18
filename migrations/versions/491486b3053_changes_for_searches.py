@@ -21,10 +21,10 @@ def upgrade():
     with op.batch_alter_table("request") as batch:
         batch.add_column(sa.Column("customer_name", sa.Unicode()))
         batch.add_column(sa.Column("customer_address", sa.Unicode()))
-        batch.add_column(sa.Column("customer_reference", sa.Unicode()))
 
     op.create_table('search_details',
                     sa.Column('id', sa.Integer(), primary_key=True),
+                    sa.Column('request_id', sa.Integer(), sa.ForeignKey('request.id')),
                     sa.Column('parameters', postgresql.JSON(), nullable=False))
 
 
