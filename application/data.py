@@ -109,11 +109,16 @@ def insert_registration(cursor, details_id, name_id, orig_reg_no=None):
                        "debtor": name_id,
                        "details": details_id
                    })
-    id = cursor.fetchone()[0]
-    return reg_no, id
+    reg_id = cursor.fetchone()[0]
+    return reg_no, reg_id
 
 
-def insert_register_details(cursor, request_id, date, application_type, legal_body, legal_body_ref, amends):
+def insert_register_details(cursor, request_id, data, amends):
+    application_type = data['application_type']
+    date = data['date']
+    legal_body = data['legal_body'] if 'legal_body' in data else ""
+    legal_body_ref = data['legal_body_ref'] if 'legal_body_ref' in data else ""
+
     cursor.execute("INSERT INTO register_details (request_id, registration_date, application_type, " +
                    "bankruptcy_date, legal_body, legal_body_ref, amends) " +
                    "VALUES ( %(req_id)s, %(reg_date)s, %(app_type)s, %(bank_date)s, " +
@@ -170,10 +175,7 @@ def insert_migration_status(cursor, register_id, registration_number, additional
 def insert_details(cursor, request_id, data, amends_id):
     logging.debug("Insert details")
     # register details
-    legal_body = data["legal_body"] if "legal_body" in data else ""
-    legal_body_ref = data["legal_body_ref"] if "legal_body_ref" in data else ""
-    register_details_id = insert_register_details(cursor, request_id, data['date'], data['application_type'],
-                                                  legal_body, legal_body_ref, amends_id)
+    register_details_id = insert_register_details(cursor, request_id, data, amends_id)
 
     # party
     party_id = insert_party(cursor, register_details_id, "Debtor", data['occupation'], data['date_of_birth'],
@@ -358,8 +360,8 @@ def get_new_registration_number(cursor, db2_reg_no):
     rows = cursor.fetchall()
     # row = rows[0]
     reg_nos = []
-    for n in rows:
-        reg_nos.append(n['registration_no'])
+    for row in rows:
+        reg_nos.append(row['registration_no'])
 
     return reg_nos
 
@@ -475,9 +477,9 @@ def get_registration_details(cursor, reg_no):
 
 
 def insert_migrated_record(cursor, data):
-    app_type = re.sub(r"\(|\)", "", data["application_type"])
-    request_id = insert_request(cursor, None, app_type, data['application_ref'], data['date'], None)
-    details_id = insert_register_details(cursor, request_id, data['date'], app_type, "", "", None)  # TODO get court
+    data["application_type"] = re.sub(r"\(|\)", "", data["application_type"])
+    request_id = insert_request(cursor, None, data["application_type"], data['application_ref'], data['date'], None)
+    details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
     party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
     name_id = insert_name(cursor, data['debtor_name'], party_id)
 
