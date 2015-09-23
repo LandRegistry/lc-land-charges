@@ -9,7 +9,7 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, get_new_registration_number, \
     get_registration, insert_record, insert_migrated_record, insert_cancellation, insert_rectification, \
-    insert_amendment, insert_new_registration
+    insert_amendment, insert_new_registration, read_counties
 from application.schema import SEARCH_SCHEMA
 from application.search import store_search_request, perform_search
 
@@ -202,7 +202,7 @@ def amend_registration(reg_no, appn_type):
             "new_registrations": reg_nos,
             "amended_registrations": originals
         }
-        return Response(json.dumps(data), status=200)
+        return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
 @app.route('/registration/<reg_no>', methods=["DELETE"])
@@ -220,4 +220,10 @@ def cancel_registration(reg_no):
             "cancelled": nos
         }
         print(data)
-        return Response(json.dumps(data), status=200)
+        return Response(json.dumps(data), status=200, mimetype='application/json')
+
+
+@app.route('/counties', methods=['GET'])
+def get_counties_list():
+    counties = read_counties()
+    return Response(json.dumps(counties), status=200, mimetype='application/json')

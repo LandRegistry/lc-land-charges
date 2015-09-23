@@ -124,6 +124,11 @@ mock_search_not_found = fetchboth_mock([1], [])
 mock_migration = fetchboth_mock(["50001"], ["50001"])
 mock_retrieve = fetchboth_mock(all_queries_data, all_queries_data)
 mock_cancellation = fetchboth_mock(['50001'], [['50001']])
+mock_counties = fetchall_mock([
+    {'name': 'COUNTY1'},
+    {'name': 'COUNTY2'},
+    {'name': 'COUNTY3'},
+])
 
 
 class TestWorking:
@@ -249,3 +254,10 @@ class TestWorking:
         response = self.app.get("/migrated_registration/500")
         data = json.loads(response.data.decode('utf-8'))
         assert data[0]['debtor_name']['surname'] == 'Howard'
+
+    @mock.patch('psycopg2.connect', **mock_counties)
+    def test_get_counties(self, mc):
+        response = self.app.get("/counties")
+        data = json.loads(response.data.decode('utf-8'))
+        assert len(data) == 3
+        assert data[1] == 'COUNTY2'

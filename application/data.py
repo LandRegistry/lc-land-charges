@@ -483,3 +483,12 @@ def insert_cancellation(registration_no, data):
     rows = cursor.rowcount
     complete(cursor)
     return rows, original_regs
+
+
+def read_counties():
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute("SELECT name FROM counties")
+    rows = cursor.fetchall()
+    counties = [row['name'] for row in rows]
+    complete(cursor)
+    return counties
