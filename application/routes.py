@@ -12,6 +12,7 @@ from application.data import connect, get_registration_details, complete, get_ne
     insert_amendment, insert_new_registration, read_counties
 from application.schema import SEARCH_SCHEMA
 from application.search import store_search_request, perform_search
+from flask.ext.cors import cross_origin
 
 @app.route('/', methods=["GET"])
 def index():
@@ -224,6 +225,7 @@ def cancel_registration(reg_no):
 
 
 @app.route('/counties', methods=['GET'])
+@cross_origin()
 def get_counties_list():
     counties = read_counties()
     return Response(json.dumps(counties), status=200, mimetype='application/json')
