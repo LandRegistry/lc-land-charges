@@ -14,6 +14,7 @@ from application.schema import SEARCH_SCHEMA
 from application.search import store_search_request, perform_search
 from flask.ext.cors import cross_origin
 
+
 @app.route('/', methods=["GET"])
 def index():
     return Response(status=200)
@@ -67,7 +68,6 @@ def retrieve():
         message = "Invalid search type supplied"
         logging.error(message)
         return Response(message, status=400)
-
 
     try:
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)

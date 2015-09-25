@@ -39,7 +39,7 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to):
                        "Where UPPER(pn.party_name)=%(fullname)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id and p.id=pa.party_id " +
                        "and pa.address_id=a.id and a.detail_id=ad.id " +
-                       #"and UPPER(ad.county) IN ('" + "', '".join((str(n) for n in counties)) + "') " +
+                       # "and UPPER(ad.county) IN ('" + "', '".join((str(n) for n in counties)) + "') " +
                        "and UPPER(ad.county) = ANY(%(counties)s) "
                        "and p.register_detl_id=rd.id " +
                        "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s",
