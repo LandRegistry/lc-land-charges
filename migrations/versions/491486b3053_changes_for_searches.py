@@ -31,6 +31,5 @@ def upgrade():
 def downgrade():
     op.drop_table('search_details')
     with op.batch_alter_table("request") as batch:
-        batch.drop_column('customer_reference')
         batch.drop_column('customer_address')
         batch.drop_column('customer_name')
