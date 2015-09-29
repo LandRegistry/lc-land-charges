@@ -189,18 +189,6 @@ class TestWorking:
         assert response.status_code == 200
         assert mock_publish.called
 
-    @mock.patch('psycopg2.connect', side_effect=psycopg2.OperationalError('Fail'))
-    def test_database_failure(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/registration', data=valid_data, headers=headers)
-        assert response.status_code == 500
-
-    @mock.patch('psycopg2.connect', side_effect=psycopg2.OperationalError('Fail'))
-    def test_database_failure_2(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/search', data=name_search_data, headers=headers)
-        assert response.status_code == 500
-
     @mock.patch('psycopg2.connect', **mock_migration)
     def test_migration_success(self, mc):
         headers = {'Content-Type': 'application/json'}

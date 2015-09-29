@@ -69,33 +69,28 @@ def retrieve():
         logging.error(message)
         return Response(message, status=400)
 
-    try:
-        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-        # Store the search request
-        store_search_request(cursor, data)
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    # Store the search request
+    store_search_request(cursor, data)
 
-        # Run the queries
-        reg_ids = perform_search(cursor, data['parameters'])
-        logging.info(reg_ids)
-        results = []
-        for reg_id in reg_ids:
-            results.append(get_registration(cursor, reg_id))
+    # Run the queries
+    reg_ids = perform_search(cursor, data['parameters'])
+    logging.info(reg_ids)
+    results = []
+    for reg_id in reg_ids:
+        results.append(get_registration(cursor, reg_id))
 
-        complete(cursor)
-        if len(results) == 0:
-            return Response(status=404)
-        else:
-            return Response(json.dumps(results, ensure_ascii=False), status=200, mimetype='application/json')
-
-    except psycopg2.OperationalError as error:
-        logging.error(error)
-        return Response("Error: " + str(error), status=500)
+    complete(cursor)
+    if len(results) == 0:
+        return Response(status=404)
+    else:
+        return Response(json.dumps(results, ensure_ascii=False), status=200, mimetype='application/json')
 
 
 # Route exists purely for testing purposes - need to get something invalid onto
 # the synchroniser's queue!
 @app.route('/synchronise', methods=["POST"])
-def synchronise():
+def synchronise():   # pragma: no cover
     if request.headers['Content-Type'] != "application/json":
         logging.error('Content-Type is not JSON')
         return Response(status=415)
