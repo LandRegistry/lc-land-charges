@@ -139,23 +139,18 @@ def insert():
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
+    data = request.get_json(force=True)
     try:
-        data = request.get_json(force=True)
-        try:
-            validate(data, migrated_schema)
-        except ValidationError as error:
-            message = "{}\n{}".format(error.message, error.path)
-            return Response(message, status=400)
+        validate(data, migrated_schema)
+    except ValidationError as error:
+        message = "{}\n{}".format(error.message, error.path)
+        return Response(message, status=400)
 
-        cursor = connect()
-        registration_no = insert_migrated_record(cursor, data)
+    cursor = connect()
+    registration_no = insert_migrated_record(cursor, data)
 
-        complete(cursor)
-        return Response(json.dumps({'new_registrations': [registration_no]}), status=200)
-
-    except Exception as error:
-        logging.error(error)
-        return Response("Error: " + str(error), status=500)
+    complete(cursor)
+    return Response(json.dumps({'new_registrations': [registration_no]}), status=200)
 
 
 @app.route('/registration', methods=['POST'])
@@ -164,16 +159,13 @@ def register():
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
-    try:
-        json_data = request.get_json(force=True)
-        cursor = connect()
-        new_regns, details = insert_new_registration(cursor, json_data)
-        complete(cursor)
-        publish_new_bankruptcy(producer, new_regns)
-        return Response(json.dumps({'new_registrations': new_regns}), status=200)
-    except Exception as error:
-        logging.error(error)
-        return Response("Error: " + str(error), status=500)
+    json_data = request.get_json(force=True)
+    cursor = connect()
+    # pylint: disable=unused-variable
+    new_regns, details = insert_new_registration(cursor, json_data)
+    complete(cursor)
+    publish_new_bankruptcy(producer, new_regns)
+    return Response(json.dumps({'new_registrations': new_regns}), status=200)
 
 
 @app.route('/registration/<reg_no>/<appn_type>', methods=["PUT"])

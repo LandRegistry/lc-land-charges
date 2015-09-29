@@ -42,5 +42,3 @@ SEARCH_SCHEMA = {
     },
     "required": ["customer", "parameters"]
 }
-
-

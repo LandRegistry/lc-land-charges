@@ -66,7 +66,7 @@ name_search_data_full_all = json.dumps({
     "parameters": {
         "search_type": "full",
         "counties": ["ALL"],
-        "search_items": [ {
+        "search_items": [{
             "name": "Jasper Beer",
             "year_from": 1925,
             "year_to": 2015
