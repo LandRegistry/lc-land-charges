@@ -309,36 +309,6 @@ def get_all_registration_nos(cursor, details_id):
     return results
 
 
-def get_registration_from_name(cursor, forenames=None, surname=None, full_name=None):
-    if full_name is None:
-        full_name = " "
-        fn_list = forenames.split(" ")
-        forename = fn_list[0]
-        middle_name = ""
-        if len(forenames) > 1:
-            middle_name = " ".join(fn_list[1:])
-    else:
-        forename = " "
-        middle_name = " "
-        surname = " "
-
-    cursor.execute("SELECT r.id " +
-                   "FROM party_name n, register r " +
-                   "where ((UPPER(n.forename)=%(forename)s and UPPER(n.surname)=%(surname)s " +
-                   "and UPPER(n.middle_names)=%(midname)s) or (UPPER(n.party_name)=%(fullname)s)) " +
-                   "and r.debtor_reg_name_id=n.id",
-                   {
-                       'forename': forename.upper(), 'midname': middle_name.upper(), 'surname': surname.upper(), 'fullname': full_name.upper()
-                   })
-
-    rows = cursor.fetchall()
-    result = []
-    for row in rows:
-        result.append(row['id'])
-
-    return result
-
-
 def get_registration(cursor, reg_id):
     cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
                    "r.id as register_id from register r, register_details rd " +
@@ -515,3 +485,12 @@ def insert_cancellation(registration_no, data):
     rows = cursor.rowcount
     complete(cursor)
     return rows, original_regs
+
+
+def read_counties():
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute("SELECT name FROM counties")
+    rows = cursor.fetchall()
+    counties = [row['name'] for row in rows]
+    complete(cursor)
+    return counties

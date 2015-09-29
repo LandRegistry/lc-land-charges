@@ -3,6 +3,7 @@ from application.routes import app
 import os
 import json
 import datetime
+import psycopg2
 
 
 def fetchall_mock(data):
@@ -35,7 +36,62 @@ def fetchboth_mock(data_one, data_all):
 directory = os.path.dirname(__file__)
 valid_data = open(os.path.join(directory, 'data/valid_data.json'), 'r').read()
 migration_data = open(os.path.join(directory, 'data/migrator.json'), 'r').read()
-name_data = '{"forenames": "Bob Oscar Francis", "surname": "Howard", "full_name": " "}'
+name_data = '{"forenames": "Bob Oscar Francis", "surname": "Howard", "full_name": "Bob Oscar Francis Howard", ' \
+            '"search_type": "banks"}'
+name_search_data = json.dumps({
+    "customer": {
+        "key_number": "1234567",
+        "name": "Dave The Customer",
+        "address": "Lurking",
+        "reference": "someRef"
+    },
+    "document_id": 17,
+    "parameters": {
+        "search_type": "bankruptcy",
+        "counties": ["ALL"],
+        "search_items": [{
+            "name": "Bob Howard"
+        }]
+    }
+})
+
+name_search_data_full_all = json.dumps({
+    "customer": {
+        "key_number": "1234567",
+        "name": "Dave The Customer",
+        "address": "Lurking",
+        "reference": "someRef"
+    },
+    "document_id": 17,
+    "parameters": {
+        "search_type": "full",
+        "counties": ["ALL"],
+        "search_items": [ {
+            "name": "Jasper Beer",
+            "year_from": 1925,
+            "year_to": 2015
+        }]
+    }
+})
+
+name_search_data_full_counties = json.dumps({
+    "customer": {
+        "key_number": "1234567",
+        "name": "Dave The Customer",
+        "address": "Lurking",
+        "reference": "someRef"
+    },
+    "document_id": 17,
+    "parameters": {
+        "search_type": "full",
+        "counties": ["Devon"],
+        "search_items": [{
+            "name": "Jasper Beer",
+            "year_from": 1925,
+            "year_to": 2015
+        }]
+    }
+})
 
 search_data = [{"id": 1, "registration_date": datetime.date(2005, 12, 2), "application_type": "PAB",
                 "registration_no": "50135"}]
@@ -63,11 +119,16 @@ all_queries_data = [{
     "extra_data": {}
 }]
 
-mock_search = fetchall_mock(search_data)
-mock_search_not_found = fetchall_mock([])
+mock_search = fetchboth_mock([1], search_data)
+mock_search_not_found = fetchboth_mock([1], [])
 mock_migration = fetchboth_mock(["50001"], ["50001"])
 mock_retrieve = fetchboth_mock(all_queries_data, all_queries_data)
 mock_cancellation = fetchboth_mock(['50001'], [['50001']])
+mock_counties = fetchall_mock([
+    {'name': 'COUNTY1'},
+    {'name': 'COUNTY2'},
+    {'name': 'COUNTY3'},
+])
 
 
 class TestWorking:
@@ -81,19 +142,37 @@ class TestWorking:
     @mock.patch('psycopg2.connect', **mock_search)
     def test_item_found(self, mock_connect):
         headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/search', data=name_data, headers=headers)
+        response = self.app.post('/search', data=name_search_data, headers=headers)
+        assert response.status_code == 200
+
+    @mock.patch('psycopg2.connect', **mock_search)
+    def test_full_search_all_counties(self, mock_connect):
+        headers = {'Content-Type': 'application/json'}
+        response = self.app.post('/search', data=name_search_data_full_all, headers=headers)
+        assert response.status_code == 200
+
+    @mock.patch('psycopg2.connect', **mock_search)
+    def test_full_search_some_counties(self, mock_connect):
+        headers = {'Content-Type': 'application/json'}
+        response = self.app.post('/search', data=name_search_data_full_counties, headers=headers)
         assert response.status_code == 200
 
     @mock.patch('psycopg2.connect', **mock_search_not_found)
     def test_item_not_found(self, mock_connect):
         headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/search', data=name_data, headers=headers)
+        response = self.app.post('/search', data=name_search_data, headers=headers)
         assert response.status_code == 404
+
+    @mock.patch('psycopg2.connect', **mock_search_not_found)
+    def test_search_bad_data(self, mock_connect):
+        headers = {'Content-Type': 'application/json'}
+        response = self.app.post('/search', data='{"foo": "bar"}', headers=headers)
+        assert response.status_code == 400
 
     @mock.patch('psycopg2.connect')
     def test_search_not_json(self, mock_connect):
         headers = {'Content-Type': 'application/xml'}
-        response = self.app.post('/search', data=name_data, headers=headers)
+        response = self.app.post('/search', data=name_search_data, headers=headers)
         assert response.status_code == 415
 
     @mock.patch('psycopg2.connect')
@@ -110,16 +189,16 @@ class TestWorking:
         assert response.status_code == 200
         assert mock_publish.called
 
-    @mock.patch('psycopg2.connect', side_effect=Exception('Fail'))
+    @mock.patch('psycopg2.connect', side_effect=psycopg2.OperationalError('Fail'))
     def test_database_failure(self, mock_connect):
         headers = {'Content-Type': 'application/json'}
         response = self.app.post('/registration', data=valid_data, headers=headers)
         assert response.status_code == 500
 
-    @mock.patch('psycopg2.connect', side_effect=Exception('Fail'))
+    @mock.patch('psycopg2.connect', side_effect=psycopg2.OperationalError('Fail'))
     def test_database_failure_2(self, mock_connect):
         headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/search', data=name_data, headers=headers)
+        response = self.app.post('/search', data=name_search_data, headers=headers)
         assert response.status_code == 500
 
     @mock.patch('psycopg2.connect', **mock_migration)
@@ -175,3 +254,10 @@ class TestWorking:
         response = self.app.get("/migrated_registration/500")
         data = json.loads(response.data.decode('utf-8'))
         assert data[0]['debtor_name']['surname'] == 'Howard'
+
+    @mock.patch('psycopg2.connect', **mock_counties)
+    def test_get_counties(self, mc):
+        response = self.app.get("/counties")
+        data = json.loads(response.data.decode('utf-8'))
+        assert len(data) == 3
+        assert data[1] == 'COUNTY2'
