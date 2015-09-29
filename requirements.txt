@@ -1,4 +1,6 @@
 flask
+Flask-Migrate
+Flask-Script
 itsdangerous
 markupsafe
 requests
