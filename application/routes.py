@@ -8,7 +8,7 @@ import logging
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, get_new_registration_number, \
-    get_registration, insert_record, insert_migrated_record, insert_cancellation, insert_rectification, \
+    get_registration, insert_migrated_record, insert_cancellation, insert_rectification, \
     insert_amendment, insert_new_registration, read_counties
 from application.schema import SEARCH_SCHEMA
 from application.search import store_search_request, perform_search
@@ -24,13 +24,13 @@ def index():
 def registration(reg_no):
     logging.debug("GET registration")
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    d = get_registration_details(cursor, reg_no)
+    details = get_registration_details(cursor, reg_no)
     complete(cursor)
-    if d is None:
+    if details is None:
         logging.warning("Returning 404")
         return Response(status=404)
     else:
-        return Response(json.dumps(d), status=200, mimetype='application/json')
+        return Response(json.dumps(details), status=200, mimetype='application/json')
 
 
 @app.route('/migrated_registration/<int:db2_reg_no>', methods=['GET'])
@@ -39,8 +39,8 @@ def migrated_registration(db2_reg_no):
     new_reg_no = get_new_registration_number(cursor, db2_reg_no)
 
     registrations = []
-    for n in new_reg_no:
-        registrations.append(get_registration_details(cursor, n))
+    for number in new_reg_no:
+        registrations.append(get_registration_details(cursor, number))
 
     complete(cursor)
 
@@ -139,23 +139,18 @@ def insert():
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
+    data = request.get_json(force=True)
     try:
-        data = request.get_json(force=True)
-        try:
-            validate(data, migrated_schema)
-        except ValidationError as error:
-            message = "{}\n{}".format(error.message, error.path)
-            return Response(message, status=400)
+        validate(data, migrated_schema)
+    except ValidationError as error:
+        message = "{}\n{}".format(error.message, error.path)
+        return Response(message, status=400)
 
-        cursor = connect()
-        registration_no = insert_migrated_record(cursor, data)
+    cursor = connect()
+    registration_no = insert_migrated_record(cursor, data)
 
-        complete(cursor)
-        return Response(json.dumps({'new_registrations': [registration_no]}), status=200)
-
-    except Exception as error:
-        logging.error(error)
-        return Response("Error: " + str(error), status=500)
+    complete(cursor)
+    return Response(json.dumps({'new_registrations': [registration_no]}), status=200)
 
 
 @app.route('/registration', methods=['POST'])
@@ -164,16 +159,13 @@ def register():
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
-    try:
-        json_data = request.get_json(force=True)
-        cursor = connect()
-        new_regns, details = insert_new_registration(cursor, json_data)
-        complete(cursor)
-        publish_new_bankruptcy(producer, new_regns)
-        return Response(json.dumps({'new_registrations': new_regns}), status=200)
-    except Exception as error:
-        logging.error(error)
-        return Response("Error: " + str(error), status=500)
+    json_data = request.get_json(force=True)
+    cursor = connect()
+    # pylint: disable=unused-variable
+    new_regns, details = insert_new_registration(cursor, json_data)
+    complete(cursor)
+    publish_new_bankruptcy(producer, new_regns)
+    return Response(json.dumps({'new_registrations': new_regns}), status=200)
 
 
 @app.route('/registration/<reg_no>/<appn_type>', methods=["PUT"])
@@ -213,8 +205,8 @@ def cancel_registration(reg_no):
         return Response(status=415)
 
     json_data = request.get_json(force=True)
-    r, nos = insert_cancellation(reg_no, json_data)
-    if r == 0:
+    rows, nos = insert_cancellation(reg_no, json_data)
+    if rows == 0:
         return Response(status=404)
     else:
         data = {

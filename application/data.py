@@ -109,11 +109,16 @@ def insert_registration(cursor, details_id, name_id, orig_reg_no=None):
                        "debtor": name_id,
                        "details": details_id
                    })
-    id = cursor.fetchone()[0]
-    return reg_no, id
+    reg_id = cursor.fetchone()[0]
+    return reg_no, reg_id
 
 
-def insert_register_details(cursor, request_id, date, application_type, legal_body, legal_body_ref, amends):
+def insert_register_details(cursor, request_id, data, amends):
+    application_type = data['application_type']
+    date = data['date']
+    legal_body = data['legal_body'] if 'legal_body' in data else ""
+    legal_body_ref = data['legal_body_ref'] if 'legal_body_ref' in data else ""
+
     cursor.execute("INSERT INTO register_details (request_id, registration_date, application_type, " +
                    "bankruptcy_date, legal_body, legal_body_ref, amends) " +
                    "VALUES ( %(req_id)s, %(reg_date)s, %(app_type)s, %(bank_date)s, " +
@@ -170,10 +175,7 @@ def insert_migration_status(cursor, register_id, registration_number, additional
 def insert_details(cursor, request_id, data, amends_id):
     logging.debug("Insert details")
     # register details
-    legal_body = data["legal_body"] if "legal_body" in data else ""
-    legal_body_ref = data["legal_body_ref"] if "legal_body_ref" in data else ""
-    register_details_id = insert_register_details(cursor, request_id, data['date'], data['application_type'],
-                                                  legal_body, legal_body_ref, amends_id)
+    register_details_id = insert_register_details(cursor, request_id, data, amends_id)
 
     # party
     party_id = insert_party(cursor, register_details_id, "Debtor", data['occupation'], data['date_of_birth'],
@@ -208,6 +210,8 @@ def insert_record(cursor, data, request_id, amends=None, orig_reg_no=None):
     name_ids, register_details_id = insert_details(cursor, request_id, data, amends)
     # insert_registration(cursor, details_id, name_id)
     reg_nos = []
+
+    # pylint: disable=unused-variable
     for name_id in name_ids:
         reg_no, reg_id = insert_registration(cursor, register_details_id, name_id, orig_reg_no)
         reg_nos.append(reg_no)
@@ -243,6 +247,7 @@ def insert_amendment(cursor, orig_reg_no, data):
 
     original_regs = get_all_registration_nos(cursor, original_detl_id)
     amend_detl_id = get_register_details_id(cursor, orig_reg_no)
+    # pylint: disable=unused-variable
     reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id)
 
     # Update old registration
@@ -268,6 +273,7 @@ def insert_rectification(cursor, orig_reg_no, data):
     now = datetime.datetime.now()
     request_id = insert_request(cursor, None, "RECTIFICATION", None, now, document, None)
 
+    # pylint: disable=unused-variable
     original_regs = get_all_registration_nos(cursor, original_detl_id)
     amend_detl_id = get_register_details_id(cursor, orig_reg_no)
     reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id, orig_reg_no)
@@ -328,10 +334,39 @@ def get_new_registration_number(cursor, db2_reg_no):
     rows = cursor.fetchall()
     # row = rows[0]
     reg_nos = []
-    for n in rows:
-        reg_nos.append(n['registration_no'])
+    for row in rows:
+        reg_nos.append(row['registration_no'])
 
     return reg_nos
+
+
+def get_name_details(cursor, data, details_id, name_id):
+    cursor.execute("select forename, middle_names, surname from party_name where id = %(id)s", {'id': name_id})
+    rows = cursor.fetchall()
+    forenames = [rows[0]['forename']]
+    if rows[0]['middle_names'] != "":
+        forenames += rows[0]['middle_names'].split(" ")
+    data['debtor_name'] = {'forenames': forenames, 'surname': rows[0]['surname']}
+
+    cursor.execute("select occupation, id from party where party_type='Debtor' and register_detl_id=%(id)s",
+                   {'id': details_id})
+    rows = cursor.fetchall()
+    data['occupation'] = rows[0]['occupation']
+    party_id = rows[0]['id']
+
+    cursor.execute("select n.forename, n.middle_names, n.surname from party_name n, party_name_rel r " +
+                   "where n.id = r.party_name_id and r.party_id = %(party_id)s and n.id != %(id)s ",
+                   {'party_id': party_id, 'id': name_id})
+    rows = cursor.fetchall()
+    data['debtor_alternative_name'] = []
+    for row in rows:
+        forenames = [row['forename']]
+        if row['middle_names'] != "":
+            forenames += row['middle_names'].split(" ")
+        data['debtor_alternative_name'].append({
+            'forenames': forenames, 'surname': row['surname']
+        })
+    return party_id
 
 
 def get_registration_details(cursor, reg_no):
@@ -362,31 +397,7 @@ def get_registration_details(cursor, reg_no):
         else:
             data['status'] = 'cancelled'
 
-    cursor.execute("select forename, middle_names, surname from party_name where id = %(id)s", {'id': name_id})
-    rows = cursor.fetchall()
-    forenames = [rows[0]['forename']]
-    if rows[0]['middle_names'] != "":
-        forenames += rows[0]['middle_names'].split(" ")
-    data['debtor_name'] = {'forenames': forenames, 'surname': rows[0]['surname']}
-
-    cursor.execute("select occupation, id from party where party_type='Debtor' and register_detl_id=%(id)s",
-                   {'id': details_id})
-    rows = cursor.fetchall()
-    data['occupation'] = rows[0]['occupation']
-    party_id = rows[0]['id']
-
-    cursor.execute("select n.forename, n.middle_names, n.surname from party_name n, party_name_rel r " +
-                   "where n.id = r.party_name_id and r.party_id = %(party_id)s and n.id != %(id)s ",
-                   {'party_id': party_id, 'id': name_id})
-    rows = cursor.fetchall()
-    data['debtor_alternative_name'] = []
-    for row in rows:
-        forenames = [row['forename']]
-        if row['middle_names'] != "":
-            forenames += row['middle_names'].split(" ")
-        data['debtor_alternative_name'].append({
-            'forenames': forenames, 'surname': row['surname']
-        })
+    party_id = get_name_details(cursor, data, details_id, name_id)
 
     cursor.execute("select trading_name from party_trading where party_id = %(id)s", {'id': party_id})
     rows = cursor.fetchall()
@@ -415,18 +426,10 @@ def get_registration_details(cursor, reg_no):
 
         else:
             address = []
-            if row['line_1'] != "":
-                address.append(row['line_1'])
-            if row['line_2'] != "":
-                address.append(row['line_2'])
-            if row['line_3'] != "":
-                address.append(row['line_3'])
-            if row['line_4'] != "":
-                address.append(row['line_4'])
-            if row['line_5'] != "":
-                address.append(row['line_5'])
-            if row['line_6'] != "":
-                address.append(row['line_6'])
+            for i in range(1, 7):
+                line = row['line_{}'.format(i)]
+                if line != "":
+                    address.append(line)
 
             data['residence'].append({
                 'address_lines': address, 'county': row['county'], 'postcode': row['postcode']
@@ -445,9 +448,9 @@ def get_registration_details(cursor, reg_no):
 
 
 def insert_migrated_record(cursor, data):
-    app_type = re.sub(r"\(|\)", "", data["application_type"])
-    request_id = insert_request(cursor, None, app_type, data['application_ref'], data['date'], None)
-    details_id = insert_register_details(cursor, request_id, data['date'], app_type, "", "", None)  # TODO get court
+    data["application_type"] = re.sub(r"\(|\)", "", data["application_type"])
+    request_id = insert_request(cursor, None, data["application_type"], data['application_ref'], data['date'], None)
+    details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
     party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
     name_id = insert_name(cursor, data['debtor_name'], party_id)
 

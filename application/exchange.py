@@ -20,5 +20,5 @@ def setup_messaging(config):
 
 
 def publish_new_bankruptcy(producer, data):
-    logging.info("Sending: {}".format(data))
+    logging.info("Sending: %s", data)
     producer.publish(data)
