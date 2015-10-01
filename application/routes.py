@@ -8,7 +8,7 @@ import logging
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, get_new_registration_number, \
-    get_registration, insert_migrated_record, insert_cancellation, insert_rectification, \
+    get_registration, insert_migrated_record, insert_cancellation,  \
     insert_amendment, insert_new_registration, read_counties
 from application.schema import SEARCH_SCHEMA
 from application.search import store_search_request, perform_search
@@ -163,8 +163,8 @@ def register():
     return Response(json.dumps({'new_registrations': new_regns}), status=200)
 
 
-@app.route('/registration/<reg_no>/<appn_type>', methods=["PUT"])
-def amend_registration(reg_no, appn_type):
+@app.route('/registration/<reg_no>', methods=["PUT"])
+def amend_registration(reg_no):
     # Amendment... we're being given the replacement data
     if request.headers['Content-Type'] != "application/json":
         logging.error('Content-Type is not JSON')
