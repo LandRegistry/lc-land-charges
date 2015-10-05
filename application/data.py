@@ -133,6 +133,7 @@ def insert_register_details(cursor, request_id, data, amends):
     return cursor.fetchone()[0]
 
 
+# pylint: disable=too-many-arguments
 def insert_request(cursor, key_number, application_type, reference, date, document=None, insolvency_data=None):
     if insolvency_data is not None:
         cursor.execute("INSERT INTO ins_bankruptcy_request (request_data) VALUES (%(json)s) RETURNING id",
