@@ -15,6 +15,7 @@ class DevelopmentConfig(Config):
     MQ_PASSWORD = 'mqpassword'
     MQ_HOSTNAME = 'localhost'
     MQ_PORT = '5672'
+    SQLALCHEMY_DATABASE_URI = 'postgresql://landcharges:lcalpha@localhost/landcharges'
 
 
 class PreviewConfig(Config):
@@ -27,3 +28,4 @@ class PreviewConfig(Config):
     MQ_PASSWORD = 'mqpassword'
     MQ_HOSTNAME = 'localhost'
     MQ_PORT = '5672'
+    SQLALCHEMY_DATABASE_URI = 'postgresql://landcharges:lcalpha@localhost/landcharges'
