@@ -20,6 +20,15 @@ def index():
     return Response(status=200)
 
 
+@app.route('/health', methods=['GET'])
+def health():
+    result = {
+        'status': 'OK',
+        'dependencies': {}
+    }
+    return Response(json.dumps(result), status=200, mimetype='application/json')
+
+
 @app.route('/registration/<int:reg_no>', methods=['GET'])
 def registration(reg_no):
     logging.debug("GET registration")
