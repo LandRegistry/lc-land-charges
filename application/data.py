@@ -405,11 +405,12 @@ def get_registration_details(cursor, reg_no):
     if len(rows) != 0:
         data['trading_name'] = rows[0]['trading_name']
 
-    cursor.execute("select r.application_reference, r.document_ref from request r, register_details d " +
+    cursor.execute("select r.key_number, r.application_reference, r.document_ref from request r, register_details d " +
                    "where r.id = d.request_id and d.id = %(id)s", {'id': details_id})
     rows = cursor.fetchall()
     data['application_ref'] = rows[0]['application_reference']
     data['document_id'] = rows[0]['document_ref']
+    data['key_number'] = rows[0]['key_number']
 
     cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, d.county, " +
                    "d.postcode, a.address_string " +
