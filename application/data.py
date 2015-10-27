@@ -370,9 +370,19 @@ def get_name_details(cursor, data, details_id, name_id):
     return party_id
 
 
+def get_registration_no_from_details_id(cursor, details_id):
+    cursor.execute("select registration_no from register where details_id = %(id)s",
+                   {'id': details_id})
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        return None
+    else:
+        return rows[0]['registration_no']
+
+
 def get_registration_details(cursor, reg_no):
     cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
-                   "r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by from register r, register_details rd " +
+                   "r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by, rd.amends from register r, register_details rd " +
                    "where r.registration_no = %(reg_no)s and r.details_id = rd.id", {'reg_no': reg_no})
     rows = cursor.fetchall()
     if len(rows) == 0:
@@ -388,7 +398,10 @@ def get_registration_details(cursor, reg_no):
     details_id = rows[0]['id']
     name_id = rows[0]['debtor_reg_name_id']
     register_id = rows[0]['register_id']
-    print(rows[0])
+
+    if rows[0]['amends'] is not None:
+        data['amends_regn'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
+
     if rows[0]['cancelled_by'] is not None:
         cursor.execute("select amends from register_details where amends=%(id)s",
                        {"id": details_id})
@@ -397,6 +410,12 @@ def get_registration_details(cursor, reg_no):
             data['status'] = 'superseded'
         else:
             data['status'] = 'cancelled'
+
+    cursor.execute('select r.registration_no, d.amends FROM register r, register_details d WHERE r.details_id=d.id AND '
+                   'd.amends=%(id)s', {'id': details_id})
+    rows = cursor.fetchall()
+    if len(rows) > 0:
+        data['amended_by'] = rows[0]['registration_no']
 
     party_id = get_name_details(cursor, data, details_id, name_id)
 
