@@ -18,3 +18,6 @@
 43|76474 Schoen Summit|Sonnymouth|Metzport|""|""|""|""|Avon|IP76 6IA
 44|27211 Breanne Fort|Luciouschester|Jaclynchester|""|""|""|""|Grampian|EF37 1YR
 45|53179 Balistreri Villages|Auroremouth|""|""|""|""|""|County Londonderry|FT73 7LB
+46|112 Winterfell|The North|""|""|""|""|""|Yorkshire|YK11 1AA
+47|112 Winterfell|The North|""|""|""|""|""|North Yorkshire|YK11 1AA
+48|234 Polerro Road|Little Hampton|""|""|""|""|""|Cornwall|CN3 3RR
