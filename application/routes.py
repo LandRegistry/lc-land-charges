@@ -83,11 +83,7 @@ def retrieve():
     store_search_request(cursor, data)
 
     # Run the queries
-    reg_ids = perform_search(cursor, data['parameters'])
-    logging.info(reg_ids)
-    results = []
-    for reg_id in reg_ids:
-        results.append(get_registration(cursor, reg_id))
+    results = perform_search(cursor, data['parameters'])
 
     complete(cursor)
     if len(results) == 0:
