@@ -35,6 +35,7 @@ def fetchboth_mock(data_one, data_all):
 
 directory = os.path.dirname(__file__)
 valid_data = open(os.path.join(directory, 'data/valid_data.json'), 'r').read()
+valid_data_complex = open(os.path.join(directory, 'data/valid_data_complex.json'), 'r').read()
 migration_data = open(os.path.join(directory, 'data/migrator.json'), 'r').read()
 name_data = '{"forenames": "Bob Oscar Francis", "surname": "Howard", "full_name": "Bob Oscar Francis Howard", ' \
             '"search_type": "banks"}'
@@ -101,8 +102,38 @@ all_queries_data = [{
     "forename": "Bob", "register_id": "2",
     "middle_names": "Oscar Francis",
     "surname": "Howard",
+    "complex_number": None,
+    "complex_name": "",
     "occupation": "Civil Servant",
     "trading_name": "Bob",
+    "application_reference": "123456789",
+    "legal_body": "LB", "legal_body_ref": "Moo",
+    "line_1": "123 The Street",
+    "line_2": "Somewhere",
+    "line_3": "",
+    "line_4": "",
+    "line_5": "",
+    "line_6": "",
+    "amends": None,
+    "key_number": "1234567",
+    "county": "Devon",
+    "document_ref": 22,
+    "postcode": "PL1 1AA",
+    "cancelled_by": None,
+    "original_regn_no": "7",
+    "extra_data": {}
+}]
+
+all_queries_complex_data = [{
+    "registration_no": "50027", "registration_date": "2012-08-09",
+    "application_type": "PAB", "id": "56", "debtor_reg_name_id": "12",
+    "forename": "", "register_id": "2",
+    "middle_names": "",
+    "surname": "",
+    "complex_number": 1234567,
+    "complex_name": "King Stark",
+    "occupation": "",
+    "trading_name": "",
     "application_reference": "123456789",
     "legal_body": "LB", "legal_body_ref": "Moo",
     "line_1": "123 The Street",
@@ -125,6 +156,7 @@ mock_search = fetchboth_mock([1], search_data)
 mock_search_not_found = fetchboth_mock([1], [])
 mock_migration = fetchboth_mock(["50001"], ["50001"])
 mock_retrieve = fetchboth_mock(all_queries_data, all_queries_data)
+mock_retrieve_complex = fetchboth_mock(all_queries_complex_data, all_queries_complex_data)
 mock_cancellation = fetchboth_mock(['50001'], [['50001']])
 mock_counties = fetchall_mock([
     {'name': 'COUNTY1'},
@@ -191,6 +223,14 @@ class TestWorking:
         assert response.status_code == 200
         assert mock_publish.called
 
+    @mock.patch('psycopg2.connect')
+    @mock.patch('kombu.Producer.publish')
+    def test_new_registration_complex_name(self, mock_connect, mock_publish):
+        headers = {'Content-Type': 'application/json'}
+        response = self.app.post('/registration', data=valid_data_complex, headers=headers)
+        assert response.status_code == 200
+        assert mock_publish.called
+
     @mock.patch('psycopg2.connect', **mock_migration)
     def test_migration_success(self, mc):
         headers = {'Content-Type': 'application/json'}
@@ -237,6 +277,13 @@ class TestWorking:
         response = self.app.get("/registration/50000")
         data = json.loads(response.data.decode('utf-8'))
         assert data['debtor_name']['surname'] == 'Howard'
+        assert "document_id" in data
+
+    @mock.patch('psycopg2.connect', **mock_retrieve_complex)
+    def test_get_registration_complex_name(self, mc):
+        response = self.app.get("/registration/50027")
+        data = json.loads(response.data.decode('utf-8'))
+        assert data['complex']['name'] == 'King Stark'
         assert "document_id" in data
 
     @mock.patch('psycopg2.connect', **mock_retrieve)
