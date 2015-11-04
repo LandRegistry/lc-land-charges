@@ -66,18 +66,27 @@ def insert_address(cursor, address, address_type, party_id):
 
 
 def insert_name(cursor, name, party_id, is_alias=False):
-    name_string = "{} {}".format(" ".join(name['forenames']), name['surname'])
-    forename = name['forenames'][0]
-    middle_names = " ".join(name['forenames'][1:])
-    cursor.execute("INSERT INTO party_name ( party_name, forename, " +
-                   "middle_names, surname, alias_name ) " +
-                   "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s ) " +
-                   "RETURNING id",
-                   {
-                       "name": name_string, "forename": forename, "midnames": middle_names,
-                       "surname": name['surname'], "alias": is_alias
-                   })
-    name['id'] = cursor.fetchone()[0]
+    if 'number' in name:
+        cursor.execute("INSERT INTO party_name (alias_name, complex_number, complex_name) " +
+                       "VALUES ( %(alias)s, %(number)s, %(name)s ) " +
+                       "RETURNING id",
+                       {
+                           "alias": is_alias, "number": name['number'], "name": name['name']
+                       })
+        name['id'] = cursor.fetchone()[0]
+    else:
+        name_string = "{} {}".format(" ".join(name['forenames']), name['surname'])
+        forename = name['forenames'][0]
+        middle_names = " ".join(name['forenames'][1:])
+        cursor.execute("INSERT INTO party_name ( party_name, forename, " +
+                       "middle_names, surname, alias_name ) " +
+                       "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s ) " +
+                       "RETURNING id",
+                       {
+                           "name": name_string, "forename": forename, "midnames": middle_names,
+                           "surname": name['surname'], "alias": is_alias
+                       })
+        name['id'] = cursor.fetchone()[0]
 
     cursor.execute("INSERT INTO party_name_rel (party_name_id, party_id) " +
                    "VALUES( %(name)s, %(party)s ) RETURNING id",
@@ -195,9 +204,12 @@ def insert_details(cursor, request_id, data, amends_id):
             insert_address(cursor, address, "Investment", party_id)
 
     # party_name, party_name_rel
-    name_ids = [insert_name(cursor, data['debtor_name'], party_id)]
-    for name in data['debtor_alternative_name']:
-        name_ids.append(insert_name(cursor, name, party_id, True))
+    if 'complex' in data:
+        name_ids = [insert_name(cursor, data['complex'], party_id)]
+    else:
+        name_ids = [insert_name(cursor, data['debtor_name'], party_id)]
+        for name in data['debtor_alternative_name']:
+            name_ids.append(insert_name(cursor, name, party_id, True))
 
     # party_trading
     if "trading_name" in data:
@@ -342,12 +354,17 @@ def get_new_registration_number(cursor, db2_reg_no):
 
 
 def get_name_details(cursor, data, details_id, name_id):
-    cursor.execute("select forename, middle_names, surname from party_name where id = %(id)s", {'id': name_id})
+    cursor.execute("select forename, middle_names, surname, complex_number, complex_name " +
+                   "from party_name where id = %(id)s", {'id': name_id})
     rows = cursor.fetchall()
-    forenames = [rows[0]['forename']]
-    if rows[0]['middle_names'] != "":
-        forenames += rows[0]['middle_names'].split(" ")
-    data['debtor_name'] = {'forenames': forenames, 'surname': rows[0]['surname']}
+    if not rows[0]['complex_number']:
+        forenames = [rows[0]['forename']]
+        if rows[0]['middle_names'] != "":
+            forenames += rows[0]['middle_names'].split(" ")
+        data['debtor_name'] = {'forenames': forenames, 'surname': rows[0]['surname']}
+    else:
+        data['debtor_name'] = {'forenames': [], 'surname': ""}
+        data['complex'] = {'name': rows[0]['complex_name'], 'number': rows[0]['complex_number']}
 
     cursor.execute("select occupation, id from party where party_type='Debtor' and register_detl_id=%(id)s",
                    {'id': details_id})
@@ -416,7 +433,6 @@ def get_registration_details(cursor, reg_no):
     rows = cursor.fetchall()
     if len(rows) > 0:
         data['amended_by'] = rows[0]['registration_no']
-
     party_id = get_name_details(cursor, data, details_id, name_id)
 
     cursor.execute("select trading_name from party_trading where party_id = %(id)s", {'id': party_id})
