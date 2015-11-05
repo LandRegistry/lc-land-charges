@@ -11,7 +11,7 @@ from application.data import connect, get_registration_details, complete, get_ne
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_amendment, insert_new_registration, read_counties
 from application.schema import SEARCH_SCHEMA
-from application.search import store_search_request, perform_search
+from application.search import store_search_request, perform_search, store_search_result
 from flask.ext.cors import cross_origin
 
 
@@ -80,10 +80,12 @@ def retrieve():
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # Store the search request
-    store_search_request(cursor, data)
+    search_request_id = store_search_request(cursor, data)
 
     # Run the queries
     results = perform_search(cursor, data['parameters'])
+
+    store_search_result(cursor, search_request_id, results)
 
     complete(cursor)
     if len(results) == 0:

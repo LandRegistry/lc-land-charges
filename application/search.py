@@ -93,7 +93,7 @@ def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_
                        "and p.register_detl_id=rd.id " +
                        "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s",
                        {
-                           'fullname': complex_name.upper(), 'from_date': year_from, 'to_date': year_to,
+                           'complex_name': complex_name.upper(), 'from_date': year_from, 'to_date': year_to,
                            'counties': uc_counties
                        })
 
@@ -130,11 +130,25 @@ def store_search_request(cursor, data):
                        'request_id': request_id, 'params': json.dumps(data['parameters'])
                    })
 
+    return request_id
+
+
+def store_search_result(cursor, search_request_id, data):
+
+    # Row on search details
+    cursor.execute("UPDATE search_details "
+                   "SET result=%(result)s "
+                   "WHERE request_id=%(request_id)s;",
+                   {
+                       'request_id': search_request_id, 'result': json.dumps(data)
+                   })
+
 
 def perform_search(cursor, parameters):
     if len(parameters['counties']) == 0:
         parameters['counties'].append('ALL')
 
+    print("search parameters : " + str(parameters))
     search_results = []
     if parameters['search_type'] == 'full':
         logging.info('Perform full search')
