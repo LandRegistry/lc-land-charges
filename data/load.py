@@ -68,9 +68,6 @@ standard_data = [
 
 
 url = os.getenv('LAND_CHARGES_URI', 'http://localhost:5004')
-response = requests.post(url + '/documents/bulk',
-                         data=json.dumps(standard_data),
-                         headers={'Content-Type': 'application/json'})
 
 for item in standard_data:
     resp = requests.post(url + '/registration',
