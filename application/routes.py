@@ -218,6 +218,28 @@ def cancel_registration(reg_no):
         return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
+@app.route('/registrations', methods=['DELETE'])
+def delete_all_regs():
+    cursor = connect()
+    cursor.execute("DELETE FROM party_address")
+    cursor.execute("DELETE FROM address")
+    cursor.execute("DELETE FROM address_detail")
+    cursor.execute("DELETE FROM party_trading")
+    cursor.execute("DELETE FROM party_name_rel")
+    cursor.execute("DELETE FROM party")
+    cursor.execute("DELETE FROM migration_status")
+    cursor.execute("DELETE FROM register")
+    cursor.execute("DELETE FROM register_details")
+    cursor.execute("DELETE FROM audit_log")
+    cursor.execute("DELETE FROM search_details")
+    cursor.execute("DELETE FROM request")
+    cursor.execute("DELETE FROM ins_bankruptcy_request")
+    cursor.execute("DELETE FROM party_name")
+    cursor.execute("DELETE FROM counties")
+    complete(cursor)
+    return Response(status=200)
+
+
 @app.route('/counties', methods=['GET'])
 @cross_origin()
 def get_counties_list():
