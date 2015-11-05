@@ -75,6 +75,44 @@ name_search_data_full_all = json.dumps({
     }
 })
 
+complex_name_search_data = json.dumps({
+    "customer": {
+        "key_number": "1234567",
+        "name": "Dave The Customer",
+        "address": "Lurking",
+        "reference": "someRef"
+    },
+    "document_id": 17,
+    "parameters": {
+        "search_type": "bankruptcy",
+        "counties": ["ALL"],
+        "search_items": [{"name": "King Stark of the North",
+                          "complex_no": "1000167"}]
+    }
+})
+
+complex_name_search_data_full_all = json.dumps({
+    "customer": {
+        "key_number": "1234567",
+        "name": "Dave The Customer",
+        "address": "Lurking",
+        "reference": "someRef"
+    },
+    "document_id": 17,
+    "parameters": {
+        "search_type": "full",
+        "counties": ["ALL"],
+        "search_items": [{"name": "Jasper Beer",
+                          "year_from": 1925,
+                          "year_to": 2015
+                          },
+                         {"name": "King Stark of the North",
+                          "complex_no": "1000167",
+                          "year_from": 1925,
+                          "year_to": 2015}]
+    }
+})
+
 name_search_data_full_counties = json.dumps({
     "customer": {
         "key_number": "1234567",
@@ -94,7 +132,7 @@ name_search_data_full_counties = json.dumps({
     }
 })
 
-search_data = [{"id": 1, "registration_date": datetime.date(2005, 12, 2), "application_type": "PAB",
+search_data = [{"id": 76, "registration_date": datetime.date(2005, 12, 2), "application_type": "PAB",
                 "registration_no": "50135"}]
 all_queries_data = [{
     "registration_no": "50000", "registration_date": "2012-08-09",
@@ -177,12 +215,26 @@ class TestWorking:
     def test_item_found(self, mock_connect):
         headers = {'Content-Type': 'application/json'}
         response = self.app.post('/search', data=name_search_data, headers=headers)
+        data = json.loads(response.data.decode('utf-8'))
         assert response.status_code == 200
+        assert 76 in data[0]['Bob Howard']
 
     @mock.patch('psycopg2.connect', **mock_search)
     def test_full_search_all_counties(self, mock_connect):
         headers = {'Content-Type': 'application/json'}
         response = self.app.post('/search', data=name_search_data_full_all, headers=headers)
+        assert response.status_code == 200
+
+    @mock.patch('psycopg2.connect', **mock_search)
+    def test_complex_name_simple_search(self, mock_connect):
+        headers = {'Content-Type': 'application/json'}
+        response = self.app.post('/search', data=complex_name_search_data, headers=headers)
+        assert response.status_code == 200
+
+    @mock.patch('psycopg2.connect', **mock_search)
+    def test_complex_name_full_search_all_counties(self, mock_connect):
+        headers = {'Content-Type': 'application/json'}
+        response = self.app.post('/search', data=complex_name_search_data_full_all, headers=headers)
         assert response.status_code == 200
 
     @mock.patch('psycopg2.connect', **mock_search)
@@ -195,7 +247,9 @@ class TestWorking:
     def test_item_not_found(self, mock_connect):
         headers = {'Content-Type': 'application/json'}
         response = self.app.post('/search', data=name_search_data, headers=headers)
-        assert response.status_code == 404
+        data = json.loads(response.data.decode('utf-8'))
+        assert response.status_code == 200
+        assert len(data[0]['Bob Howard']) == 0
 
     @mock.patch('psycopg2.connect', **mock_search_not_found)
     def test_search_bad_data(self, mock_connect):
