@@ -157,6 +157,11 @@ def insert():
 
 @app.route('/registration', methods=['POST'])
 def register():
+    suppress = False
+    if 'suppress_queue' in request.args:
+        logging.info('Queue suppressed')
+        suppress = True
+
     if request.headers['Content-Type'] != "application/json":
         logging.error('Content-Type is not JSON')
         return Response(status=415)
@@ -166,7 +171,8 @@ def register():
     # pylint: disable=unused-variable
     new_regns, details = insert_new_registration(cursor, json_data)
     complete(cursor)
-    publish_new_bankruptcy(producer, new_regns)
+    if not suppress:
+        publish_new_bankruptcy(producer, new_regns)
     return Response(json.dumps({'new_registrations': new_regns}), status=200)
 
 

@@ -70,7 +70,7 @@ standard_data = [
 
 
 standard_data.each do |item|
-    request = Net::HTTP::Post.new('/registration')
+    request = Net::HTTP::Post.new('/registration?suppress_queue=yes')
     request.body = item
     request["Content-Type"] = "application/json"
     response = http.request(request)
