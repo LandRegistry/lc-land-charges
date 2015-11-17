@@ -6,9 +6,11 @@ import json
 # TODO: the banks searches don't just search banks (needs more filtering)
 def search_by_name(cursor, full_name):
     cursor.execute("SELECT r.id "
-                   "FROM party_name n, register r "
+                   "FROM party_name n, register r, register_details rd "
                    "WHERE UPPER(n.party_name) = %(name)s "
-                   "  AND r.debtor_reg_name_id = n.id",
+                   "  AND r.debtor_reg_name_id = n.id "
+                   "  AND r.details_id = rd.id "
+                   "  AND rd.cancelled_by is null",
                    {
                        'name': full_name.upper()
                    })
@@ -25,7 +27,8 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to):
                        "Where UPPER(pn.party_name)=%(fullname)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s",
+                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and rd.cancelled_by is null",
                        {
                            'fullname': full_name.upper(), 'from_date': year_from, 'to_date': year_to
                        })
@@ -42,7 +45,8 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to):
                        # "and UPPER(ad.county) IN ('" + "', '".join((str(n) for n in counties)) + "') " +
                        "and UPPER(ad.county) = ANY(%(counties)s) "
                        "and p.register_detl_id=rd.id " +
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s",
+                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and rd.cancelled_by is null",
                        {
                            'fullname': full_name.upper(), 'from_date': year_from, 'to_date': year_to,
                            'counties': uc_counties
@@ -55,9 +59,11 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to):
 
 def search_by_complex_name(cursor, complex_name):
     cursor.execute("SELECT r.id "
-                   "FROM party_name n, register r "
+                   "FROM party_name n, register r, register_details rd "
                    "WHERE UPPER(n.complex_name) = %(name)s "
-                   "  AND r.debtor_reg_name_id = n.id",
+                   "  AND r.debtor_reg_name_id = n.id "
+                   "  AND r.details_id = rd.id "
+                   "  AND rd.cancelled_by is null",
                    {
                        'name': complex_name.upper()
                    })
@@ -74,7 +80,8 @@ def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_
                        "Where UPPER(pn.complex_name)=%(complex_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s",
+                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and rd.cancelled_by is null",
                        {
                            'complex_name': complex_name.upper(), 'from_date': year_from, 'to_date': year_to
                        })
@@ -91,7 +98,8 @@ def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_
                        # "and UPPER(ad.county) IN ('" + "', '".join((str(n) for n in counties)) + "') " +
                        "and UPPER(ad.county) = ANY(%(counties)s) "
                        "and p.register_detl_id=rd.id " +
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s",
+                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and rd.cancelled_by is null",
                        {
                            'complex_name': complex_name.upper(), 'from_date': year_from, 'to_date': year_to,
                            'counties': uc_counties
