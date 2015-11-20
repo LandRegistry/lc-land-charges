@@ -244,30 +244,3 @@ def delete_all_regs():
     cursor.execute("DELETE FROM counties")
     complete(cursor)
     return Response(status=200)
-
-
-@app.route('/counties', methods=['GET'])
-@cross_origin()
-def get_counties_list():
-    counties = read_counties()
-    return Response(json.dumps(counties), status=200, mimetype='application/json')
-
-
-@app.route('/counties', methods=['POST'])
-def load_counties():
-    if request.headers['Content-Type'] != "application/json":
-        logging.error('Content-Type is not JSON')
-        return Response(status=415)
-
-    json_data = request.get_json(force=True)
-    cursor = connect()
-    for item in json_data:
-        if 'cym' not in item:
-            item['cym'] = None
-
-        cursor.execute('INSERT INTO COUNTIES (name, welsh_name) VALUES (%(e)s, %(c)s)',
-                       {
-                           'e': item['eng'], 'c': item['cym']
-                       })
-    complete(cursor)
-    return Response(status=200)
