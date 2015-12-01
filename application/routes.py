@@ -29,7 +29,9 @@ def health():
     return Response(json.dumps(result), status=200, mimetype='application/json')
 
 
-@app.route('/registration/<int:reg_no>', methods=['GET'])
+# ============== /registrations ===============
+
+@app.route('/registrations/<int:reg_no>', methods=['GET'])
 def registration(reg_no):
     logging.debug("GET registration")
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -42,24 +44,79 @@ def registration(reg_no):
         return Response(json.dumps(details), status=200, mimetype='application/json')
 
 
-@app.route('/migrated_registration/<int:db2_reg_no>', methods=['GET'])
-def migrated_registration(db2_reg_no):
-    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    new_reg_no = get_new_registration_number(cursor, db2_reg_no)
+@app.route('/registrations', methods=['POST'])
+def register():
+    suppress = False
+    if 'suppress_queue' in request.args:
+        logging.info('Queue suppressed')
+        suppress = True
 
-    registrations = []
-    for number in new_reg_no:
-        registrations.append(get_registration_details(cursor, number))
+    if request.headers['Content-Type'] != "application/json":
+        logging.error('Content-Type is not JSON')
+        return Response(status=415)
 
+    json_data = request.get_json(force=True)
+    cursor = connect()
+    # pylint: disable=unused-variable
+    new_regns, details = insert_new_registration(cursor, json_data)
     complete(cursor)
+    if not suppress:
+        publish_new_bankruptcy(producer, new_regns)
+    return Response(json.dumps({'new_registrations': new_regns}), status=200)
 
-    if len(registrations) > 0:
-        return Response(json.dumps(registrations), status=200, mimetype='application/json')
-    else:
+
+@app.route('/registrations/<reg_no>', methods=["PUT"])
+def amend_registration(reg_no):
+    # Amendment... we're being given the replacement data
+    if request.headers['Content-Type'] != "application/json":
+        logging.error('Content-Type is not JSON')
+        return Response(status=415)
+
+    json_data = request.get_json(force=True)
+    cursor = connect()
+
+    # TODO: may need to revisit if business rules for rectification differs to amendment
+    # if appn_type == 'amend':
+    originals, reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
+    # else:
+    # originals, reg_nos, rows = insert_rectification(cursor, reg_no, json_data)
+
+    if rows is None or rows == 0:
+        cursor.connection.rollback()
+        cursor.close()
+        cursor.connection.close()
         return Response(status=404)
+    else:
+        complete(cursor)
+        data = {
+            "new_registrations": reg_nos,
+            "amended_registrations": originals
+        }
+        return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
-@app.route('/search', methods=['POST'])
+@app.route('/registrations/<reg_no>', methods=["DELETE"])
+def cancel_registration(reg_no):
+    if request.headers['Content-Type'] != "application/json":
+        logging.error('Content-Type is not JSON')
+        return Response(status=415)
+
+    json_data = request.get_json(force=True)
+    rows, nos = insert_cancellation(reg_no, json_data)
+    if rows == 0:
+        return Response(status=404)
+    else:
+        data = {
+            "cancelled": nos
+        }
+        print(data)
+        return Response(json.dumps(data), status=200, mimetype='application/json')
+
+
+# ============== Searches ===============
+
+
+@app.route('/searches', methods=['POST'])
 def retrieve():
     if request.headers['Content-Type'] != "application/json":
         logging.error('Content-Type is not JSON')
@@ -94,17 +151,27 @@ def retrieve():
         return Response(json.dumps(results, ensure_ascii=False), status=200, mimetype='application/json')
 
 
-# Route exists purely for testing purposes - need to get something invalid onto
-# the synchroniser's queue!
-@app.route('/synchronise', methods=["POST"])
-def synchronise():   # pragma: no cover
-    if request.headers['Content-Type'] != "application/json":
-        logging.error('Content-Type is not JSON')
-        return Response(status=415)
+# @app.route('/migrated_registration/<int:db2_reg_no>', methods=['GET'])
+# def migrated_registration(db2_reg_no):
+#     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+#     new_reg_no = get_new_registration_number(cursor, db2_reg_no)
+#
+#     registrations = []
+#     for number in new_reg_no:
+#         registrations.append(get_registration_details(cursor, number))
+#
+#     complete(cursor)
+#
+#     if len(registrations) > 0:
+#         return Response(json.dumps(registrations), status=200, mimetype='application/json')
+#     else:
+#         return Response(status=404)
 
-    json_data = request.get_json(force=True)
-    publish_new_bankruptcy(producer, json_data)
-    return Response(status=200)
+
+
+
+
+
 
 
 migrated_schema = {
@@ -155,77 +222,14 @@ def insert():
     return Response(json.dumps({'new_registrations': [registration_no]}), status=200)
 
 
-@app.route('/registration', methods=['POST'])
-def register():
-    suppress = False
-    if 'suppress_queue' in request.args:
-        logging.info('Queue suppressed')
-        suppress = True
-
-    if request.headers['Content-Type'] != "application/json":
-        logging.error('Content-Type is not JSON')
-        return Response(status=415)
-
-    json_data = request.get_json(force=True)
-    cursor = connect()
-    # pylint: disable=unused-variable
-    new_regns, details = insert_new_registration(cursor, json_data)
-    complete(cursor)
-    if not suppress:
-        publish_new_bankruptcy(producer, new_regns)
-    return Response(json.dumps({'new_registrations': new_regns}), status=200)
-
-
-@app.route('/registration/<reg_no>', methods=["PUT"])
-def amend_registration(reg_no):
-    # Amendment... we're being given the replacement data
-    if request.headers['Content-Type'] != "application/json":
-        logging.error('Content-Type is not JSON')
-        return Response(status=415)
-
-    json_data = request.get_json(force=True)
-    cursor = connect()
-
-    # TODO: may need to revisit if business rules for rectification differs to amendment
-    # if appn_type == 'amend':
-    originals, reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
-    # else:
-    # originals, reg_nos, rows = insert_rectification(cursor, reg_no, json_data)
-
-    if rows is None or rows == 0:
-        cursor.connection.rollback()
-        cursor.close()
-        cursor.connection.close()
-        return Response(status=404)
-    else:
-        complete(cursor)
-        data = {
-            "new_registrations": reg_nos,
-            "amended_registrations": originals
-        }
-        return Response(json.dumps(data), status=200, mimetype='application/json')
-
-
-@app.route('/registration/<reg_no>', methods=["DELETE"])
-def cancel_registration(reg_no):
-    if request.headers['Content-Type'] != "application/json":
-        logging.error('Content-Type is not JSON')
-        return Response(status=415)
-
-    json_data = request.get_json(force=True)
-    rows, nos = insert_cancellation(reg_no, json_data)
-    if rows == 0:
-        return Response(status=404)
-    else:
-        data = {
-            "cancelled": nos
-        }
-        print(data)
-        return Response(json.dumps(data), status=200, mimetype='application/json')
+# ============= Dev routes ===============
 
 
 @app.route('/registrations', methods=['DELETE'])
 def delete_all_regs():
+    if not app.config['ALLOW_DEV_ROUTES']:
+        return Response(status=403)
+
     cursor = connect()
     cursor.execute("DELETE FROM party_address")
     cursor.execute("DELETE FROM address")
@@ -243,4 +247,20 @@ def delete_all_regs():
     cursor.execute("DELETE FROM party_name")
     cursor.execute("DELETE FROM counties")
     complete(cursor)
+    return Response(status=200)
+
+
+# Route exists purely for testing purposes - need to get something invalid onto
+# the synchroniser's queue!
+@app.route('/synchronise', methods=["POST"])
+def synchronise():   # pragma: no cover
+    if not app.config['ALLOW_DEV_ROUTES']:
+        return Response(status=403)
+
+    if request.headers['Content-Type'] != "application/json":
+        logging.error('Content-Type is not JSON')
+        return Response(status=415)
+
+    json_data = request.get_json(force=True)
+    publish_new_bankruptcy(producer, json_data)
     return Response(status=200)

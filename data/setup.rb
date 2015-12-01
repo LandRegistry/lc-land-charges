@@ -70,11 +70,11 @@ standard_data = [
 
 
 standard_data.each do |item|
-    request = Net::HTTP::Post.new('/registration?suppress_queue=yes')
+    request = Net::HTTP::Post.new('/registrations?suppress_queue=yes')
     request.body = item
     request["Content-Type"] = "application/json"
     response = http.request(request)
     if response.code != "200"
-        puts "banks-reg/registration: #{response.code}"
+        puts "banks-reg/registrations: #{response.code}"
     end
 end
