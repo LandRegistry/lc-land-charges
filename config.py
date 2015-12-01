@@ -16,6 +16,7 @@ class DevelopmentConfig(Config):
     MQ_PASSWORD = 'mqpassword'
     MQ_HOSTNAME = 'localhost'
     MQ_PORT = '5672'
+    ALLOW_DEV_ROUTES = True
 
 
 class PreviewConfig(Config):
@@ -29,3 +30,4 @@ class PreviewConfig(Config):
     MQ_PASSWORD = 'mqpassword'
     MQ_HOSTNAME = 'localhost'
     MQ_PORT = '5672'
+    ALLOW_DEV_ROUTES = True
