@@ -97,16 +97,23 @@ def insert_name(cursor, name, party_id, is_alias=False):
     return name['id']
 
 
-def insert_registration(cursor, details_id, name_id, orig_reg_no=None):
+def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
     if orig_reg_no is None:
         # Get the next registration number
-        cursor.execute("SELECT MAX(registration_no) FROM register", {})
+        year = date[:4]  # date is a string
+        cursor.execute('select MAX(r.registration_no) + 1 '
+                       'from register r, register_details d '
+                       'where r.details_id = d.id AND d.registration_date >=%(start)s AND d.registration_date < %(end)s',
+                       {
+                           'start': "{}-01-01".format(year),
+                           'end': "{}-01-01".format(int(year) + 1)
+                       })
 
         rows = cursor.fetchall()
         if rows[0][0] is None:
-            reg_no = 50000
+            reg_no = 1000
         else:
-            reg_no = int(rows[0][0]) + 1
+            reg_no = int(rows[0][0])
     else:
         reg_no = orig_reg_no
 
@@ -221,13 +228,15 @@ def insert_details(cursor, request_id, data, amends_id):
 
 def insert_record(cursor, data, request_id, amends=None, orig_reg_no=None):
     name_ids, register_details_id = insert_details(cursor, request_id, data, amends)
-    # insert_registration(cursor, details_id, name_id)
     reg_nos = []
 
     # pylint: disable=unused-variable
     for name_id in name_ids:
-        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id, orig_reg_no)
-        reg_nos.append(reg_no)
+        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id, data['date'], orig_reg_no)
+        reg_nos.append({
+            'number': reg_no,
+            'date': data['date']
+        })
 
     # TODO: audit-log not done. Not sure it belongs here?
     return reg_nos, register_details_id

@@ -59,10 +59,11 @@ def register():
     json_data = request.get_json(force=True)
     cursor = connect()
     # pylint: disable=unused-variable
-    new_regns, details = insert_new_registration(cursor, json_data)
+    new_regns, details_id = insert_new_registration(cursor, json_data)
     complete(cursor)
     if not suppress:
         publish_new_bankruptcy(producer, new_regns)
+
     return Response(json.dumps({'new_registrations': new_regns}), status=200)
 
 
