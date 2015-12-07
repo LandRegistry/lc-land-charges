@@ -1,5 +1,5 @@
 from application import app, producer
-from application.exchange import publish_new_bankruptcy
+from application.exchange import publish_new_bankruptcy, publish_amendment, publish_cancellation
 from flask import Response, request
 import psycopg2
 import psycopg2.extras
@@ -31,11 +31,12 @@ def health():
 
 # ============== /registrations ===============
 
-@app.route('/registrations/<int:reg_no>', methods=['GET'])
-def registration(reg_no):
+@app.route('/registrations/<date>/<int:reg_no>', methods=['GET'])
+def registration(date, reg_no):
     logging.debug("GET registration")
+
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    details = get_registration_details(cursor, reg_no)
+    details = get_registration_details(cursor, reg_no, date)
     complete(cursor)
     if details is None:
         logging.warning("Returning 404")
@@ -72,6 +73,11 @@ def amend_registration(reg_no):
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
+    suppress = False
+    if 'suppress_queue' in request.args:
+        logging.info('Queue suppressed')
+        suppress = True
+
     json_data = request.get_json(force=True)
     cursor = connect()
 
@@ -92,6 +98,9 @@ def amend_registration(reg_no):
             "new_registrations": reg_nos,
             "amended_registrations": originals
         }
+        if not suppress:
+            publish_amendment(producer, data)
+
         return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
@@ -101,6 +110,11 @@ def cancel_registration(reg_no):
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
+    suppress = False
+    if 'suppress_queue' in request.args:
+        logging.info('Queue suppressed')
+        suppress = True
+
     json_data = request.get_json(force=True)
     rows, nos = insert_cancellation(reg_no, json_data)
     if rows == 0:
@@ -109,6 +123,8 @@ def cancel_registration(reg_no):
         data = {
             "cancelled": nos
         }
+        if not suppress:
+            publish_cancellation(producer, nos)
         print(data)
         return Response(json.dumps(data), status=200, mimetype='application/json')
 

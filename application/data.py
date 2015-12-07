@@ -388,25 +388,36 @@ def get_name_details(cursor, data, details_id, name_id):
 
 
 def get_registration_no_from_details_id(cursor, details_id):
-    cursor.execute("select registration_no from register where details_id = %(id)s",
+    cursor.execute("select r.registration_no, d.registration_date from register r, register_details d where " +
+                   "  r.details_id = %(id)s AND r.details_id = d.id",
                    {'id': details_id})
     rows = cursor.fetchall()
     if len(rows) == 0:
         return None
     else:
-        return rows[0]['registration_no']
+        return {
+            'number': rows[0]['registration_no'],
+            'date': str(rows[0]['registration_date'])
+        }
 
 
-def get_registration_details(cursor, reg_no):
+def get_registration_details(cursor, reg_no, date):
     cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
-                   "r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by, rd.amends from register r, register_details rd " +
-                   "where r.registration_no = %(reg_no)s and r.details_id = rd.id", {'reg_no': reg_no})
+                   "r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id " +
+                   "from register r, register_details rd " +
+                   "where r.registration_no = %(reg_no)s and r.details_id = rd.id " +
+                   "and rd.registration_date = %(date)s", {
+                       'reg_no': reg_no,
+                       'date': date,
+                   })
     rows = cursor.fetchall()
     if len(rows) == 0:
         return None
     data = {
-        'registration_no': rows[0]['registration_no'],
-        'registration_date': str(rows[0]['registration_date']),
+        'registration': {
+            'number': rows[0]['registration_no'],
+            'date': str(rows[0]['registration_date'])
+        },
         'application_type': rows[0]['application_type'],
         'legal_body': rows[0]['legal_body'],
         'legal_body_ref': rows[0]['legal_body_ref'],
@@ -419,20 +430,30 @@ def get_registration_details(cursor, reg_no):
     if rows[0]['amends'] is not None:
         data['amends_regn'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
 
-    if rows[0]['cancelled_by'] is not None:
+    cancelled_by = rows[0]['cancelled_by']
+    if cancelled_by is not None:
         cursor.execute("select amends from register_details where amends=%(id)s",
                        {"id": details_id})
+
         rows = cursor.fetchall()
         if len(rows) > 0:
             data['status'] = 'superseded'
         else:
             data['status'] = 'cancelled'
+            data['cancellation_ref'] = cancelled_by
+            cursor.execute('select application_date from request where id=%(id)s', {'id': data['cancellation_ref']})
+            print(data['cancellation_ref'])
+            cancel_rows = cursor.fetchall()
+            data['cancellation_date'] = cancel_rows[0]['application_date'].isoformat()
 
-    cursor.execute('select r.registration_no, d.amends FROM register r, register_details d WHERE r.details_id=d.id AND '
+    cursor.execute('select r.registration_no, d.registration_date, d.amends FROM register r, register_details d WHERE r.details_id=d.id AND '
                    'd.amends=%(id)s', {'id': details_id})
     rows = cursor.fetchall()
     if len(rows) > 0:
-        data['amended_by'] = rows[0]['registration_no']
+        data['amended_by'] = {
+            'number': rows[0]['registration_no'],
+            'date': str(rows[0]['registration_date'])
+        }
     party_id = get_name_details(cursor, data, details_id, name_id)
 
     cursor.execute("select trading_name from party_trading where party_id = %(id)s", {'id': party_id})
@@ -520,6 +541,7 @@ def insert_cancellation(registration_no, data):
                    {
                        "canc": request_id, "id": original_detl_id
                    })
+    # TODO: archive document
     rows = cursor.rowcount
     complete(cursor)
     return rows, original_regs
