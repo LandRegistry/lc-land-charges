@@ -167,13 +167,6 @@ def retrieve():
 #     else:
 #         return Response(status=404)
 
-
-
-
-
-
-
-
 migrated_schema = {
     "type": "object",
     "properties": {
@@ -188,7 +181,8 @@ migrated_schema = {
                     "items": {"type": "string"},
                     "minItems": 1
                 },
-                "surname": {"type": "string"}
+                "surname": {"type": "string"},
+                "name_string": {"type": "string"}
             },
             "required": ["forenames", "surname"]
         },
@@ -209,14 +203,16 @@ def insert():
         return Response(status=415)
 
     data = request.get_json(force=True)
-    try:
+    print(data)
+    """try:
         validate(data, migrated_schema)
     except ValidationError as error:
         message = "{}\n{}".format(error.message, error.path)
-        return Response(message, status=400)
+        return Response(message, status=400)"""
 
-    cursor = connect()
-    registration_no = insert_migrated_record(cursor, data)
+    for reg in data:
+        cursor = connect()
+        registration_no = insert_migrated_record(cursor, reg)
 
     complete(cursor)
     return Response(json.dumps({'new_registrations': [registration_no]}), status=200)
