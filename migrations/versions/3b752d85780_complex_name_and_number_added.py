@@ -20,11 +20,9 @@ def upgrade():
     with op.batch_alter_table("party_name") as batch_op:
         batch_op.add_column(sa.Column('complex_number', sa.Integer()))
         batch_op.add_column(sa.Column('complex_name', sa.Unicode()))
-    pass
 
 
 def downgrade():
     with op.batch_alter_table("party_name") as batch_op:
         batch_op.drop_column('complex_number')
         batch_op.drop_column('complex_name')
-    pass

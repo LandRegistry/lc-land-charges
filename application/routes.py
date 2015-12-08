@@ -7,7 +7,7 @@ import json
 import logging
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
-from application.data import connect, get_registration_details, complete, get_new_registration_number, \
+from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_amendment, insert_new_registration, read_counties
 from application.schema import SEARCH_SCHEMA
@@ -105,8 +105,8 @@ def amend_registration(reg_no):
         return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
-@app.route('/registrations/<reg_no>', methods=["DELETE"])
-def cancel_registration(reg_no):
+@app.route('/registrations/<date>/<reg_no>', methods=["DELETE"])
+def cancel_registration(date, reg_no):
     if request.headers['Content-Type'] != "application/json":
         logging.error('Content-Type is not JSON')
         return Response(status=415)
@@ -117,7 +117,7 @@ def cancel_registration(reg_no):
         suppress = True
 
     json_data = request.get_json(force=True)
-    rows, nos = insert_cancellation(reg_no, json_data)
+    rows, nos = insert_cancellation(reg_no, date, json_data)
     if rows == 0:
         return Response(status=404)
     else:

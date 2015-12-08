@@ -101,9 +101,9 @@ def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
     if orig_reg_no is None:
         # Get the next registration number
         year = date[:4]  # date is a string
-        cursor.execute('select MAX(r.registration_no) + 1 '
-                       'from register r, register_details d '
-                       'where r.details_id = d.id AND d.registration_date >=%(start)s AND d.registration_date < %(end)s',
+        cursor.execute('select MAX(registration_no) + 1 '
+                       'from register  '
+                       'where date >=%(start)s AND date < %(end)s',
                        {
                            'start': "{}-01-01".format(year),
                            'end': "{}-01-01".format(int(year) + 1)
@@ -118,12 +118,13 @@ def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
         reg_no = orig_reg_no
 
     # Cap it all off with the actual legal "one registration per name":
-    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id) " +
-                   "VALUES( %(regno)s, %(debtor)s, %(details)s ) RETURNING id",
+    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, date) " +
+                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(date)s ) RETURNING id",
                    {
                        "regno": reg_no,
                        "debtor": name_id,
-                       "details": details_id
+                       "details": details_id,
+                       'date': date
                    })
     reg_id = cursor.fetchone()[0]
     return reg_no, reg_id
@@ -310,10 +311,11 @@ def insert_rectification(cursor, orig_reg_no, data):
     return original_regs, reg_nos, rows
 
 
-def get_register_details_id(cursor, reg_no):
-    cursor.execute("SELECT details_id FROM register WHERE registration_no = %(regno)s",
+def get_register_details_id(cursor, reg_no, date):
+    cursor.execute("SELECT details_id FROM register WHERE registration_no = %(regno)s AND date=%(date)s",
                    {
-                       "regno": reg_no
+                       "regno": reg_no,
+                       'date': date
                    })
     rows = cursor.fetchall()
     if len(rows) == 0:
@@ -325,21 +327,24 @@ def get_register_details_id(cursor, reg_no):
 
 
 def get_all_registration_nos(cursor, details_id):
-    cursor.execute("SELECT registration_no FROM register WHERE details_id = %(details)s",
+    cursor.execute("SELECT registration_no, date FROM register WHERE details_id = %(details)s",
                    {"details": details_id})
     rows = cursor.fetchall()
     print(rows)
     results = []
     for row in rows:
-        results.append(str(row[0]))
+        results.append({
+            'number': str(row[0]),
+            'date': str(row[1])
+        })
     return results
 
 
-def get_registration(cursor, reg_id):
+def get_registration(cursor, reg_id, date):
     cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
                    "r.id as register_id from register r, register_details rd " +
                    "where r.details_id = rd.id " +
-                   "and r.id=%(id)s", {'id': reg_id})
+                   "and r.id=%(id)s and r.date=%(date)s", {'id': reg_id, 'date': date})
     rows = cursor.fetchall()
     row = rows[0]
     result = {
@@ -350,16 +355,16 @@ def get_registration(cursor, reg_id):
     return result
 
 
-def get_new_registration_number(cursor, db2_reg_no):
-    cursor.execute("select r.registration_no from register r, migration_status ms where r.id = ms.register_id"
-                   " and ms.original_regn_no = %(reg_no)s", {'reg_no': db2_reg_no})
-    rows = cursor.fetchall()
-    # row = rows[0]
-    reg_nos = []
-    for row in rows:
-        reg_nos.append(row['registration_no'])
-
-    return reg_nos
+# def get_new_registration_number(cursor, db2_reg_no):
+#     cursor.execute("select r.registration_no from register r, migration_status ms where r.id = ms.register_id"
+#                    " and ms.original_regn_no = %(reg_no)s", {'reg_no': db2_reg_no})
+#     rows = cursor.fetchall()
+#     # row = rows[0]
+#     reg_nos = []
+#     for row in rows:
+#         reg_nos.append(row['registration_no'])
+#
+#     return reg_nos
 
 
 def get_name_details(cursor, data, details_id, name_id):
@@ -455,7 +460,7 @@ def get_registration_details(cursor, reg_no, date):
             cancel_rows = cursor.fetchall()
             data['cancellation_date'] = cancel_rows[0]['application_date'].isoformat()
 
-    cursor.execute('select r.registration_no, d.registration_date, d.amends FROM register r, register_details d WHERE r.details_id=d.id AND '
+    cursor.execute('select r.registration_no, r.date, d.amends FROM register r, register_details d WHERE r.details_id=d.id AND '
                    'd.amends=%(id)s', {'id': details_id})
     rows = cursor.fetchall()
     if len(rows) > 0:
@@ -530,7 +535,7 @@ def insert_migrated_record(cursor, data):
     return registration_no
 
 
-def insert_cancellation(registration_no, data):
+def insert_cancellation(registration_no, date, data):
     cursor = connect()
 
     # Insert a row with application info
