@@ -181,8 +181,7 @@ migrated_schema = {
                     "items": {"type": "string"},
                     "minItems": 1
                 },
-                "surname": {"type": "string"},
-                "name_string": {"type": "string"}
+                "surname": {"type": "string"}
             },
             "required": ["forenames", "surname"]
         },
@@ -203,7 +202,7 @@ def insert():
         return Response(status=415)
 
     data = request.get_json(force=True)
-    print(data)
+    # TODO: is there a need to validate the migration schema???
     """try:
         validate(data, migrated_schema)
     except ValidationError as error:
@@ -212,10 +211,24 @@ def insert():
 
     for reg in data:
         cursor = connect()
-        registration_no = insert_migrated_record(cursor, reg)
+        details_id, request_id = insert_migrated_record(cursor, reg)
+        if reg['type'] == 'AM' or reg['type'] == 'CN' or reg['type'] == 'CP':
+            cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+                           "id = %(id)s AND cancelled_by IS NULL",
+                           {
+                               "canc": request_id, "id": previous_id
+                           })
+            if reg['type'] == 'AM':
+                cursor.execute("UPDATE register_details SET amends = %(amend)s WHERE " +
+                               "id = %(id)s",
+                               {
+                                   "amend": previous_id, "id": details_id
+                               })
 
-    complete(cursor)
-    return Response(json.dumps({'new_registrations': [registration_no]}), status=200)
+        previous_id = details_id
+        complete(cursor)
+
+    return Response(status=200)
 
 
 # ============= Dev routes ===============
