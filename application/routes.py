@@ -184,13 +184,6 @@ def retrieve():
 #     else:
 #         return Response(status=404)
 
-
-
-
-
-
-
-
 migrated_schema = {
     "type": "object",
     "properties": {
@@ -226,17 +219,33 @@ def insert():
         return Response(status=415)
 
     data = request.get_json(force=True)
-    try:
+    # TODO: is there a need to validate the migration schema???
+    """try:
         validate(data, migrated_schema)
     except ValidationError as error:
         message = "{}\n{}".format(error.message, error.path)
-        return Response(message, status=400)
+        return Response(message, status=400)"""
 
-    cursor = connect()
-    registration_no = insert_migrated_record(cursor, data)
+    for reg in data:
+        cursor = connect()
+        details_id, request_id = insert_migrated_record(cursor, reg)
+        if reg['type'] == 'AM' or reg['type'] == 'CN' or reg['type'] == 'CP':
+            cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+                           "id = %(id)s AND cancelled_by IS NULL",
+                           {
+                               "canc": request_id, "id": previous_id
+                           })
+            if reg['type'] == 'AM':
+                cursor.execute("UPDATE register_details SET amends = %(amend)s WHERE " +
+                               "id = %(id)s",
+                               {
+                                   "amend": previous_id, "id": details_id
+                               })
 
-    complete(cursor)
-    return Response(json.dumps({'new_registrations': [registration_no]}), status=200)
+        previous_id = details_id
+        complete(cursor)
+
+    return Response(status=200)
 
 
 # ============= Dev routes ===============

@@ -530,15 +530,20 @@ def insert_migrated_record(cursor, data):
     request_id = insert_request(cursor, None, data["application_type"], data['application_ref'], data['date'], None)
     details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
     party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
-    name_id = insert_name(cursor, data['debtor_name'], party_id)
+    if 'complex' in data:
+        name_id = insert_name(cursor, data['complex'], party_id)
+    elif 'debtor_name' in data:
+        name_id = insert_name(cursor, data['debtor_name'], party_id)
+    else:
+        data['complex'] = {"number": 0, "name": ""}
+        name_id = insert_name(cursor, data['complex'], party_id)
 
-    for address in data['residence']:
-        insert_address(cursor, address, "Debtor Residence", party_id)
+    insert_address(cursor, data['residence'], "Debtor Residence", party_id)
 
-    registration_no, registration_id = insert_registration(cursor, details_id, name_id)
+    registration_no, registration_id = insert_registration(cursor, details_id, name_id, data['reg_no'])
     insert_migration_status(cursor, registration_id, data['migration_data']['registration_no'],
                             data['migration_data']['extra'])
-    return registration_no
+    return details_id, request_id
 
 
 def insert_cancellation(registration_no, date, data):
