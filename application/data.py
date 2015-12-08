@@ -215,9 +215,15 @@ def insert_details(cursor, request_id, data, amends_id):
     if 'complex' in data:
         name_ids = [insert_name(cursor, data['complex'], party_id)]
     else:
-        name_ids = [insert_name(cursor, data['debtor_name'], party_id)]
-        for name in data['debtor_alternative_name']:
-            name_ids.append(insert_name(cursor, name, party_id, True))
+        if 'debtor_names' in data: # Handle array input
+            name_ids = [insert_name(cursor, data['debtor_names'][0], party_id)]
+            for name in data['debtor_names'][1:]:
+                name_ids.append(insert_name(cursor, name, party_id, True))
+
+        else: # TODO: retire this leg
+            name_ids = [insert_name(cursor, data['debtor_name'], party_id)]
+            for name in data['debtor_alternative_name']:
+                name_ids.append(insert_name(cursor, name, party_id, True))
 
     # party_trading
     if "trading_name" in data:
@@ -255,9 +261,9 @@ def insert_new_registration(cursor, data):
     return reg_nos, details_id
 
 
-def insert_amendment(cursor, orig_reg_no, data):
+def insert_amendment(cursor, orig_reg_no, date, data):
     # For now, always insert a new record
-    original_detl_id = get_register_details_id(cursor, orig_reg_no)
+    original_detl_id = get_register_details_id(cursor, orig_reg_no, date)
     if original_detl_id is None:
         return None, None, None
 
@@ -269,7 +275,7 @@ def insert_amendment(cursor, orig_reg_no, data):
     request_id = insert_request(cursor, None, "AMENDMENT", None, now, document, None)
 
     original_regs = get_all_registration_nos(cursor, original_detl_id)
-    amend_detl_id = get_register_details_id(cursor, orig_reg_no)
+    amend_detl_id = get_register_details_id(cursor, orig_reg_no, date)
     # pylint: disable=unused-variable
     reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id)
 
@@ -375,9 +381,9 @@ def get_name_details(cursor, data, details_id, name_id):
         forenames = [rows[0]['forename']]
         if rows[0]['middle_names'] != "":
             forenames += rows[0]['middle_names'].split(" ")
-        data['debtor_name'] = {'forenames': forenames, 'surname': rows[0]['surname']}
+        data['debtor_names'] = [{'forenames': forenames, 'surname': rows[0]['surname']}]
     else:
-        data['debtor_name'] = {'forenames': [], 'surname': ""}
+        data['debtor_names'] = [{'forenames': [], 'surname': ""}]
         data['complex'] = {'name': rows[0]['complex_name'], 'number': rows[0]['complex_number']}
 
     cursor.execute("select occupation, id from party where party_type='Debtor' and register_detl_id=%(id)s",
@@ -390,12 +396,12 @@ def get_name_details(cursor, data, details_id, name_id):
                    "where n.id = r.party_name_id and r.party_id = %(party_id)s and n.id != %(id)s ",
                    {'party_id': party_id, 'id': name_id})
     rows = cursor.fetchall()
-    data['debtor_alternative_name'] = []
+    #data['debtor_alternative_name'] = []
     for row in rows:
         forenames = [row['forename']]
         if row['middle_names'] != "":
             forenames += row['middle_names'].split(" ")
-        data['debtor_alternative_name'].append({
+        data['debtor_names'].append({
             'forenames': forenames, 'surname': row['surname']
         })
     return party_id
@@ -466,7 +472,7 @@ def get_registration_details(cursor, reg_no, date):
     if len(rows) > 0:
         data['amended_by'] = {
             'number': rows[0]['registration_no'],
-            'date': str(rows[0]['registration_date'])
+            'date': str(rows[0]['date'])
         }
     party_id = get_name_details(cursor, data, details_id, name_id)
 
@@ -545,16 +551,22 @@ def insert_cancellation(registration_no, date, data):
         document = data['document_id']
 
     request_id = insert_request(cursor, None, "CANCELLATION", None, now, document, None)
-
+    logging.info(request_id)
     # Set cancelled_on to now
-    original_detl_id = get_register_details_id(cursor, registration_no)
+    original_detl_id = get_register_details_id(cursor, registration_no, date)
+    logging.info(original_detl_id)
+
     original_regs = get_all_registration_nos(cursor, original_detl_id)
-    print(original_regs)
+    logging.info('--->')
+    logging.info(original_regs)
+
+    logging.info("SELECT * FROM register_details where id='" + str(original_detl_id) + "' AND cancelled_by IS NULL")
     cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
                    "id = %(id)s AND cancelled_by IS NULL",
                    {
                        "canc": request_id, "id": original_detl_id
                    })
+
     # TODO: archive document
     rows = cursor.rowcount
     complete(cursor)

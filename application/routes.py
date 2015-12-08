@@ -67,8 +67,8 @@ def register():
     return Response(json.dumps({'new_registrations': new_regns}), status=200)
 
 
-@app.route('/registrations/<reg_no>', methods=["PUT"])
-def amend_registration(reg_no):
+@app.route('/registrations/<date>/<reg_no>', methods=["PUT"])
+def amend_registration(date, reg_no):
     # Amendment... we're being given the replacement data
     if request.headers['Content-Type'] != "application/json":
         logging.error('Content-Type is not JSON')
@@ -84,7 +84,7 @@ def amend_registration(reg_no):
 
     # TODO: may need to revisit if business rules for rectification differs to amendment
     # if appn_type == 'amend':
-    originals, reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
+    originals, reg_nos, rows = insert_amendment(cursor, reg_no, date, json_data)
     # else:
     # originals, reg_nos, rows = insert_rectification(cursor, reg_no, json_data)
 
