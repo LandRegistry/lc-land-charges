@@ -101,7 +101,7 @@ def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
     if orig_reg_no is None:
         # Get the next registration number
         year = date[:4]  # date is a string
-        cursor.execute('select MAX(registration_no) + 1 '
+        cursor.execute('select MAX(registration_no) + 1 AS reg '
                        'from register  '
                        'where date >=%(start)s AND date < %(end)s',
                        {
@@ -110,10 +110,11 @@ def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
                        })
 
         rows = cursor.fetchall()
-        if rows[0][0] is None:
+        print(rows)
+        if rows[0]['reg'] is None:
             reg_no = 1000
         else:
-            reg_no = int(rows[0][0])
+            reg_no = int(rows[0]['reg'])
     else:
         reg_no = orig_reg_no
 
@@ -329,7 +330,7 @@ def get_register_details_id(cursor, reg_no, date):
     elif len(rows) > 1:
         raise RuntimeError("Too many rows retrieved")
     else:
-        return rows[0][0]
+        return rows[0]['details_id']
 
 
 def get_all_registration_nos(cursor, details_id):
@@ -340,8 +341,8 @@ def get_all_registration_nos(cursor, details_id):
     results = []
     for row in rows:
         results.append({
-            'number': str(row[0]),
-            'date': str(row[1])
+            'number': str(row['registration_no']),
+            'date': str(row['date'])
         })
     return results
 
@@ -576,12 +577,3 @@ def insert_cancellation(registration_no, date, data):
     rows = cursor.rowcount
     complete(cursor)
     return rows, original_regs
-
-
-def read_counties():
-    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    cursor.execute("SELECT name FROM counties")
-    rows = cursor.fetchall()
-    counties = [row['name'] for row in rows]
-    complete(cursor)
-    return counties

@@ -9,10 +9,10 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
-    insert_amendment, insert_new_registration, read_counties
+    insert_amendment, insert_new_registration
 from application.schema import SEARCH_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result
-from flask.ext.cors import cross_origin
+
 
 
 @app.route('/', methods=["GET"])
@@ -252,7 +252,7 @@ def insert():
 
 
 @app.route('/registrations', methods=['DELETE'])
-def delete_all_regs():
+def delete_all_regs():  # pragma: no cover
     if not app.config['ALLOW_DEV_ROUTES']:
         return Response(status=403)
 
@@ -279,7 +279,7 @@ def delete_all_regs():
 # Route exists purely for testing purposes - need to get something invalid onto
 # the synchroniser's queue!
 @app.route('/synchronise', methods=["POST"])
-def synchronise():   # pragma: no cover
+def synchronise():  # pragma: no cover
     if not app.config['ALLOW_DEV_ROUTES']:
         return Response(status=403)
 
