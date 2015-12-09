@@ -3,13 +3,12 @@
   "application_type": "WO(B)",
   "application_ref": "2844141",
   "date": "2015-01-07",
-  "debtor_name": {
+  "debtor_names":[ {
     "forenames": [
       "Quincy"
     ],
     "surname": "Kirlin"
-  },
-  "debtor_alternative_name": [],
+  }],
   "gender": "N/A",
   "occupation": "Medical student",
   "residence": [{

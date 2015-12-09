@@ -1,5 +1,5 @@
 from application import app, producer
-from application.exchange import publish_new_bankruptcy
+from application.exchange import publish_new_bankruptcy, publish_amendment, publish_cancellation
 from flask import Response, request
 import psycopg2
 import psycopg2.extras
@@ -7,12 +7,12 @@ import json
 import logging
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
-from application.data import connect, get_registration_details, complete, get_new_registration_number, \
+from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
-    insert_amendment, insert_new_registration, read_counties
+    insert_amendment, insert_new_registration
 from application.schema import SEARCH_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result
-from flask.ext.cors import cross_origin
+
 
 
 @app.route('/', methods=["GET"])
@@ -31,11 +31,12 @@ def health():
 
 # ============== /registrations ===============
 
-@app.route('/registrations/<int:reg_no>', methods=['GET'])
-def registration(reg_no):
+@app.route('/registrations/<date>/<int:reg_no>', methods=['GET'])
+def registration(date, reg_no):
     logging.debug("GET registration")
+
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    details = get_registration_details(cursor, reg_no)
+    details = get_registration_details(cursor, reg_no, date)
     complete(cursor)
     if details is None:
         logging.warning("Returning 404")
@@ -58,26 +59,32 @@ def register():
     json_data = request.get_json(force=True)
     cursor = connect()
     # pylint: disable=unused-variable
-    new_regns, details = insert_new_registration(cursor, json_data)
+    new_regns, details_id = insert_new_registration(cursor, json_data)
     complete(cursor)
     if not suppress:
         publish_new_bankruptcy(producer, new_regns)
+
     return Response(json.dumps({'new_registrations': new_regns}), status=200)
 
 
-@app.route('/registrations/<reg_no>', methods=["PUT"])
-def amend_registration(reg_no):
+@app.route('/registrations/<date>/<reg_no>', methods=["PUT"])
+def amend_registration(date, reg_no):
     # Amendment... we're being given the replacement data
     if request.headers['Content-Type'] != "application/json":
         logging.error('Content-Type is not JSON')
         return Response(status=415)
+
+    suppress = False
+    if 'suppress_queue' in request.args:
+        logging.info('Queue suppressed')
+        suppress = True
 
     json_data = request.get_json(force=True)
     cursor = connect()
 
     # TODO: may need to revisit if business rules for rectification differs to amendment
     # if appn_type == 'amend':
-    originals, reg_nos, rows = insert_amendment(cursor, reg_no, json_data)
+    originals, reg_nos, rows = insert_amendment(cursor, reg_no, date, json_data)
     # else:
     # originals, reg_nos, rows = insert_rectification(cursor, reg_no, json_data)
 
@@ -92,23 +99,33 @@ def amend_registration(reg_no):
             "new_registrations": reg_nos,
             "amended_registrations": originals
         }
+        if not suppress:
+            publish_amendment(producer, data)
+
         return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
-@app.route('/registrations/<reg_no>', methods=["DELETE"])
-def cancel_registration(reg_no):
+@app.route('/registrations/<date>/<reg_no>', methods=["DELETE"])
+def cancel_registration(date, reg_no):
     if request.headers['Content-Type'] != "application/json":
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
+    suppress = False
+    if 'suppress_queue' in request.args:
+        logging.info('Queue suppressed')
+        suppress = True
+
     json_data = request.get_json(force=True)
-    rows, nos = insert_cancellation(reg_no, json_data)
+    rows, nos = insert_cancellation(reg_no, date, json_data)
     if rows == 0:
         return Response(status=404)
     else:
         data = {
             "cancelled": nos
         }
+        if not suppress:
+            publish_cancellation(producer, nos)
         print(data)
         return Response(json.dumps(data), status=200, mimetype='application/json')
 
@@ -235,7 +252,7 @@ def insert():
 
 
 @app.route('/registrations', methods=['DELETE'])
-def delete_all_regs():
+def delete_all_regs():  # pragma: no cover
     if not app.config['ALLOW_DEV_ROUTES']:
         return Response(status=403)
 
@@ -262,7 +279,7 @@ def delete_all_regs():
 # Route exists purely for testing purposes - need to get something invalid onto
 # the synchroniser's queue!
 @app.route('/synchronise', methods=["POST"])
-def synchronise():   # pragma: no cover
+def synchronise():  # pragma: no cover
     if not app.config['ALLOW_DEV_ROUTES']:
         return Response(status=403)
 

@@ -97,26 +97,35 @@ def insert_name(cursor, name, party_id, is_alias=False):
     return name['id']
 
 
-def insert_registration(cursor, details_id, name_id, orig_reg_no=None):
+def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
     if orig_reg_no is None:
         # Get the next registration number
-        cursor.execute("SELECT MAX(registration_no) FROM register", {})
+        year = date[:4]  # date is a string
+        cursor.execute('select MAX(registration_no) + 1 AS reg '
+                       'from register  '
+                       'where date >=%(start)s AND date < %(end)s',
+                       {
+                           'start': "{}-01-01".format(year),
+                           'end': "{}-01-01".format(int(year) + 1)
+                       })
 
         rows = cursor.fetchall()
-        if rows[0][0] is None:
-            reg_no = 50000
+        print(rows)
+        if rows[0]['reg'] is None:
+            reg_no = 1000
         else:
-            reg_no = int(rows[0][0]) + 1
+            reg_no = int(rows[0]['reg'])
     else:
         reg_no = orig_reg_no
 
     # Cap it all off with the actual legal "one registration per name":
-    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id) " +
-                   "VALUES( %(regno)s, %(debtor)s, %(details)s ) RETURNING id",
+    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, date) " +
+                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(date)s ) RETURNING id",
                    {
                        "regno": reg_no,
                        "debtor": name_id,
-                       "details": details_id
+                       "details": details_id,
+                       'date': date
                    })
     reg_id = cursor.fetchone()[0]
     return reg_no, reg_id
@@ -207,9 +216,15 @@ def insert_details(cursor, request_id, data, amends_id):
     if 'complex' in data:
         name_ids = [insert_name(cursor, data['complex'], party_id)]
     else:
-        name_ids = [insert_name(cursor, data['debtor_name'], party_id)]
-        for name in data['debtor_alternative_name']:
-            name_ids.append(insert_name(cursor, name, party_id, True))
+        if 'debtor_names' in data: # Handle array input
+            name_ids = [insert_name(cursor, data['debtor_names'][0], party_id)]
+            for name in data['debtor_names'][1:]:
+                name_ids.append(insert_name(cursor, name, party_id, True))
+
+        else: # TODO: retire this leg
+            name_ids = [insert_name(cursor, data['debtor_name'], party_id)]
+            for name in data['debtor_alternative_name']:
+                name_ids.append(insert_name(cursor, name, party_id, True))
 
     # party_trading
     if "trading_name" in data:
@@ -221,13 +236,15 @@ def insert_details(cursor, request_id, data, amends_id):
 
 def insert_record(cursor, data, request_id, amends=None, orig_reg_no=None):
     name_ids, register_details_id = insert_details(cursor, request_id, data, amends)
-    # insert_registration(cursor, details_id, name_id)
     reg_nos = []
 
     # pylint: disable=unused-variable
     for name_id in name_ids:
-        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id, orig_reg_no)
-        reg_nos.append(reg_no)
+        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id, data['date'], orig_reg_no)
+        reg_nos.append({
+            'number': reg_no,
+            'date': data['date']
+        })
 
     # TODO: audit-log not done. Not sure it belongs here?
     return reg_nos, register_details_id
@@ -245,9 +262,9 @@ def insert_new_registration(cursor, data):
     return reg_nos, details_id
 
 
-def insert_amendment(cursor, orig_reg_no, data):
+def insert_amendment(cursor, orig_reg_no, date, data):
     # For now, always insert a new record
-    original_detl_id = get_register_details_id(cursor, orig_reg_no)
+    original_detl_id = get_register_details_id(cursor, orig_reg_no, date)
     if original_detl_id is None:
         return None, None, None
 
@@ -259,7 +276,7 @@ def insert_amendment(cursor, orig_reg_no, data):
     request_id = insert_request(cursor, None, "AMENDMENT", None, now, document, None)
 
     original_regs = get_all_registration_nos(cursor, original_detl_id)
-    amend_detl_id = get_register_details_id(cursor, orig_reg_no)
+    amend_detl_id = get_register_details_id(cursor, orig_reg_no, date)
     # pylint: disable=unused-variable
     reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id)
 
@@ -301,10 +318,11 @@ def insert_rectification(cursor, orig_reg_no, data):
     return original_regs, reg_nos, rows
 
 
-def get_register_details_id(cursor, reg_no):
-    cursor.execute("SELECT details_id FROM register WHERE registration_no = %(regno)s",
+def get_register_details_id(cursor, reg_no, date):
+    cursor.execute("SELECT details_id FROM register WHERE registration_no = %(regno)s AND date=%(date)s",
                    {
-                       "regno": reg_no
+                       "regno": reg_no,
+                       'date': date
                    })
     rows = cursor.fetchall()
     if len(rows) == 0:
@@ -312,25 +330,28 @@ def get_register_details_id(cursor, reg_no):
     elif len(rows) > 1:
         raise RuntimeError("Too many rows retrieved")
     else:
-        return rows[0][0]
+        return rows[0]['details_id']
 
 
 def get_all_registration_nos(cursor, details_id):
-    cursor.execute("SELECT registration_no FROM register WHERE details_id = %(details)s",
+    cursor.execute("SELECT registration_no, date FROM register WHERE details_id = %(details)s",
                    {"details": details_id})
     rows = cursor.fetchall()
     print(rows)
     results = []
     for row in rows:
-        results.append(str(row[0]))
+        results.append({
+            'number': str(row['registration_no']),
+            'date': str(row['date'])
+        })
     return results
 
 
-def get_registration(cursor, reg_id):
+def get_registration(cursor, reg_id, date):
     cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
                    "r.id as register_id from register r, register_details rd " +
                    "where r.details_id = rd.id " +
-                   "and r.id=%(id)s", {'id': reg_id})
+                   "and r.id=%(id)s and r.date=%(date)s", {'id': reg_id, 'date': date})
     rows = cursor.fetchall()
     row = rows[0]
     result = {
@@ -341,16 +362,16 @@ def get_registration(cursor, reg_id):
     return result
 
 
-def get_new_registration_number(cursor, db2_reg_no):
-    cursor.execute("select r.registration_no from register r, migration_status ms where r.id = ms.register_id"
-                   " and ms.original_regn_no = %(reg_no)s", {'reg_no': db2_reg_no})
-    rows = cursor.fetchall()
-    # row = rows[0]
-    reg_nos = []
-    for row in rows:
-        reg_nos.append(row['registration_no'])
-
-    return reg_nos
+# def get_new_registration_number(cursor, db2_reg_no):
+#     cursor.execute("select r.registration_no from register r, migration_status ms where r.id = ms.register_id"
+#                    " and ms.original_regn_no = %(reg_no)s", {'reg_no': db2_reg_no})
+#     rows = cursor.fetchall()
+#     # row = rows[0]
+#     reg_nos = []
+#     for row in rows:
+#         reg_nos.append(row['registration_no'])
+#
+#     return reg_nos
 
 
 def get_name_details(cursor, data, details_id, name_id):
@@ -361,9 +382,9 @@ def get_name_details(cursor, data, details_id, name_id):
         forenames = [rows[0]['forename']]
         if rows[0]['middle_names'] != "":
             forenames += rows[0]['middle_names'].split(" ")
-        data['debtor_name'] = {'forenames': forenames, 'surname': rows[0]['surname']}
+        data['debtor_names'] = [{'forenames': forenames, 'surname': rows[0]['surname']}]
     else:
-        data['debtor_name'] = {'forenames': [], 'surname': ""}
+        data['debtor_names'] = [{'forenames': [], 'surname': ""}]
         data['complex'] = {'name': rows[0]['complex_name'], 'number': rows[0]['complex_number']}
 
     cursor.execute("select occupation, id from party where party_type='Debtor' and register_detl_id=%(id)s",
@@ -376,37 +397,48 @@ def get_name_details(cursor, data, details_id, name_id):
                    "where n.id = r.party_name_id and r.party_id = %(party_id)s and n.id != %(id)s ",
                    {'party_id': party_id, 'id': name_id})
     rows = cursor.fetchall()
-    data['debtor_alternative_name'] = []
+    #data['debtor_alternative_name'] = []
     for row in rows:
         forenames = [row['forename']]
         if row['middle_names'] != "":
             forenames += row['middle_names'].split(" ")
-        data['debtor_alternative_name'].append({
+        data['debtor_names'].append({
             'forenames': forenames, 'surname': row['surname']
         })
     return party_id
 
 
 def get_registration_no_from_details_id(cursor, details_id):
-    cursor.execute("select registration_no from register where details_id = %(id)s",
+    cursor.execute("select r.registration_no, d.registration_date from register r, register_details d where " +
+                   "  r.details_id = %(id)s AND r.details_id = d.id",
                    {'id': details_id})
     rows = cursor.fetchall()
     if len(rows) == 0:
         return None
     else:
-        return rows[0]['registration_no']
+        return {
+            'number': rows[0]['registration_no'],
+            'date': str(rows[0]['registration_date'])
+        }
 
 
-def get_registration_details(cursor, reg_no):
+def get_registration_details(cursor, reg_no, date):
     cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
-                   "r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by, rd.amends from register r, register_details rd " +
-                   "where r.registration_no = %(reg_no)s and r.details_id = rd.id", {'reg_no': reg_no})
+                   "r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id " +
+                   "from register r, register_details rd " +
+                   "where r.registration_no = %(reg_no)s and r.details_id = rd.id " +
+                   "and rd.registration_date = %(date)s", {
+                       'reg_no': reg_no,
+                       'date': date,
+                   })
     rows = cursor.fetchall()
     if len(rows) == 0:
         return None
     data = {
-        'registration_no': rows[0]['registration_no'],
-        'registration_date': str(rows[0]['registration_date']),
+        'registration': {
+            'number': rows[0]['registration_no'],
+            'date': str(rows[0]['registration_date'])
+        },
         'application_type': rows[0]['application_type'],
         'legal_body': rows[0]['legal_body'],
         'legal_body_ref': rows[0]['legal_body_ref'],
@@ -419,20 +451,30 @@ def get_registration_details(cursor, reg_no):
     if rows[0]['amends'] is not None:
         data['amends_regn'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
 
-    if rows[0]['cancelled_by'] is not None:
+    cancelled_by = rows[0]['cancelled_by']
+    if cancelled_by is not None:
         cursor.execute("select amends from register_details where amends=%(id)s",
                        {"id": details_id})
+
         rows = cursor.fetchall()
         if len(rows) > 0:
             data['status'] = 'superseded'
         else:
             data['status'] = 'cancelled'
+            data['cancellation_ref'] = cancelled_by
+            cursor.execute('select application_date from request where id=%(id)s', {'id': data['cancellation_ref']})
+            print(data['cancellation_ref'])
+            cancel_rows = cursor.fetchall()
+            data['cancellation_date'] = cancel_rows[0]['application_date'].isoformat()
 
-    cursor.execute('select r.registration_no, d.amends FROM register r, register_details d WHERE r.details_id=d.id AND '
+    cursor.execute('select r.registration_no, r.date, d.amends FROM register r, register_details d WHERE r.details_id=d.id AND '
                    'd.amends=%(id)s', {'id': details_id})
     rows = cursor.fetchall()
     if len(rows) > 0:
-        data['amended_by'] = rows[0]['registration_no']
+        data['amended_by'] = {
+            'number': rows[0]['registration_no'],
+            'date': str(rows[0]['date'])
+        }
     party_id = get_name_details(cursor, data, details_id, name_id)
 
     cursor.execute("select trading_name from party_trading where party_id = %(id)s", {'id': party_id})
@@ -505,7 +547,7 @@ def insert_migrated_record(cursor, data):
     return details_id, request_id
 
 
-def insert_cancellation(registration_no, data):
+def insert_cancellation(registration_no, date, data):
     cursor = connect()
 
     # Insert a row with application info
@@ -515,25 +557,23 @@ def insert_cancellation(registration_no, data):
         document = data['document_id']
 
     request_id = insert_request(cursor, None, "CANCELLATION", None, now, document, None)
-
+    logging.info(request_id)
     # Set cancelled_on to now
-    original_detl_id = get_register_details_id(cursor, registration_no)
+    original_detl_id = get_register_details_id(cursor, registration_no, date)
+    logging.info(original_detl_id)
+
     original_regs = get_all_registration_nos(cursor, original_detl_id)
-    print(original_regs)
+    logging.info('--->')
+    logging.info(original_regs)
+
+    logging.info("SELECT * FROM register_details where id='" + str(original_detl_id) + "' AND cancelled_by IS NULL")
     cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
                    "id = %(id)s AND cancelled_by IS NULL",
                    {
                        "canc": request_id, "id": original_detl_id
                    })
+
+    # TODO: archive document
     rows = cursor.rowcount
     complete(cursor)
     return rows, original_regs
-
-
-def read_counties():
-    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    cursor.execute("SELECT name FROM counties")
-    rows = cursor.fetchall()
-    counties = [row['name'] for row in rows]
-    complete(cursor)
-    return counties

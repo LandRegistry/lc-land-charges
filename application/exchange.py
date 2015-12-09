@@ -20,5 +20,27 @@ def setup_messaging(config):
 
 
 def publish_new_bankruptcy(producer, data):
-    logging.info("Sending: %s", data)
-    producer.publish(data)
+    publish = {
+        "application": "new",
+        "data": data
+    }
+    logging.info("Sending: %s", publish)
+    producer.publish(publish)
+
+
+def publish_amendment(producer, data):
+    publish = {
+        "application": "amend",
+        "data": data
+    }
+    logging.info("Sending: %s", publish)
+    producer.publish(publish)
+
+
+def publish_cancellation(producer, data):
+    publish = {
+        "application": "cancel",
+        "data": data
+    }
+    logging.info("Sending: %s", publish)
+    producer.publish(publish)
