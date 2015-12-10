@@ -11,7 +11,7 @@ from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_amendment, insert_new_registration
 from application.schema import SEARCH_SCHEMA
-from application.search import store_search_request, perform_search, store_search_result
+from application.search import store_search_request, perform_search, store_search_result, read_searches
 
 
 
@@ -57,7 +57,7 @@ def register():
         return Response(status=415)
 
     json_data = request.get_json(force=True)
-    cursor = connect()
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # pylint: disable=unused-variable
     new_regns, details_id = insert_new_registration(cursor, json_data)
     complete(cursor)
@@ -80,7 +80,7 @@ def amend_registration(date, reg_no):
         suppress = True
 
     json_data = request.get_json(force=True)
-    cursor = connect()
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
 
     # TODO: may need to revisit if business rules for rectification differs to amendment
     # if appn_type == 'amend':
@@ -134,7 +134,7 @@ def cancel_registration(date, reg_no):
 
 
 @app.route('/searches', methods=['POST'])
-def retrieve():
+def create_search():
     if request.headers['Content-Type'] != "application/json":
         logging.error('Content-Type is not JSON')
         return Response(status=415)
@@ -167,7 +167,15 @@ def retrieve():
     else:
         return Response(json.dumps(results, ensure_ascii=False), status=200, mimetype='application/json')
 
-
+        
+@app.route('/searches', methods=['GET'])
+def get_searches():
+    nonissued = False
+    if 'filter' in request.args:
+        nonissued = (request.args['filter'] == 'nonissued')
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    result = read_searches(cursor, nonissued)
+    return Response(json.dumps(result), status=200, mimetype='application/json')
 # @app.route('/migrated_registration/<int:db2_reg_no>', methods=['GET'])
 # def migrated_registration(db2_reg_no):
 #     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -227,7 +235,7 @@ def insert():
         return Response(message, status=400)"""
 
     for reg in data:
-        cursor = connect()
+        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         details_id, request_id = insert_migrated_record(cursor, reg)
         if reg['type'] == 'AM' or reg['type'] == 'CN' or reg['type'] == 'CP':
             cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
@@ -256,7 +264,7 @@ def delete_all_regs():  # pragma: no cover
     if not app.config['ALLOW_DEV_ROUTES']:
         return Response(status=403)
 
-    cursor = connect()
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     cursor.execute("DELETE FROM party_address")
     cursor.execute("DELETE FROM address")
     cursor.execute("DELETE FROM address_detail")

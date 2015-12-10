@@ -8,7 +8,7 @@ CUSTOMER_SCHEMA = {
         "address": {"type": "string"},
         "reference": {"type": "string"},
     },
-    "required": ["name", "address"]
+    "required": ["name", "address", "reference", "key_number"]
 }
 
 

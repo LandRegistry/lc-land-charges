@@ -153,6 +153,9 @@ def store_search_result(cursor, search_request_id, data):
 
 
 def perform_search(cursor, parameters):
+    if "counties" not in parameters:
+        parameters["counties"] = []
+    
     if len(parameters['counties']) == 0:
         parameters['counties'].append('ALL')
 
@@ -184,3 +187,16 @@ def perform_search(cursor, parameters):
                 search_results.append({item['name']: search_by_name(cursor, item['name'])})
 
     return search_results
+
+    
+def read_searches(cursor,nonissued):
+    # TODO: handle the unprinted/unissued thing
+    cursor.execute("SELECT id, request_id, parameters, result FROM search_details")
+    # Generate the results here...
+    rows = cursor.fetchall()
+    results = []
+    for row in rows:
+        results.append({
+            "result": row['result'],
+        })
+    return results
