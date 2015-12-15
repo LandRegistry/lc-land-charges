@@ -126,7 +126,6 @@ def cancel_registration(date, reg_no):
         }
         if not suppress:
             publish_cancellation(producer, nos)
-        print(data)
         return Response(json.dumps(data), status=200, mimetype='application/json')
 
 

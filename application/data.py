@@ -110,7 +110,6 @@ def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
                        })
 
         rows = cursor.fetchall()
-        print(rows)
         if rows[0]['reg'] is None:
             reg_no = 1000
         else:
@@ -337,7 +336,6 @@ def get_all_registration_nos(cursor, details_id):
     cursor.execute("SELECT registration_no, date FROM register WHERE details_id = %(details)s",
                    {"details": details_id})
     rows = cursor.fetchall()
-    print(rows)
     results = []
     for row in rows:
         results.append({
@@ -463,7 +461,6 @@ def get_registration_details(cursor, reg_no, date):
             data['status'] = 'cancelled'
             data['cancellation_ref'] = cancelled_by
             cursor.execute('select application_date from request where id=%(id)s', {'id': data['cancellation_ref']})
-            print(data['cancellation_ref'])
             cancel_rows = cursor.fetchall()
             data['cancellation_date'] = cancel_rows[0]['application_date'].isoformat()
 
@@ -548,7 +545,7 @@ def insert_migrated_record(cursor, data):
 
 
 def insert_cancellation(registration_no, date, data):
-    cursor = connect()
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
 
     # Insert a row with application info
     now = datetime.datetime.now()
