@@ -66,6 +66,7 @@ def insert_address(cursor, address, address_type, party_id):
 
 
 def insert_name(cursor, name, party_id, is_alias=False):
+    name_string = ''
     if 'number' in name:
         cursor.execute("INSERT INTO party_name (alias_name, complex_number, complex_name) " +
                        "VALUES ( %(alias)s, %(number)s, %(name)s ) " +
@@ -94,7 +95,11 @@ def insert_name(cursor, name, party_id, is_alias=False):
                        "name": name['id'], "party": party_id
                    })
 
-    return name['id']
+    return {
+        'id': name['id'],
+        'forenames': name['forenames'],
+        'surname': name['surname']
+    }
 
 
 def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
@@ -205,7 +210,8 @@ def insert_details(cursor, request_id, data, amends_id):
             insert_address(cursor, address, "Debtor Residence", party_id)
 
     if "business_address" in data:
-        insert_address(cursor, data["business_address"], "Debtor Business", party_id)
+        for address in data["investment_property"]:
+            insert_address(cursor, address, "Debtor Business", party_id)
 
     if "investment_property" in data:
         for address in data["investment_property"]:
@@ -213,36 +219,39 @@ def insert_details(cursor, request_id, data, amends_id):
 
     # party_name, party_name_rel
     if 'complex' in data:
-        name_ids = [insert_name(cursor, data['complex'], party_id)]
+        names = [insert_name(cursor, data['complex'], party_id)]
     else:
         if 'debtor_names' in data: # Handle array input
-            name_ids = [insert_name(cursor, data['debtor_names'][0], party_id)]
+            names = [insert_name(cursor, data['debtor_names'][0], party_id)]
             for name in data['debtor_names'][1:]:
-                name_ids.append(insert_name(cursor, name, party_id, True))
+                names.append(insert_name(cursor, name, party_id, True))
 
-        else: # TODO: retire this leg
-            name_ids = [insert_name(cursor, data['debtor_name'], party_id)]
+        else:  # TODO: retire this leg
+            names = [insert_name(cursor, data['debtor_name'], party_id)]
             for name in data['debtor_alternative_name']:
-                name_ids.append(insert_name(cursor, name, party_id, True))
+                names.append(insert_name(cursor, name, party_id, True))
 
     # party_trading
     if "trading_name" in data:
         cursor.execute("INSERT INTO party_trading (party_id, trading_name) " +
                        "VALUES ( %(party)s, %(trading)s ) RETURNING id",
                        {"party": party_id, "trading": data['trading_name']})
-    return name_ids, register_details_id
+    return names, register_details_id
 
 
 def insert_record(cursor, data, request_id, amends=None, orig_reg_no=None):
-    name_ids, register_details_id = insert_details(cursor, request_id, data, amends)
+    names, register_details_id = insert_details(cursor, request_id, data, amends)
     reg_nos = []
 
     # pylint: disable=unused-variable
-    for name_id in name_ids:
-        reg_no, reg_id = insert_registration(cursor, register_details_id, name_id, data['date'], orig_reg_no)
+    for name in names:
+        reg_no, reg_id = insert_registration(cursor, register_details_id, name['id'], data['date'], orig_reg_no)
         reg_nos.append({
             'number': reg_no,
-            'date': data['date']
+            'date': data['date'],
+            'forenames': name['forenames'],
+            'surname': name['surname']
+
         })
 
     # TODO: audit-log not done. Not sure it belongs here?
