@@ -75,6 +75,11 @@ def insert_name(cursor, name, party_id, is_alias=False):
                            "alias": is_alias, "number": name['number'], "name": name['name']
                        })
         name['id'] = cursor.fetchone()[0]
+        return_data = {
+            'id': name['id'],
+            'name': name['name'],
+            'number': name['number']
+        }
     else:
         name_string = "{} {}".format(" ".join(name['forenames']), name['surname'])
         forename = name['forenames'][0]
@@ -88,6 +93,11 @@ def insert_name(cursor, name, party_id, is_alias=False):
                            "surname": name['surname'], "alias": is_alias
                        })
         name['id'] = cursor.fetchone()[0]
+        return_data = {
+            'id': name['id'],
+            'forenames': name['forenames'],
+            'surname': name['surname']
+        }
 
     cursor.execute("INSERT INTO party_name_rel (party_name_id, party_id) " +
                    "VALUES( %(name)s, %(party)s ) RETURNING id",
@@ -95,11 +105,7 @@ def insert_name(cursor, name, party_id, is_alias=False):
                        "name": name['id'], "party": party_id
                    })
 
-    return {
-        'id': name['id'],
-        'forenames': name['forenames'],
-        'surname': name['surname']
-    }
+    return return_data
 
 
 def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
@@ -214,6 +220,9 @@ def insert_details(cursor, request_id, data, amends_id):
             insert_address(cursor, address, "Debtor Business", party_id)
 
     if "investment_property" in data:
+        if not isinstance(data['investment_property'], list):
+            data['investment_property'] = [data['investment_property']]
+
         for address in data["investment_property"]:
             insert_address(cursor, address, "Investment", party_id)
 
@@ -246,13 +255,20 @@ def insert_record(cursor, data, request_id, amends=None, orig_reg_no=None):
     # pylint: disable=unused-variable
     for name in names:
         reg_no, reg_id = insert_registration(cursor, register_details_id, name['id'], data['date'], orig_reg_no)
-        reg_nos.append({
-            'number': reg_no,
-            'date': data['date'],
-            'forenames': name['forenames'],
-            'surname': name['surname']
 
-        })
+        if 'forenames' in name:
+            reg_nos.append({
+                'number': reg_no,
+                'date': data['date'],
+                'forenames': name['forenames'],
+                'surname': name['surname']
+            })
+        else:
+            reg_nos.append({
+                'number': reg_no,
+                'date': data['date'],
+                'name': name['name']
+            })
 
     # TODO: audit-log not done. Not sure it belongs here?
     return reg_nos, register_details_id
