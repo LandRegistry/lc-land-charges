@@ -9,7 +9,7 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
-    insert_amendment, insert_new_registration
+    insert_amendment, insert_new_registration, get_req_details
 from application.schema import SEARCH_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result, read_searches
 
@@ -297,3 +297,30 @@ def synchronise():  # pragma: no cover
     json_data = request.get_json(force=True)
     publish_new_bankruptcy(producer, json_data)
     return Response(status=200)
+
+#Get details of a request for printing
+@app.route('/request_details/<request_id>', methods=["GET"])
+def get_request_details(request_id):
+    reqs = get_req_details(request_id)
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    reg = get_registration_details(cursor, reqs[0]["registration_no"], reqs[0]["registration_date"])
+    complete(cursor)
+    return Response(json.dumps(reg), status=200, mimetype='application/json')
+
+#Route exists purely for testing purposes - get some valid request ids for test data
+#count is the amount of ids to return
+@app.route('/request_ids/<count>', methods=["GET"])
+def get_request_ids(count):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    sql = "Select id as request_id from request fetch first " + str(count) + " rows only"
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+    complete(cursor)
+    data = []
+    if len(rows) == 0:
+        data = None
+    else:
+        for row in rows:
+            job = {'request_id': row['request_id']}
+            data.append(job)
+    return Response(json.dumps(data), status=200, mimetype='application/json')

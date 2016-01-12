@@ -504,13 +504,14 @@ def get_registration_details(cursor, reg_no, date):
     if len(rows) != 0:
         data['trading_name'] = rows[0]['trading_name']
 
-    cursor.execute("select r.key_number, r.application_reference, r.document_ref from request r, register_details d " +
-                   "where r.id = d.request_id and d.id = %(id)s", {'id': details_id})
+    cursor.execute("select r.key_number, r.application_reference, r.document_ref, r.customer_name, r.customer_address "+
+            " from request r, register_details d where r.id = d.request_id and d.id = %(id)s", {'id': details_id})
     rows = cursor.fetchall()
     data['application_ref'] = rows[0]['application_reference']
     data['document_id'] = rows[0]['document_ref']
     data['key_number'] = rows[0]['key_number']
-
+    data['customer_name'] = rows[0]['customer_name']
+    data['customer_address'] = rows[0]['customer_address']
     cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, d.county, " +
                    "d.postcode, a.address_string " +
                    "from address a " +
@@ -599,3 +600,18 @@ def insert_cancellation(registration_no, date, data):
     rows = cursor.rowcount
     complete(cursor)
     return rows, original_regs
+
+
+def get_req_details(request_id):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    sql = "Select request_id, registration_date, registration_no "\
+    " from register_details a, register b "\
+    " where a.request_id = %(request_id)s and a.id = b.details_id "
+    cursor.execute(sql, {"request_id": request_id})
+    rows = cursor.fetchall()
+    complete(cursor)
+    registrations = []
+    for row in rows:
+        registration = {"request_id": row["request_id"], "registration_date": row["registration_date"], "registration_no": row["registration_no"]}
+        registrations.append(registration)
+    return registrations
