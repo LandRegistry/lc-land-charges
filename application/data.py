@@ -513,18 +513,30 @@ def get_registration_details(cursor, reg_no, date):
     data['customer_name'] = rows[0]['customer_name']
     data['customer_address'] = rows[0]['customer_address']
     cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, d.county, " +
-                   "d.postcode, a.address_string " +
+                   "d.postcode, a.address_string, a.address_type " +
                    "from address a " +
                    "left outer join address_detail d on a.detail_id = d.id " +
                    "inner join party_address pa on a.id = pa.address_id " +
-                   "where a.address_type='Debtor Residence' and pa.party_id = %(id)s", {'id': party_id})
+                   "where pa.party_id = %(id)s", {'id': party_id})
+                   #"where a.address_type='Debtor Residence' and pa.party_id = %(id)s", {'id': party_id})
 
     rows = cursor.fetchall()
     data['residence'] = []
+    data['investment_property'] = []
+    data['business_address'] = []
     for row in rows:
+        add_to = ''
+        address_type = row['address_type']
+        if address_type == 'Debtor Residence':
+            add_to = 'residence'
+        elif address_type == 'Debtor Business':
+            add_to = 'business_address'
+        elif address_type == 'Investment':
+            add_to = 'investment_property'
+
         if row['line_1'] is None:  # Unstructured address stored as text
             text = row['address_string']
-            data['residence'].append({'text': text})
+            data[add_to].append({'text': text})
 
         else:
             address = []
@@ -533,7 +545,7 @@ def get_registration_details(cursor, reg_no, date):
                 if line != "":
                     address.append(line)
 
-            data['residence'].append({
+            data[add_to].append({
                 'address_lines': address, 'county': row['county'], 'postcode': row['postcode']
             })
 
