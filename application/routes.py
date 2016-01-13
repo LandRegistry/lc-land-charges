@@ -9,8 +9,8 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
-    insert_amendment, insert_new_registration
-from application.schema import SEARCH_SCHEMA
+    insert_amendment, insert_new_registration, get_req_details
+from application.schema import SEARCH_SCHEMA, validate, BANKRUPTCY_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result, read_searches
 
 
@@ -57,6 +57,12 @@ def register():
         return Response(status=415)
 
     json_data = request.get_json(force=True)
+    print(json_data)
+    errors = validate(json_data, BANKRUPTCY_SCHEMA)
+    if len(errors) > 0:
+        logging.error("Input data failed validation")
+        return Response(json.dumps(errors), status=400, mimetype='application/json')
+
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # pylint: disable=unused-variable
     new_regns, details_id = insert_new_registration(cursor, json_data)
@@ -298,6 +304,7 @@ def synchronise():  # pragma: no cover
     publish_new_bankruptcy(producer, json_data)
     return Response(status=200)
 
+<<<<<<< HEAD
 
 @app.route('/counties', methods=['POST'])
 def load_counties():  # pragma: no cover
@@ -320,3 +327,31 @@ def load_counties():  # pragma: no cover
                        })
     complete(cursor)
     return Response(status=200)
+=======
+#Get details of a request for printing
+@app.route('/request_details/<request_id>', methods=["GET"])
+def get_request_details(request_id):
+    reqs = get_req_details(request_id)
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    reg = get_registration_details(cursor, reqs[0]["registration_no"], reqs[0]["registration_date"])
+    complete(cursor)
+    return Response(json.dumps(reg), status=200, mimetype='application/json')
+
+#Route exists purely for testing purposes - get some valid request ids for test data
+#count is the amount of ids to return
+@app.route('/request_ids/<count>', methods=["GET"])
+def get_request_ids(count):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    sql = "Select id as request_id from request fetch first " + str(count) + " rows only"
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+    complete(cursor)
+    data = []
+    if len(rows) == 0:
+        data = None
+    else:
+        for row in rows:
+            job = {'request_id': row['request_id']}
+            data.append(job)
+    return Response(json.dumps(data), status=200, mimetype='application/json')
+>>>>>>> 4ece7805d80cb6c95883e964d6d50fa9dc135e7e
