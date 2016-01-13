@@ -297,3 +297,26 @@ def synchronise():  # pragma: no cover
     json_data = request.get_json(force=True)
     publish_new_bankruptcy(producer, json_data)
     return Response(status=200)
+
+
+@app.route('/counties', methods=['POST'])
+def load_counties():  # pragma: no cover
+    if not app.config['ALLOW_DEV_ROUTES']:
+        return Response(status=403)
+
+    if request.headers['Content-Type'] != "application/json":
+        logging.error('Content-Type is not JSON')
+        return Response(status=415)
+
+    json_data = request.get_json(force=True)
+    cursor = connect()
+    for item in json_data:
+        if 'cym' not in item:
+            item['cym'] = None
+
+        cursor.execute('INSERT INTO COUNTY (name, welsh_name) VALUES (%(e)s, %(c)s)',
+                       {
+                           'e': item['eng'], 'c': item['cym']
+                       })
+    complete(cursor)
+    return Response(status=200)

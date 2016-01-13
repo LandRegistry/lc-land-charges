@@ -66,7 +66,38 @@ def insert_address(cursor, address, address_type, party_id):
 
 
 def insert_name(cursor, name, party_id, is_alias=False):
-    if 'number' in name:
+    if 'estate_owner_ind' in name:
+        name_string, forename, middle_names, surname, company = ('',) * 5
+        local_auth, local_auth_area, complex_name, other = ('',) * 4
+        complex_number = 0
+        if name['private']['forenames'] != '' or name['private']['surname'] != '':
+            name_string = "{} {}".format(" ".join(name['private']['forenames']), name['private']['surname'])
+            forename = name['private']['forenames'][0]
+            middle_names = " ".join(name['private']['forenames'][1:])
+            surname = name['private']['surname']
+        else:
+            company = name['company'] if name['company'] != '' else ''
+            local_auth = name['local']['name'] if name['local']['name'] != '' else ''
+            local_auth_area = name['local']['area'] if name['local']['area'] != '' else ''
+            other = name['other'] if name['other'] != '' else ''
+            complex_name = name['complex']['name'] if name['complex']['name'] != '' else ''
+            complex_number = name['complex']['number'] if name['complex']['number'] != '' else ''
+
+        cursor.execute("INSERT INTO party_name ( party_name, forename, " +
+                       "middle_names, surname, alias_name, complex_number, complex_name, " +
+                       "name_type_ind, company_name, local_authority_name, local_authority_area, other_name ) " +
+                       "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s, " +
+                       "%(comp_num)s, %(comp_name)s, %(type)s, %(company)s, " +
+                       "%(loc_auth)s, %(loc_auth_area)s, %(other)s ) " +
+                       "RETURNING id",
+                       {
+                           "name": name_string, "forename": forename, "midnames": middle_names,
+                           "surname": surname, "alias": is_alias, "comp_num":complex_number, "comp_name": complex_name,
+                           "type": name['estate_owner_ind'], "company": company, "loc_auth": local_auth,
+                           "loc_auth_area": local_auth_area, "other": other
+                       })
+        name['id'] = cursor.fetchone()[0]
+    elif 'number' in name:
         cursor.execute("INSERT INTO party_name (alias_name, complex_number, complex_name) " +
                        "VALUES ( %(alias)s, %(number)s, %(name)s ) " +
                        "RETURNING id",
@@ -135,17 +166,23 @@ def insert_register_details(cursor, request_id, data, amends):
     date = data['date']
     legal_body = data['legal_body'] if 'legal_body' in data else ""
     legal_body_ref = data['legal_body_ref'] if 'legal_body_ref' in data else ""
+    district = data['lc_register_details']['district'] if 'lc_register_details' in data else ""
+    short_description = data['lc_register_details']['short_description'] if 'lc_register_details' in data else ""
+    additional_info = data['lc_register_details']['additional_info'] if 'lc_register_details' in data else ""
 
     cursor.execute("INSERT INTO register_details (request_id, registration_date, application_type, " +
-                   "bankruptcy_date, legal_body, legal_body_ref, amends) " +
+                   "bankruptcy_date, legal_body, legal_body_ref, amends, district, short_description, "
+                   "additional_info) " +
                    "VALUES ( %(req_id)s, %(reg_date)s, %(app_type)s, %(bank_date)s, " +
-                   " %(lbody)s, %(lbodyref)s, %(amends)s ) " +
+                   " %(lbody)s, %(lbodyref)s, %(amends)s, %(district)s, %(short_desc)s, " +
+                   "%(addl_info)s )" +
                    "RETURNING id",
                    {
                        "req_id": request_id, "reg_date": date,
                        "app_type": application_type, "bank_date": date,
                        "lbody": legal_body, "lbodyref": legal_body_ref,
-                       "amends": amends
+                       "amends": amends, "district": district, "short_desc": short_description,
+                       "addl_info": additional_info
                    })   # TODO: Seems probable we won't need both dates
     return cursor.fetchone()[0]
 
@@ -196,7 +233,14 @@ def insert_details(cursor, request_id, data, amends_id):
     register_details_id = insert_register_details(cursor, request_id, data, amends_id)
 
     # party
-    party_id = insert_party(cursor, register_details_id, "Debtor", data['occupation'], data['date_of_birth'],
+    if 'lc_register_details' in data:
+        party_type = 'Debtor'  # TODO: set to debtor for time being as table constraint needs to be removed
+        occupation = data['lc_register_details']['occupation']
+    else:
+        party_type = 'Debtor'
+        occupation = data['occupation']
+
+    party_id = insert_party(cursor, register_details_id, party_type, occupation, data['date_of_birth'],
                             data['residence_withheld'])
 
     # party_address, address, address_detail
@@ -212,7 +256,10 @@ def insert_details(cursor, request_id, data, amends_id):
             insert_address(cursor, address, "Investment", party_id)
 
     # party_name, party_name_rel
-    if 'complex' in data:
+    if 'lc_register_details' in data:
+        # TODO: insert county here???
+        name_ids = [insert_name(cursor, data['lc_register_details']['estate_owner'], party_id)]
+    elif 'complex' in data:
         name_ids = [insert_name(cursor, data['complex'], party_id)]
     else:
         if 'debtor_names' in data: # Handle array input
