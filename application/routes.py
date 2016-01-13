@@ -10,7 +10,7 @@ from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_amendment, insert_new_registration, get_req_details
-from application.schema import SEARCH_SCHEMA
+from application.schema import SEARCH_SCHEMA, validate, BANKRUPTCY_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result, read_searches
 
 
@@ -57,6 +57,12 @@ def register():
         return Response(status=415)
 
     json_data = request.get_json(force=True)
+    print(json_data)
+    errors = validate(json_data, BANKRUPTCY_SCHEMA)
+    if len(errors) > 0:
+        logging.error("Input data failed validation")
+        return Response(json.dumps(errors), status=400, mimetype='application/json')
+
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # pylint: disable=unused-variable
     new_regns, details_id = insert_new_registration(cursor, json_data)

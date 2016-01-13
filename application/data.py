@@ -230,15 +230,15 @@ def insert_details(cursor, request_id, data, amends_id):
     if 'complex' in data:
         names = [insert_name(cursor, data['complex'], party_id)]
     else:
-        if 'debtor_names' in data: # Handle array input
-            names = [insert_name(cursor, data['debtor_names'][0], party_id)]
-            for name in data['debtor_names'][1:]:
-                names.append(insert_name(cursor, name, party_id, True))
+        # if 'debtor_names' in data: # Handle array input
+        names = [insert_name(cursor, data['debtor_names'][0], party_id)]
+        for name in data['debtor_names'][1:]:
+            names.append(insert_name(cursor, name, party_id, True))
 
-        else:  # TODO: retire this leg
-            names = [insert_name(cursor, data['debtor_name'], party_id)]
-            for name in data['debtor_alternative_name']:
-                names.append(insert_name(cursor, name, party_id, True))
+        # else:  # TODO: retire this leg
+        #     names = [insert_name(cursor, data['debtor_name'], party_id)]
+        #     for name in data['debtor_alternative_name']:
+        #         names.append(insert_name(cursor, name, party_id, True))
 
     # party_trading
     if "trading_name" in data:
