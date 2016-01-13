@@ -280,8 +280,11 @@ def insert_new_registration(cursor, data):
         document = data['document_id']
 
     # request
+    original = None
+    if 'original_request' in data:
+        original = data['original_request']
     request_id = insert_request(cursor, data['key_number'], data["application_type"], data['application_ref'],
-                                data['date'], document, data)
+                                data['date'], document, original)
     reg_nos, details_id = insert_record(cursor, data, request_id)
     return reg_nos, details_id
 
@@ -505,7 +508,7 @@ def get_registration_details(cursor, reg_no, date):
         data['trading_name'] = rows[0]['trading_name']
 
     cursor.execute("select r.key_number, r.application_reference, r.document_ref, r.customer_name, r.customer_address "+
-            " from request r, register_details d where r.id = d.request_id and d.id = %(id)s", {'id': details_id})
+                   " from request r, register_details d where r.id = d.request_id and d.id = %(id)s", {'id': details_id})
     rows = cursor.fetchall()
     data['application_ref'] = rows[0]['application_reference']
     data['document_id'] = rows[0]['document_ref']
@@ -518,7 +521,6 @@ def get_registration_details(cursor, reg_no, date):
                    "left outer join address_detail d on a.detail_id = d.id " +
                    "inner join party_address pa on a.id = pa.address_id " +
                    "where pa.party_id = %(id)s", {'id': party_id})
-                   #"where a.address_type='Debtor Residence' and pa.party_id = %(id)s", {'id': party_id})
 
     rows = cursor.fetchall()
     data['residence'] = []
@@ -617,8 +619,8 @@ def insert_cancellation(registration_no, date, data):
 def get_req_details(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     sql = "Select request_id, registration_date, registration_no "\
-    " from register_details a, register b "\
-    " where a.request_id = %(request_id)s and a.id = b.details_id "
+          " from register_details a, register b "\
+          " where a.request_id = %(request_id)s and a.id = b.details_id "
     cursor.execute(sql, {"request_id": request_id})
     rows = cursor.fetchall()
     complete(cursor)
