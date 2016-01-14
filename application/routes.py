@@ -304,7 +304,6 @@ def synchronise():  # pragma: no cover
     publish_new_bankruptcy(producer, json_data)
     return Response(status=200)
 
-<<<<<<< HEAD
 
 @app.route('/counties', methods=['POST'])
 def load_counties():  # pragma: no cover
@@ -327,7 +326,7 @@ def load_counties():  # pragma: no cover
                        })
     complete(cursor)
     return Response(status=200)
-=======
+
 #Get details of a request for printing
 @app.route('/request_details/<request_id>', methods=["GET"])
 def get_request_details(request_id):
@@ -354,4 +353,4 @@ def get_request_ids(count):
             job = {'request_id': row['request_id']}
             data.append(job)
     return Response(json.dumps(data), status=200, mimetype='application/json')
->>>>>>> 4ece7805d80cb6c95883e964d6d50fa9dc135e7e
+
