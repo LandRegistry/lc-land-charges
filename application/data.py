@@ -71,17 +71,18 @@ def insert_name(cursor, name, party_id, is_alias=False):
         local_auth, local_auth_area, complex_name, other = ('',) * 4
         complex_number = 0
         if name['private']['forenames'] != '' or name['private']['surname'] != '':
-            name_string = "{} {}".format(" ".join(name['private']['forenames']), name['private']['surname'])
-            forename = name['private']['forenames'][0]
-            middle_names = " ".join(name['private']['forenames'][1:])
+            name_string = "{} {}".format(name['private']['forenames'], name['private']['surname'])
+            first, _, rest = name['private']['forenames'].partition(" ")
+            forename = first
+            middle_names = rest
             surname = name['private']['surname']
         else:
-            company = name['company'] if name['company'] != '' else ''
-            local_auth = name['local']['name'] if name['local']['name'] != '' else ''
-            local_auth_area = name['local']['area'] if name['local']['area'] != '' else ''
-            other = name['other'] if name['other'] != '' else ''
-            complex_name = name['complex']['name'] if name['complex']['name'] != '' else ''
-            complex_number = name['complex']['number'] if name['complex']['number'] != '' else ''
+            company = name['company'] if name['company'] != '' else None
+            local_auth = name['local']['name'] if name['local']['name'] != '' else None
+            local_auth_area = name['local']['area'] if name['local']['area'] != '' else None
+            other = name['other'] if name['other'] != '' else None
+            complex_name = name['complex']['name'] if name['complex']['name'] != '' else None
+            complex_number = name['complex']['number'] if name['complex']['number'] != '' else None
 
         cursor.execute("INSERT INTO party_name ( party_name, forename, " +
                        "middle_names, surname, alias_name, complex_number, complex_name, " +
@@ -97,6 +98,17 @@ def insert_name(cursor, name, party_id, is_alias=False):
                            "loc_auth_area": local_auth_area, "other": other
                        })
         name['id'] = cursor.fetchone()[0]
+        return_data = {
+            'id': name['id'],
+            'forenames': name['private']['forenames'],
+            'surname': name['private']['surname'],
+            'company': name['company'],
+            'local_authority': name['local']['name'],
+            'local_authority_area': name['local']['area'],
+            'other': name['other'],
+            # 'complex_name': name['complex']['name'],
+            # 'complex_number': name['complex']['number']
+        }
     elif 'number' in name:
         cursor.execute("INSERT INTO party_name (alias_name, complex_number, complex_name) " +
                        "VALUES ( %(alias)s, %(number)s, %(name)s ) " +

@@ -118,6 +118,25 @@ BANKRUPTCY_SCHEMA = {
                  "residence_withheld"]
 }
 
+LANDCHARGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "key_number": {
+            "type": "string",
+            "pattern": "^\d+$"
+        },
+        "application_type": {
+            "type": "string",
+            "enum": ["K1", "K2", "K3", "K4", "K5", "K6", "K7"]
+        },
+        "application_ref": {"type": "string"},
+        "date": DATE_SCHEMA,
+        "gender": {"type": "string"},
+        "occupation": {"type": "string"}
+    },
+    "required": ["key_number", "application_type", "application_ref", "date"]
+}
+
 
 def validate(data, schema):
     val = Draft4Validator(schema)
