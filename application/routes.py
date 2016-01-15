@@ -70,7 +70,7 @@ def register():
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # pylint: disable=unused-variable
     try:
-        new_regns, details_id = insert_new_registration(cursor, json_data)
+        new_regns, details_id, request_id = insert_new_registration(cursor, json_data)
         complete(cursor)
     except:
         rollback(cursor)
@@ -79,7 +79,7 @@ def register():
     if not suppress:
         publish_new_bankruptcy(producer, new_regns)
 
-    return Response(json.dumps({'new_registrations': new_regns}), status=200)
+    return Response(json.dumps({'new_registrations': new_regns, 'request_id': request_id}), status=200)
 
 
 @app.route('/registrations/<date>/<reg_no>', methods=["PUT"])

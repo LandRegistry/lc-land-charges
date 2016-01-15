@@ -358,7 +358,7 @@ def insert_new_registration(cursor, data):
     request_id = insert_request(cursor, data['key_number'], data["application_type"], data['application_ref'],
                                 data['date'], document, original, data['customer_name'], data['customer_address'])
     reg_nos, details_id = insert_record(cursor, data, request_id)
-    return reg_nos, details_id
+    return reg_nos, details_id, request_id
 
 
 def insert_amendment(cursor, orig_reg_no, date, data):
