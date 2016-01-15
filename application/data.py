@@ -510,7 +510,8 @@ def get_registration_no_from_details_id(cursor, details_id):
 
 def get_registration_details(cursor, reg_no, date):
     cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
-                   "r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id " +
+                   " r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, " +
+                   " rd.additional_info, rd.district, rd.short_description "
                    "from register r, register_details rd " +
                    "where r.registration_no = %(reg_no)s and r.details_id = rd.id " +
                    "and rd.registration_date = %(date)s", {
@@ -528,7 +529,11 @@ def get_registration_details(cursor, reg_no, date):
         'application_type': rows[0]['application_type'],
         'legal_body': rows[0]['legal_body'],
         'legal_body_ref': rows[0]['legal_body_ref'],
-        'status': "current"
+        'status': "current",
+        'additional_info': rows[0]['additional_info'],
+        'district': rows[0]['district'],
+        'short_description': rows[0]['short_description']
+
     }
     details_id = rows[0]['id']
     name_id = rows[0]['debtor_reg_name_id']
@@ -560,6 +565,16 @@ def get_registration_details(cursor, reg_no, date):
             'number': rows[0]['registration_no'],
             'date': str(rows[0]['date'])
         }
+
+    cursor.execute("select dcr.county_id, c.name  from detl_county_rel dcr, county c " +
+                   " where dcr.details_id = %(id)s and dcr.county_id = c.id ", {'id': details_id})
+    rows = cursor.fetchall()
+    if len(rows) != 0:
+        counties = {}
+        for row in rows:
+            counties.append(row['name'])
+        data['counties'] = counties
+
     party_id = get_name_details(cursor, data, details_id, name_id)
 
     cursor.execute("select trading_name from party_trading where party_id = %(id)s", {'id': party_id})
