@@ -104,17 +104,8 @@ def insert_name(cursor, name, party_id, is_alias=False):
                            "loc_auth_area": local_auth_area, "other": other
                        })
         name['id'] = cursor.fetchone()[0]
-        return_data = {
-            'id': name['id'],
-            'forenames': name['private']['forenames'],
-            'surname': name['private']['surname'],
-            'company': name['company'],
-            'local_authority': name['local']['name'],
-            'local_authority_area': name['local']['area'],
-            'other': name['other'],
-            # 'complex_name': name['complex']['name'],
-            # 'complex_number': name['complex']['number']
-        }
+        return_data = {'id': name['id'],
+                       'name': name}
     elif 'number' in name:
         cursor.execute("INSERT INTO party_name (alias_name, complex_number, complex_name) " +
                        "VALUES ( %(alias)s, %(number)s, %(name)s ) " +
@@ -299,6 +290,7 @@ def insert_details(cursor, request_id, data, amends_id):
         for item in data['lc_register_details']['county']:
             county_detl_id = insert_lc_county(cursor, register_details_id, item)
         names = [insert_name(cursor, data['lc_register_details']['estate_owner'], party_id)]
+        names[0]['county_detl_id'] = county_detl_id
     elif 'complex' in data:
         names = [insert_name(cursor, data['complex'], party_id)]
     else:
@@ -347,7 +339,6 @@ def insert_record(cursor, data, request_id, amends=None, orig_reg_no=None):
 
 
 def insert_new_registration(cursor, data):
-    print('data received for new registration', data)
     document = None
     if 'document_id' in data:
         document = data['document_id']

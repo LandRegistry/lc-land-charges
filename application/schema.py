@@ -124,8 +124,7 @@ LANDCHARGE_SCHEMA = {
             "pattern": "^\d+$"
         },
         "application_type": {
-            "type": "string",
-            "enum": ["K1", "K2", "K3", "K4", "K5", "K6", "K7"]
+            "type": "string"
         },
         "application_ref": {"type": "string"},
         "date": DATE_SCHEMA,
