@@ -48,8 +48,7 @@ NAME_SCHEMA = {
     "properties": {
         "forenames": {
             "type": "array",
-            "items": {"type": "string"},
-            "minItems": 1
+            "items": {"type": "string"}
         },
         "surname": {"type": "string"}
     },
@@ -90,7 +89,6 @@ BANKRUPTCY_SCHEMA = {
         "date": DATE_SCHEMA,
         "debtor_names": {
             "type": "array",
-            "minItems": 1,
             "items": NAME_SCHEMA
         },
         "gender": {"type": "string"},
@@ -151,7 +149,7 @@ def validate(data, schema):
                 path += "." + item
         if path == '$':
             path = '$.'
-        print(error.message)
+        print(error.message + "|" + path)
         errors.append({
             "location": path,
             "error_message": error.message
