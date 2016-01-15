@@ -19,6 +19,12 @@ def complete(cursor):
     cursor.connection.close()
 
 
+def rollback(cursor):
+    cursor.connection.rollback()
+    cursor.close()
+    cursor.connection.close()
+
+
 def insert_address(cursor, address, address_type, party_id):
     if 'address_lines' in address:
         lines = address['address_lines'][0:5]   # First five lines
@@ -184,7 +190,10 @@ def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
 
 
 def insert_register_details(cursor, request_id, data, amends):
-    application_type = data['application_type']
+    if 'lc_register_details' in data:
+        class_of_charge = data['lc_register_details']['class']
+    else:
+        class_of_charge = data['application_type']
     date = data['date']
     legal_body = data['legal_body'] if 'legal_body' in data else ""
     legal_body_ref = data['legal_body_ref'] if 'legal_body_ref' in data else ""
@@ -192,16 +201,16 @@ def insert_register_details(cursor, request_id, data, amends):
     short_description = data['lc_register_details']['short_description'] if 'lc_register_details' in data else ""
     additional_info = data['lc_register_details']['additional_info'] if 'lc_register_details' in data else ""
 
-    cursor.execute("INSERT INTO register_details (request_id, registration_date, application_type, " +
+    cursor.execute("INSERT INTO register_details (request_id, registration_date, class_of_charge, " +
                    "bankruptcy_date, legal_body, legal_body_ref, amends, district, short_description, "
                    "additional_info) " +
-                   "VALUES ( %(req_id)s, %(reg_date)s, %(app_type)s, %(bank_date)s, " +
+                   "VALUES ( %(req_id)s, %(reg_date)s, %(charge)s, %(bank_date)s, " +
                    " %(lbody)s, %(lbodyref)s, %(amends)s, %(district)s, %(short_desc)s, " +
                    "%(addl_info)s )" +
                    "RETURNING id",
                    {
                        "req_id": request_id, "reg_date": date,
-                       "app_type": application_type, "bank_date": date,
+                       "charge": class_of_charge, "bank_date": date,
                        "lbody": legal_body, "lbodyref": legal_body_ref,
                        "amends": amends, "district": district, "short_desc": short_description,
                        "addl_info": additional_info
@@ -210,7 +219,8 @@ def insert_register_details(cursor, request_id, data, amends):
 
 
 # pylint: disable=too-many-arguments
-def insert_request(cursor, key_number, application_type, reference, date, document=None, insolvency_data=None):
+def insert_request(cursor, key_number, application_type, reference, date, document=None, insolvency_data=None,
+                   customer_name=None, customer_address=None):
     if insolvency_data is not None:
         cursor.execute("INSERT INTO ins_bankruptcy_request (request_data) VALUES (%(json)s) RETURNING id",
                        {"json": json.dumps(insolvency_data)})
@@ -219,11 +229,13 @@ def insert_request(cursor, key_number, application_type, reference, date, docume
         ins_request_id = None  # TODO: consider when ins data should be added...
 
     cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
-                   "ins_request_id, document_ref) " +
-                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s, %(doc)s ) RETURNING id",
+                   "ins_request_id, document_ref, customer_name, customer_address) " +
+                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s, %(doc)s, " +
+                   "%(cust_name)s, %(cust_addr)s ) RETURNING id",
                    {
                        "key": key_number, "app_type": application_type, "app_ref": reference,
-                       "app_date": date, "ins_id": ins_request_id, "doc": document
+                       "app_date": date, "ins_id": ins_request_id, "doc": document, "cust_name": customer_name,
+                       "cust_addr": customer_address
                    })
     return cursor.fetchone()[0]
 
@@ -344,7 +356,7 @@ def insert_new_registration(cursor, data):
     if 'original_request' in data:
         original = data['original_request']
     request_id = insert_request(cursor, data['key_number'], data["application_type"], data['application_ref'],
-                                data['date'], document, original)
+                                data['date'], document, original, data['customer_name'], data['customer_address'])
     reg_nos, details_id = insert_record(cursor, data, request_id)
     return reg_nos, details_id
 
@@ -360,7 +372,8 @@ def insert_amendment(cursor, orig_reg_no, date, data):
         document = data['document_id']
 
     now = datetime.datetime.now()
-    request_id = insert_request(cursor, None, "AMENDMENT", None, now, document, None)
+    request_id = insert_request(cursor, None, "AMENDMENT", None, now, document, None, data['customer_name'],
+                                data['customer_address'])
 
     original_regs = get_all_registration_nos(cursor, original_detl_id)
     amend_detl_id = get_register_details_id(cursor, orig_reg_no, date)
@@ -388,7 +401,8 @@ def insert_rectification(cursor, orig_reg_no, data):
         document = data['document_id']
 
     now = datetime.datetime.now()
-    request_id = insert_request(cursor, None, "RECTIFICATION", None, now, document, None)
+    request_id = insert_request(cursor, None, "RECTIFICATION", None, now, document, None, data['customer_name'],
+                                data['customer_address'])
 
     # pylint: disable=unused-variable
     original_regs = get_all_registration_nos(cursor, original_detl_id)
@@ -625,7 +639,8 @@ def get_registration_details(cursor, reg_no, date):
 
 def insert_migrated_record(cursor, data):
     data["application_type"] = re.sub(r"\(|\)", "", data["application_type"])
-    request_id = insert_request(cursor, None, data["application_type"], data['application_ref'], data['date'], None)
+    request_id = insert_request(cursor, None, data["application_type"], data['application_ref'], data['date'], None,
+                                None, None)
     details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
     party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
     if 'complex' in data:
@@ -646,44 +661,51 @@ def insert_migrated_record(cursor, data):
 
 def insert_cancellation(registration_no, date, data):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        # Insert a row with application info
+        now = datetime.datetime.now()
+        document = None
+        if 'document_id' in data:
+            document = data['document_id']
 
-    # Insert a row with application info
-    now = datetime.datetime.now()
-    document = None
-    if 'document_id' in data:
-        document = data['document_id']
+        request_id = insert_request(cursor, None, "CANCELLATION", None, now, document, None, data['customer_name'],
+                                    data['customer_address'])
+        logging.info(request_id)
+        # Set cancelled_on to now
+        original_detl_id = get_register_details_id(cursor, registration_no, date)
+        logging.info(original_detl_id)
 
-    request_id = insert_request(cursor, None, "CANCELLATION", None, now, document, None)
-    logging.info(request_id)
-    # Set cancelled_on to now
-    original_detl_id = get_register_details_id(cursor, registration_no, date)
-    logging.info(original_detl_id)
+        original_regs = get_all_registration_nos(cursor, original_detl_id)
+        logging.info('--->')
+        logging.info(original_regs)
 
-    original_regs = get_all_registration_nos(cursor, original_detl_id)
-    logging.info('--->')
-    logging.info(original_regs)
+        logging.info("SELECT * FROM register_details where id='" + str(original_detl_id) + "' AND cancelled_by IS NULL")
+        cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+                       "id = %(id)s AND cancelled_by IS NULL",
+                       {
+                           "canc": request_id, "id": original_detl_id
+                       })
 
-    logging.info("SELECT * FROM register_details where id='" + str(original_detl_id) + "' AND cancelled_by IS NULL")
-    cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
-                   "id = %(id)s AND cancelled_by IS NULL",
-                   {
-                       "canc": request_id, "id": original_detl_id
-                   })
+        # TODO: archive document
+        rows = cursor.rowcount
+        complete(cursor)
+    except:
+        rollback(cursor)
+        raise
 
-    # TODO: archive document
-    rows = cursor.rowcount
-    complete(cursor)
     return rows, original_regs
 
 
 def get_req_details(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    sql = "Select request_id, registration_date, registration_no "\
-          " from register_details a, register b "\
-          " where a.request_id = %(request_id)s and a.id = b.details_id "
-    cursor.execute(sql, {"request_id": request_id})
-    rows = cursor.fetchall()
-    complete(cursor)
+    try:
+        sql = "Select request_id, registration_date, registration_no "\
+              " from register_details a, register b "\
+              " where a.request_id = %(request_id)s and a.id = b.details_id "
+        cursor.execute(sql, {"request_id": request_id})
+        rows = cursor.fetchall()
+    finally:
+        complete(cursor)
     registrations = []
     for row in rows:
         registration = {"request_id": row["request_id"], "registration_date": row["registration_date"], "registration_no": row["registration_no"]}

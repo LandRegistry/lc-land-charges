@@ -9,7 +9,7 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
-    insert_amendment, insert_new_registration, get_req_details
+    insert_amendment, insert_new_registration, get_req_details, rollback
 from application.schema import SEARCH_SCHEMA, validate, BANKRUPTCY_SCHEMA, LANDCHARGE_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result, read_searches
 
@@ -36,8 +36,10 @@ def registration(date, reg_no):
     logging.debug("GET registration")
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    details = get_registration_details(cursor, reg_no, date)
-    complete(cursor)
+    try:
+        details = get_registration_details(cursor, reg_no, date)
+    finally:
+        complete(cursor)
     if details is None:
         logging.warning("Returning 404")
         return Response(status=404)
@@ -57,7 +59,6 @@ def register():
         return Response(status=415)
 
     json_data = request.get_json(force=True)
-    print(json_data)
     if 'lc_register_details' in json_data:
         errors = validate(json_data, LANDCHARGE_SCHEMA)
     else:
@@ -68,8 +69,13 @@ def register():
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # pylint: disable=unused-variable
-    new_regns, details_id = insert_new_registration(cursor, json_data)
-    complete(cursor)
+    try:
+        new_regns, details_id = insert_new_registration(cursor, json_data)
+        complete(cursor)
+    except:
+        rollback(cursor)
+        raise
+
     if not suppress:
         publish_new_bankruptcy(producer, new_regns)
 
@@ -161,15 +167,20 @@ def create_search():
         return Response(message, status=400)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    # Store the search request
-    search_request_id = store_search_request(cursor, data)
+    try:
+        # Store the search request
+        search_request_id = store_search_request(cursor, data)
 
-    # Run the queries
-    results = perform_search(cursor, data['parameters'])
+        # Run the queries
+        results = perform_search(cursor, data['parameters'])
 
-    store_search_result(cursor, search_request_id, results)
+        store_search_result(cursor, search_request_id, results)
 
-    complete(cursor)
+        complete(cursor)
+    except:
+        rollback(cursor)
+        raise
+
     if len(results) == 0:
         return Response(status=404)
     else:
@@ -182,7 +193,11 @@ def get_searches():
     if 'filter' in request.args:
         nonissued = (request.args['filter'] == 'nonissued')
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    result = read_searches(cursor, nonissued)
+    try:
+        result = read_searches(cursor, nonissued)
+    finally:
+        complete(cursor)
+
     return Response(json.dumps(result), status=200, mimetype='application/json')
 # @app.route('/migrated_registration/<int:db2_reg_no>', methods=['GET'])
 # def migrated_registration(db2_reg_no):
@@ -244,22 +259,26 @@ def insert():
 
     for reg in data:
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-        details_id, request_id = insert_migrated_record(cursor, reg)
-        if reg['type'] == 'AM' or reg['type'] == 'CN' or reg['type'] == 'CP':
-            cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
-                           "id = %(id)s AND cancelled_by IS NULL",
-                           {
-                               "canc": request_id, "id": previous_id
-                           })
-            if reg['type'] == 'AM':
-                cursor.execute("UPDATE register_details SET amends = %(amend)s WHERE " +
-                               "id = %(id)s",
+        try:
+            details_id, request_id = insert_migrated_record(cursor, reg)
+            if reg['type'] == 'AM' or reg['type'] == 'CN' or reg['type'] == 'CP':
+                cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+                               "id = %(id)s AND cancelled_by IS NULL",
                                {
-                                   "amend": previous_id, "id": details_id
+                                   "canc": request_id, "id": previous_id
                                })
+                if reg['type'] == 'AM':
+                    cursor.execute("UPDATE register_details SET amends = %(amend)s WHERE " +
+                                   "id = %(id)s",
+                                   {
+                                       "amend": previous_id, "id": details_id
+                                   })
 
-        previous_id = details_id
-        complete(cursor)
+            previous_id = details_id
+            complete(cursor)
+        except:
+            rollback(cursor)
+            raise
 
     return Response(status=200)
 
@@ -273,22 +292,27 @@ def delete_all_regs():  # pragma: no cover
         return Response(status=403)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    cursor.execute("DELETE FROM party_address")
-    cursor.execute("DELETE FROM address")
-    cursor.execute("DELETE FROM address_detail")
-    cursor.execute("DELETE FROM party_trading")
-    cursor.execute("DELETE FROM party_name_rel")
-    cursor.execute("DELETE FROM party")
-    cursor.execute("DELETE FROM migration_status")
-    cursor.execute("DELETE FROM register")
-    cursor.execute("DELETE FROM register_details")
-    cursor.execute("DELETE FROM audit_log")
-    cursor.execute("DELETE FROM search_details")
-    cursor.execute("DELETE FROM request")
-    cursor.execute("DELETE FROM ins_bankruptcy_request")
-    cursor.execute("DELETE FROM party_name")
-    cursor.execute("DELETE FROM counties")
-    complete(cursor)
+    try:
+        cursor.execute("DELETE FROM party_address")
+        cursor.execute("DELETE FROM address")
+        cursor.execute("DELETE FROM address_detail")
+        cursor.execute("DELETE FROM party_trading")
+        cursor.execute("DELETE FROM party_name_rel")
+        cursor.execute("DELETE FROM party")
+        cursor.execute("DELETE FROM migration_status")
+        cursor.execute("DELETE FROM register")
+        cursor.execute("DELETE FROM detl_county_rel")
+        cursor.execute("DELETE FROM register_details")
+        cursor.execute("DELETE FROM audit_log")
+        cursor.execute("DELETE FROM search_details")
+        cursor.execute("DELETE FROM request")
+        cursor.execute("DELETE FROM ins_bankruptcy_request")
+        cursor.execute("DELETE FROM party_name")
+        cursor.execute("DELETE FROM county")
+        complete(cursor)
+    except:
+        rollback(cursor)
+        raise
     return Response(status=200)
 
 
@@ -319,15 +343,20 @@ def load_counties():  # pragma: no cover
 
     json_data = request.get_json(force=True)
     cursor = connect()
-    for item in json_data:
-        if 'cym' not in item:
-            item['cym'] = None
+    try:
+        for item in json_data:
+            if 'cym' not in item:
+                item['cym'] = None
 
-        cursor.execute('INSERT INTO COUNTY (name, welsh_name) VALUES (%(e)s, %(c)s)',
-                       {
-                           'e': item['eng'], 'c': item['cym']
-                       })
-    complete(cursor)
+            cursor.execute('INSERT INTO COUNTY (name, welsh_name) VALUES (%(e)s, %(c)s)',
+                           {
+                               'e': item['eng'], 'c': item['cym']
+                           })
+        complete(cursor)
+    except:
+        rollback(cursor)
+        raise
+
     return Response(status=200)
 
 
@@ -336,8 +365,10 @@ def load_counties():  # pragma: no cover
 def get_request_details(request_id):
     reqs = get_req_details(request_id)
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    reg = get_registration_details(cursor, reqs[0]["registration_no"], reqs[0]["registration_date"])
-    complete(cursor)
+    try:
+        reg = get_registration_details(cursor, reqs[0]["registration_no"], reqs[0]["registration_date"])
+    finally:
+        complete(cursor)
     return Response(json.dumps(reg), status=200, mimetype='application/json')
 
 
@@ -346,10 +377,12 @@ def get_request_details(request_id):
 @app.route('/request_ids/<count>', methods=["GET"])
 def get_request_ids(count):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    sql = "Select id as request_id from request fetch first " + str(count) + " rows only"
-    cursor.execute(sql)
-    rows = cursor.fetchall()
-    complete(cursor)
+    try:
+        sql = "Select id as request_id from request fetch first " + str(count) + " rows only"
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+    finally:
+        complete(cursor)
     data = []
     if len(rows) == 0:
         data = None
