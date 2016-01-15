@@ -347,6 +347,7 @@ def insert_record(cursor, data, request_id, amends=None, orig_reg_no=None):
 
 
 def insert_new_registration(cursor, data):
+    print('data received for new registration', data)
     document = None
     if 'document_id' in data:
         document = data['document_id']
@@ -448,7 +449,7 @@ def get_all_registration_nos(cursor, details_id):
 
 
 def get_registration(cursor, reg_id, date):
-    cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
+    cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.class_of_charge, rd.id, " +
                    "r.id as register_id from register r, register_details rd " +
                    "where r.details_id = rd.id " +
                    "and r.id=%(id)s and r.date=%(date)s", {'id': reg_id, 'date': date})
@@ -523,7 +524,7 @@ def get_registration_no_from_details_id(cursor, details_id):
 
 
 def get_registration_details(cursor, reg_no, date):
-    cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.application_type, rd.id, " +
+    cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.class_of_charge, rd.id, " +
                    " r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, " +
                    " rd.additional_info, rd.district, rd.short_description "
                    "from register r, register_details rd " +
@@ -540,7 +541,7 @@ def get_registration_details(cursor, reg_no, date):
             'number': rows[0]['registration_no'],
             'date': str(rows[0]['registration_date'])
         },
-        'application_type': rows[0]['application_type'],
+        'class_of_charge': rows[0]['class_of_charge'],
         'legal_body': rows[0]['legal_body'],
         'legal_body_ref': rows[0]['legal_body_ref'],
         'status': "current",
@@ -571,8 +572,8 @@ def get_registration_details(cursor, reg_no, date):
             cancel_rows = cursor.fetchall()
             data['cancellation_date'] = cancel_rows[0]['application_date'].isoformat()
 
-    cursor.execute('select r.registration_no, r.date, d.amends FROM register r, register_details d WHERE r.details_id=d.id AND '
-                   'd.amends=%(id)s', {'id': details_id})
+    cursor.execute('select r.registration_no, r.date, d.amends FROM register r, register_details d ' +
+                   'WHERE r.details_id=d.id AND d.amends=%(id)s', {'id': details_id})
     rows = cursor.fetchall()
     if len(rows) > 0:
         data['amended_by'] = {
@@ -581,10 +582,10 @@ def get_registration_details(cursor, reg_no, date):
         }
 
     cursor.execute("select dcr.county_id, c.name  from detl_county_rel dcr, county c " +
-                   " where dcr.details_id = %(id)s and dcr.county_id = c.id ", {'id': details_id})
+                   "where dcr.details_id = %(id)s and dcr.county_id = c.id ", {'id': details_id})
     rows = cursor.fetchall()
     if len(rows) != 0:
-        counties = {}
+        counties = []
         for row in rows:
             counties.append(row['name'])
         data['counties'] = counties
@@ -596,8 +597,10 @@ def get_registration_details(cursor, reg_no, date):
     if len(rows) != 0:
         data['trading_name'] = rows[0]['trading_name']
 
-    cursor.execute("select r.key_number, r.application_reference, r.document_ref, r.customer_name, r.customer_address "+
-                   " from request r, register_details d where r.id = d.request_id and d.id = %(id)s", {'id': details_id})
+    cursor.execute("select r.key_number, r.application_reference, r.document_ref, r.customer_name, " +
+                   "r.customer_address " +
+                   " from request r, register_details d where r.id = d.request_id and d.id = %(id)s",
+                   {'id': details_id})
     rows = cursor.fetchall()
     data['application_ref'] = rows[0]['application_reference']
     data['document_id'] = rows[0]['document_ref']
