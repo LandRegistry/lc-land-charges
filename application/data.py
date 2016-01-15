@@ -284,6 +284,8 @@ def insert_details(cursor, request_id, data, amends_id):
     # party_name, party_name_rel
     if 'lc_register_details' in data:
         # TODO: insert county here???
+        for item in data['lc_register_details']['county']:
+            county_detl_id = insert_lc_county(cursor, register_details_id, item)
         names = [insert_name(cursor, data['lc_register_details']['estate_owner'], party_id)]
     elif 'complex' in data:
         names = [insert_name(cursor, data['complex'], party_id)]
@@ -687,3 +689,22 @@ def get_req_details(request_id):
         registration = {"request_id": row["request_id"], "registration_date": row["registration_date"], "registration_no": row["registration_no"]}
         registrations.append(registration)
     return registrations
+
+
+def insert_lc_county(cursor, register_details_id, county):
+    county_id = get_county_id(cursor, county)
+    cursor.execute("INSERT INTO detl_county_rel (county_id, details_id) " +
+                   "VALUES( %(county_id)s, %(details_id)s ) RETURNING id",
+                   {
+                       "county_id": county_id, "details_id": register_details_id
+                   })
+    return cursor.fetchone()[0]
+
+
+def get_county_id(cursor, county):
+    cursor.execute("SELECT id FROM county WHERE UPPER(name) = %(county)s",
+                   {
+                       "county": county.upper()
+                   })
+    rows = cursor.fetchone()[0]
+    return rows
