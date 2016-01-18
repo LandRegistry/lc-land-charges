@@ -139,6 +139,7 @@ all_queries_data = [{
     "registration_date": "2012-08-09",
     "reg": 50001,
     "date": "2012-08-09",
+    "class_of_charge": "PAB",
     "application_type": "PAB", "id": "56", "debtor_reg_name_id": "12",
     "forename": "Bob", "register_id": "2",
     "middle_names": "Oscar Francis",
@@ -155,12 +156,16 @@ all_queries_data = [{
     "line_4": "",
     "line_5": "",
     "line_6": "",
+    "address_type": "Debtor Residence", "address_string": "",
     "amends": None,
     "key_number": "1234567",
     "county": "Devon",
+    "customer_name": "Bob", "customer_address": "Place",
+    "name": "Devon",
     "document_ref": 22,
     "postcode": "PL1 1AA",
     "cancelled_by": None,
+    "additional_info": "", "district": "", "short_description": "",
     "original_regn_no": "7",
     "extra_data": {},
     "details_id": 528
@@ -170,13 +175,16 @@ all_queries_complex_data = [{
     "registration_no": "50027",
     "registration_date": "2012-08-09",
     "date": "2012-08-09",
+    "class_of_charge": "PAB",
     "application_type": "PAB", "id": "56", "debtor_reg_name_id": "12",
     "forename": "", "register_id": "2",
     "middle_names": "",
     "surname": "",
     "complex_number": 1234567,
     "complex_name": "King Stark",
+    "customer_name": "Bob", "customer_address": "Place",
     "occupation": "",
+    "name": "Devon",
     "trading_name": "",
     "application_reference": "123456789",
     "legal_body": "LB", "legal_body_ref": "Moo",
@@ -186,6 +194,7 @@ all_queries_complex_data = [{
     "line_4": "",
     "line_5": "",
     "line_6": "",
+    "address_type": "Debtor Residence", "address_string": "",
     "amends": None,
     "key_number": "1234567",
     "county": "Devon",
@@ -193,6 +202,7 @@ all_queries_complex_data = [{
     "postcode": "PL1 1AA",
     "cancelled_by": None,
     "original_regn_no": "7",
+    "additional_info": "", "district": "", "short_description": "",
     "extra_data": {}
 }]
 
@@ -275,7 +285,7 @@ class TestWorking:
         response = self.app.post('/registrations', data=valid_data, headers=headers)
         assert response.status_code == 415
 
-    @mock.patch('psycopg2.connect')
+    @mock.patch('psycopg2.connect', **mock_retrieve)
     @mock.patch('kombu.Producer.publish')
     def test_new_registration(self, mock_connect, mock_publish):
         headers = {'Content-Type': 'application/json'}
@@ -283,7 +293,7 @@ class TestWorking:
         assert response.status_code == 200
         assert mock_publish.called
 
-    @mock.patch('psycopg2.connect')
+    @mock.patch('psycopg2.connect', **mock_retrieve)
     @mock.patch('kombu.Producer.publish')
     def test_new_registration_complex_name(self, mock_connect, mock_publish):
         headers = {'Content-Type': 'application/json'}
@@ -291,25 +301,12 @@ class TestWorking:
         assert response.status_code == 200
         assert mock_publish.called
 
-    # @mock.patch('psycopg2.connect', **mock_migration)
-    # def test_migration_success(self, mc):
-    #     headers = {'Content-Type': 'application/json'}
-    #     response = self.app.post('/migrated_record', data=migration_data, headers=headers)
-    #     assert response.status_code == 200
-
-    # @mock.patch('psycopg2.connect')
-    # def test_migration_invalid(self, mc):
-    #     headers = {'Content-Type': 'application/json'}
-    #     response = self.app.post('/migrated_record', data='{"cheese": "brie"}', headers=headers)
-    #     assert response.status_code == 400
-
     @mock.patch('psycopg2.connect', **mock_retrieve)
     @mock.patch('kombu.Producer.publish')
     def test_cancellation(self, mc, k):
-        response = self.app.delete('/registrations/2015-01-01/50001', data='{}', headers={'Content-Type': 'application/json'})
+        response = self.app.delete('/registrations/2015-01-01/50001', data=valid_data, headers={'Content-Type': 'application/json'})
         data = json.loads(response.data.decode('utf-8'))
         assert data['cancelled'][0]['number'] == '50000'
-
 
     @mock.patch('psycopg2.connect', **mock_retrieve)
     @mock.patch('kombu.Producer.publish')
@@ -319,23 +316,6 @@ class TestWorking:
         data = json.loads(response.data.decode('utf-8'))
         assert data['new_registrations'][0]['number'] == 50001
         assert data['amended_registrations'][0]['number'] == '50000'
-
-    # @mock.patch('psycopg2.connect', **mock_cancellation)
-    # @mock.patch('kombu.Producer.publish')
-    # def test_amendment(self, mc, kombu):
-    #     response = self.app.put('/registrations/2015-01-01/50001', data=valid_data,
-    #                             headers={'Content-Type': 'application/json'})
-    #     data = json.loads(response.data.decode('utf-8'))
-    #     amendment_call = mock_cancellation['return_value'].mock_calls[-4].call_list()
-    #
-    #     # Because the DB is mocked, we can't check to ensure the indicator's gone on
-    #     # But we can check that the correct SQL call has been issued...
-    #     sql_call = str(amendment_call[0])
-    #     assert "UPDATE register_details SET cancelled_by" in sql_call  # Ensure we're looking at the right call
-    #     assert "'canc': '50001'" in sql_call  # mock_cancellation returns 50001 for all the queries
-    #     assert "'id': '50001'" in sql_call
-    #     assert data['new_registrations'][0] == 50002
-    #     assert data['amended_registrations'][0] == '50001'
 
     @mock.patch('psycopg2.connect', **mock_search_not_found)
     def test_amendment_not_found(self, mc):
@@ -362,10 +342,3 @@ class TestWorking:
         data = json.loads(response.data.decode('utf-8'))
         assert data['complex']['name'] == 'King Stark'
         assert "document_id" in data
-
-    # @mock.patch('psycopg2.connect', **mock_retrieve)
-    # def test_get_migrated_registration(self, mc):
-    #     response = self.app.get("/migrated_registration/500")
-    #     data = json.loads(response.data.decode('utf-8'))
-    #     assert data[0]['debtor_name']['surname'] == 'Howard'
-
