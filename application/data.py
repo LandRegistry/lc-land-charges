@@ -259,7 +259,7 @@ def insert_details(cursor, request_id, data, amends_id):
 
     # party
     if 'lc_register_details' in data:
-        party_type = 'Debtor'  # TODO: set to debtor for time being as table constraint needs to be removed
+        party_type = 'Estate Owner'
         occupation = data['lc_register_details']['occupation']
     else:
         party_type = 'Debtor'
