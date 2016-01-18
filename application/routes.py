@@ -154,12 +154,9 @@ def create_search():
         return Response(status=415)
 
     data = request.get_json(force=True)
-    try:
-        validate(data, SEARCH_SCHEMA)
-    except ValidationError as error:
-        message = "{}\n{}".format(error.message, error.path)
-        logging.error(message)
-        return Response(message, status=400)
+    errors = validate(data, SEARCH_SCHEMA)
+    if len(errors) > 0:
+        return Response(json.dumps(errors), status=400)
 
     if data['parameters']['search_type'] not in ['full', 'bankruptcy']:
         message = "Invalid search type supplied"

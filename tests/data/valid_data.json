@@ -24,5 +24,7 @@
   ],
   "residence_withheld": false,
   "date_of_birth": "1971-06-10",
-  "investment_property": []
+  "investment_property": [],
+  "customer_name": "Bob",
+  "customer_address": "Bob's House"
 }

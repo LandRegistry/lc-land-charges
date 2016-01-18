@@ -42,8 +42,8 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_table('county')
     op.drop_table('detl_county_rel')
+    op.drop_table('county')
 
     with op.batch_alter_table("register_details") as batch_op:
         batch_op.drop_column('district')
