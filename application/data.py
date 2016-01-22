@@ -183,8 +183,10 @@ def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
 def insert_register_details(cursor, request_id, data, amends):
     if 'lc_register_details' in data:
         class_of_charge = data['lc_register_details']['class']
+        bank_date = None
     else:
         class_of_charge = data['application_type']
+        bank_date = data['date']
     date = data['date']
     legal_body = data['legal_body'] if 'legal_body' in data else ""
     legal_body_ref = data['legal_body_ref'] if 'legal_body_ref' in data else ""
@@ -201,7 +203,7 @@ def insert_register_details(cursor, request_id, data, amends):
                    "RETURNING id",
                    {
                        "req_id": request_id, "reg_date": date,
-                       "charge": class_of_charge, "bank_date": date,
+                       "charge": class_of_charge, "bank_date": bank_date,
                        "lbody": legal_body, "lbodyref": legal_body_ref,
                        "amends": amends, "district": district, "short_desc": short_description,
                        "addl_info": additional_info

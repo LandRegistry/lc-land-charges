@@ -15,7 +15,18 @@ CUSTOMER_SCHEMA = {
 PARAMETER_SCHEMA = {
     "type": "object",
     "properties": {
-        "name": {"type": "string"},
+        "name_type": {"type": "string"},
+        "name": {"type": "object",
+                 "properties": {
+                     "forenames": {"type": "string"},
+                     "surname": {"type": "string"},
+                     "complex_name": {"type": "string"},
+                     "complex_number": {"type": "integer"},
+                     "local_authority_name": {"type": "string"},
+                     "local_authority_area": {"type": "string"},
+                     "other_name": {"type": "string"},
+                 },
+                 },
         "year_from": {"type": "integer", "minimum": 1925},
         "year_to": {"type": "integer", "minimum": 1925},
     },

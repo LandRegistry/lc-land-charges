@@ -119,6 +119,8 @@ def store_search_request(cursor, data):
     date = datetime.datetime.now()
     ins_request_id = None
     document = data['document_id']
+    search_type = data['parameters']['search_type']
+    counties = data['parameters']['counties']
 
     cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
                    "ins_request_id, document_ref, customer_name, customer_address) " +
@@ -132,11 +134,41 @@ def store_search_request(cursor, data):
     request_id = cursor.fetchone()[0]
 
     # Row on search details
-    cursor.execute("INSERT INTO search_details (request_id, parameters) "
-                   "VALUES ( %(request_id)s, %(params)s )",
+    cursor.execute("INSERT INTO search_details (request_id, search_timestamp, type, counties) "
+                   "VALUES ( %(request_id)s, current_timestamp, %(type)s, %(counties)s ) RETURNING id",
                    {
-                       'request_id': request_id, 'params': json.dumps(data['parameters'])
+                       'request_id': request_id, 'type': search_type, 'counties': counties
                    })
+    details_id = cursor.fetchone()[0]
+    print("details_id is ", details_id)
+
+    search_name_id = []
+    for item in data['parameters']['search_items']:
+        name_type = item['name_type']
+        forenames = item['name']['forenames'] if 'forenames' in item['name'] else None
+        surname = item['name']['surname'] if 'surname' in item['name'] else None
+        complex_name = item['name']['complex_name'] if 'complex_name' in item['name'] else None
+        complex_number = item['name']['complex_number'] if 'complex_number' in item['name'] else None
+        company = item['name']['company_name'] if 'company_name' in item['name'] else None
+        local_auth_name = item['name']['local_authority_name'] if 'local_authority_name' in item['name'] else None
+        local_auth_area = item['name']['local_authority_area'] if 'local_authority_area' in item['name'] else None
+        other = item['name']['other_name'] if 'other_name' in item['name'] else None
+        year_from = item['year_from'] if 'year_from' in item else None
+        year_to = item['year_to'] if 'year_to' in item else None
+
+        cursor.execute("INSERT INTO search_name (details_id, name_type, forenames, surname, " +
+                       "complex_name, complex_number, company_name, local_authority_name, local_authority_area, " +
+                       "other_name, year_from, year_to) "
+                       "VALUES ( %(details_id)s, %(name_type)s, %(forenames)s, %(surname)s, " +
+                       "%(complex_name)s, %(complex_number)s, %(company)s, %(loc_auth_name)s, " +
+                       "%(loc_auth_number)s, %(other)s, %(year_from)s, %(year_to)s ) RETURNING id",
+                       {
+                           'details_id': details_id, 'name_type': name_type, 'forenames': forenames,
+                           'surname': surname, 'complex_name': complex_name, 'complex_number': complex_number,
+                           'company': company, 'loc_auth_name': local_auth_name, 'loc_auth_number': local_auth_area,
+                           'other': other, 'year_from': year_from, 'year_to': year_to
+                       })
+        search_name_id.append(cursor.fetchone()[0])
 
     return request_id
 

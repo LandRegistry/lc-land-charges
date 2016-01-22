@@ -158,7 +158,7 @@ def create_search():
     if len(errors) > 0:
         return Response(json.dumps(errors), status=400)
 
-    if data['parameters']['search_type'] not in ['full', 'bankruptcy']:
+    if data['parameters']['search_type'] not in ['full', 'banks']:
         message = "Invalid search type supplied"
         logging.error(message)
         return Response(message, status=400)
@@ -169,15 +169,15 @@ def create_search():
         search_request_id = store_search_request(cursor, data)
 
         # Run the queries
-        results = perform_search(cursor, data['parameters'])
+        # results = perform_search(cursor, data['parameters'])
 
-        store_search_result(cursor, search_request_id, results)
+        # store_search_result(cursor, search_request_id, results)
 
         complete(cursor)
     except:
         rollback(cursor)
         raise
-
+    results = [search_request_id]
     if len(results) == 0:
         return Response(status=404)
     else:
