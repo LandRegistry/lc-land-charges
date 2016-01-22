@@ -184,7 +184,7 @@ def insert_register_details(cursor, request_id, data, amends):
     if 'lc_register_details' in data:
         class_of_charge = data['lc_register_details']['class']
     else:
-        class_of_charge = data['application_type']
+        class_of_charge = data['class_of_charge']
     date = data['date']
     legal_body = data['legal_body'] if 'legal_body' in data else ""
     legal_body_ref = data['legal_body_ref'] if 'legal_body_ref' in data else ""
@@ -472,7 +472,7 @@ def get_name_details(cursor, data, details_id, name_id):
     rows = cursor.fetchall()
     if not rows[0]['complex_number']:
         forenames = [rows[0]['forename']]
-        if rows[0]['middle_names'] != "":
+        if rows[0]['middle_names'] is not None and rows[0]['middle_names'] != "":
             forenames += rows[0]['middle_names'].split(" ")
         data['debtor_names'] = [{'forenames': forenames, 'surname': rows[0]['surname']}]
     else:
@@ -647,22 +647,29 @@ def get_registration_details(cursor, reg_no, date):
 
 
 def insert_migrated_record(cursor, data):
-    data["application_type"] = re.sub(r"\(|\)", "", data["application_type"])
-    request_id = insert_request(cursor, None, data["application_type"], data['application_ref'], data['date'], None,
+    data["class_of_charge"] = re.sub(r"\(|\)", "", data["class_of_charge"])
+
+    # TODO: using registration date as request date. Valid? Always?
+    request_id = insert_request(cursor, None, data["class_of_charge"], data['application_ref'],
+                                data['registration']['date'], None,
                                 None, None)
+
     details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
     party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
+
     if 'complex' in data:
         name_id = insert_name(cursor, data['complex'], party_id)
-    elif 'debtor_name' in data:
-        name_id = insert_name(cursor, data['debtor_name'], party_id)
+    elif 'debtor_names' in data:
+        name_id = insert_name(cursor, data['debtor_names'][0], party_id)
     else:
         data['complex'] = {"number": 0, "name": ""}
         name_id = insert_name(cursor, data['complex'], party_id)
 
     insert_address(cursor, data['residence'], "Debtor Residence", party_id)
+    #def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
+    logging.debug(data['date'])
 
-    registration_no, registration_id = insert_registration(cursor, details_id, name_id, data['reg_no'])
+    registration_no, registration_id = insert_registration(cursor, details_id, name_id['id'], data['date'], data['reg_no'])
     insert_migration_status(cursor, registration_id, data['migration_data']['registration_no'],
                             data['migration_data']['extra'])
     return details_id, request_id

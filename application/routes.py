@@ -247,6 +247,7 @@ def insert():
         return Response(status=415)
 
     data = request.get_json(force=True)
+    logging.info(data)
     # TODO: is there a need to validate the migration schema???
     """try:
         validate(data, migrated_schema)
@@ -264,7 +265,8 @@ def insert():
                                {
                                    "canc": request_id, "id": previous_id
                                })
-                if reg['type'] == 'AM':
+                if reg['type'] == 'AM' or reg['type'] == 'RN':
+                    # TODO: need an amendment type column or similar...
                     cursor.execute("UPDATE register_details SET amends = %(amend)s WHERE " +
                                    "id = %(id)s",
                                    {
