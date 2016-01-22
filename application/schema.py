@@ -134,7 +134,7 @@ LANDCHARGE_SCHEMA = {
             "type": "string",
             "pattern": "^\d+$"
         },
-        "application_type": {
+        "class_of_charge": {
             "type": "string"
         },
         "application_ref": {"type": "string"},
@@ -142,7 +142,7 @@ LANDCHARGE_SCHEMA = {
         "gender": {"type": "string"},
         "occupation": {"type": "string"}
     },
-    "required": ["key_number", "application_type", "application_ref", "date"]
+    "required": ["key_number", "class_of_charge", "application_ref", "date"]
 }
 
 
