@@ -501,7 +501,7 @@ def get_name_details(cursor, data, details_id, name_id):
 
 
 def get_registration_no_from_details_id(cursor, details_id):
-    cursor.execute("select r.registration_no, d.registration_date from register r, register_details d where " +
+    cursor.execute("select r.registration_no, d.registration_date, d.amendment_type from register r, register_details d where " +
                    "  r.details_id = %(id)s AND r.details_id = d.id",
                    {'id': details_id})
     rows = cursor.fetchall()
@@ -510,7 +510,8 @@ def get_registration_no_from_details_id(cursor, details_id):
     else:
         return {
             'number': rows[0]['registration_no'],
-            'date': str(rows[0]['registration_date'])
+            'date': str(rows[0]['registration_date']),
+            'type': rows[0]['amendment_type']
         }
 
 
@@ -550,7 +551,7 @@ def get_registration_details(cursor, reg_no, date):
 
     cancelled_by = rows[0]['cancelled_by']
     if cancelled_by is not None:
-        cursor.execute("select amends from register_details where amends=%(id)s",
+        cursor.execute("select amends, amendment_type from register_details where amends=%(id)s",
                        {"id": details_id})
 
         rows = cursor.fetchall()
@@ -563,13 +564,14 @@ def get_registration_details(cursor, reg_no, date):
             cancel_rows = cursor.fetchall()
             data['cancellation_date'] = cancel_rows[0]['application_date'].isoformat()
 
-    cursor.execute('select r.registration_no, r.date, d.amends FROM register r, register_details d ' +
+    cursor.execute('select r.registration_no, r.date, d.amendment_type, d.amends FROM register r, register_details d ' +
                    'WHERE r.details_id=d.id AND d.amends=%(id)s', {'id': details_id})
     rows = cursor.fetchall()
     if len(rows) > 0:
         data['amended_by'] = {
             'number': rows[0]['registration_no'],
-            'date': str(rows[0]['date'])
+            'date': str(rows[0]['date']),
+            'type': rows[0]['amendment_type']
         }
 
     cursor.execute("select dcr.county_id, c.name  from detl_county_rel dcr, county c " +

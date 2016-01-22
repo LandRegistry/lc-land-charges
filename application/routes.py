@@ -259,18 +259,27 @@ def insert():
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         try:
             details_id, request_id = insert_migrated_record(cursor, reg)
-            if reg['type'] == 'AM' or reg['type'] == 'CN' or reg['type'] == 'CP':
+            #if reg['type'] == 'AM' or reg['type'] == 'CN' or reg['type'] == 'CP':
+            if reg['type'] in ['AM', 'CN', 'CP', 'RN']:
                 cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
                                "id = %(id)s AND cancelled_by IS NULL",
                                {
                                    "canc": request_id, "id": previous_id
                                })
-                if reg['type'] == 'AM' or reg['type'] == 'RN':
+                if reg['type'] == 'AM':
                     # TODO: need an amendment type column or similar...
-                    cursor.execute("UPDATE register_details SET amends = %(amend)s WHERE " +
+                    cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
                                    "id = %(id)s",
                                    {
-                                       "amend": previous_id, "id": details_id
+                                       "amend": previous_id, "id": details_id, "type": "Amendment"
+                                   })
+
+                if reg['type'] == 'RN':
+                    # TODO: need an amendment type column or similar...
+                    cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
+                                   "id = %(id)s",
+                                   {
+                                       "amend": previous_id, "id": details_id, "type": "Renewal"
                                    })
 
             previous_id = details_id
