@@ -259,7 +259,7 @@ def insert_details(cursor, request_id, data, amends_id):
 
     # party
     if 'lc_register_details' in data:
-        party_type = 'Debtor'  # TODO: set to debtor for time being as table constraint needs to be removed
+        party_type = 'Estate Owner'
         occupation = data['lc_register_details']['occupation']
     else:
         party_type = 'Debtor'
@@ -479,7 +479,7 @@ def get_name_details(cursor, data, details_id, name_id):
         data['debtor_names'] = [{'forenames': [], 'surname': ""}]
         data['complex'] = {'name': rows[0]['complex_name'], 'number': rows[0]['complex_number']}
 
-    cursor.execute("select occupation, id from party where party_type='Debtor' and register_detl_id=%(id)s",
+    cursor.execute("select occupation, id from party where (party_type='Debtor' or party_type='Estate Owner') and register_detl_id=%(id)s",
                    {'id': details_id})
     rows = cursor.fetchall()
     data['occupation'] = rows[0]['occupation']
