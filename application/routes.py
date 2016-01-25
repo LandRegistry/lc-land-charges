@@ -168,8 +168,10 @@ def create_search():
         # Store the search request
         search_request_id = store_search_request(cursor, data)
 
+        # name_string = "{} {}".format(name['private']['forenames'], name['private']['surname'])
         # Run the queries
         # results = perform_search(cursor, data['parameters'])
+        # print(results)
 
         # store_search_result(cursor, search_request_id, results)
 

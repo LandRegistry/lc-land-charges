@@ -12,6 +12,15 @@ CUSTOMER_SCHEMA = {
 }
 
 
+COMPLEX_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "complex_name": {"type": "string"},
+        "complex_number": {"type": "integer"}
+    }
+}
+
+
 PARAMETER_SCHEMA = {
     "type": "object",
     "properties": {
@@ -22,6 +31,8 @@ PARAMETER_SCHEMA = {
                      "surname": {"type": "string"},
                      "complex_name": {"type": "string"},
                      "complex_number": {"type": "integer"},
+                     "complex_variations": {"type": "array",
+                                            "items": COMPLEX_SCHEMA},
                      "local_authority_name": {"type": "string"},
                      "local_authority_area": {"type": "string"},
                      "other_name": {"type": "string"},

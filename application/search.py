@@ -111,6 +111,7 @@ def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_
 
 
 def store_search_request(cursor, data):
+    print(data)
     # row on request
     reference = data['customer']['reference']
     key_number = data['customer']['key_number']
