@@ -243,12 +243,15 @@ def insert_party(cursor, details_id, party_type, occupation, date_of_birth, resi
     return cursor.fetchone()[0]
 
 
-def insert_migration_status(cursor, register_id, registration_number, additional_data):
-    cursor.execute("INSERT INTO migration_status (register_id, original_regn_no, migration_complete, extra_data ) " +
-                   "VALUES( %(register_id)s, %(reg_no)s, True, %(extra)s ) RETURNING id",
+def insert_migration_status(cursor, register_id, registration_number, registration_date, class_of_charge, additional_data):
+    cursor.execute("INSERT INTO migration_status (register_id, original_regn_no, date, class_of_charge, "
+                   "migration_complete, extra_data ) "
+                   "VALUES( %(register_id)s, %(reg_no)s, %(date)s, %(class)s, True, %(extra)s ) RETURNING id",
                    {
                        "register_id": register_id,
                        "reg_no": registration_number,
+                       "date": registration_date,
+                       "class": class_of_charge,
                        "extra": json.dumps(additional_data)
                    })
     return cursor.fetchone()[0]
@@ -654,45 +657,84 @@ def insert_migrated_record(cursor, data):
     data["class_of_charge"] = re.sub(r"\(|\)", "", data["class_of_charge"])
 
     # TODO: using registration date as request date. Valid? Always?
-    request_id = insert_request(cursor, None, data["class_of_charge"], data['application_ref'],
-                                data['registration']['date'], None,
-                                None, None)
 
-    details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
-    party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
+    logging.debug(data)
+    if data['type'] in ['CN']:
 
-    if 'complex' in data:
-        name_id = insert_name(cursor, data['complex'], party_id)
-    elif 'debtor_names' in data:
-        name_id = insert_name(cursor, data['debtor_names'][0], party_id)
+        data['customer_name'] = ''
+        data['customer_address'] = ''
+        insert_cancellation(data['migration_data']['original']['registration_no'],
+                            data['migration_data']['original']['date'], data)
+        registration_id = None
+        details_id = None
+        request_id = None
     else:
-        data['complex'] = {"number": 0, "name": ""}
-        name_id = insert_name(cursor, data['complex'], party_id)
+        request_id = insert_request(cursor, None, data["class_of_charge"], data['application_ref'],
+                                    data['registration']['date'], None,
+                                    None, None)
 
-    insert_address(cursor, data['residence'], "Debtor Residence", party_id)
-    #def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
-    logging.debug(data['date'])
+        details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
+        party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
 
-    registration_no, registration_id = insert_registration(cursor, details_id, name_id['id'], data['date'], data['reg_no'])
-    insert_migration_status(cursor, registration_id, data['migration_data']['registration_no'],
-                            data['migration_data']['extra'])
+        if 'complex' in data:
+            name_id = insert_name(cursor, data['complex'], party_id)
+        elif 'debtor_names' in data:
+            name_id = insert_name(cursor, data['debtor_names'][0], party_id)
+        else:
+            data['complex'] = {"number": 0, "name": ""}
+            name_id = insert_name(cursor, data['complex'], party_id)
+
+        insert_address(cursor, data['residence'], "Debtor Residence", party_id)
+        #def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
+        logging.debug(data['date'])
+
+        registration_no, registration_id = insert_registration(cursor, details_id, name_id['id'], data['date'], data['reg_no'])
+
+    insert_migration_status(cursor, registration_id, data['registration']['registration_no'], data['registration']['date'],
+                            data['class_of_charge'], data['migration_data'])
     return details_id, request_id
+
+
+def get_head_of_chain(cursor, reg_no, date):
+    # reg_no/date could be anywhere in the 'chain', though typically would be the start
+    # as cancelled_by is a request_id, navigate by request_ids until we find the uncancelled
+    # head entry
+    cursor.execute('SELECT d.request_id, d.id FROM register r, register_details d '
+                   'WHERE registration_no=%(reg)s AND date=%(date)s AND r.details_id = d.id ',
+                   {"reg": reg_no, "date": date})
+    row = cursor.fetchone()
+    request_id = row['request_id']
+
+    while True:
+        cursor.execute('SELECT cancelled_by, id FROM register_details WHERE request_id=%(id)s', {"id": request_id})
+        row = cursor.fetchone()
+        next_id = row['cancelled_by']
+        details_id = row['id']
+
+        if next_id is None:
+            return details_id
+        request_id = next_id
 
 
 def insert_cancellation(registration_no, date, data):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         # Insert a row with application info
+        logging.info("Cancelling {} {}".format(registration_no, date))
+
         now = datetime.datetime.now()
         document = None
         if 'document_id' in data:
+            logging.warning("Obsolete: cancellation with document-id")  # TODO: remove this and what needs it
             document = data['document_id']
 
         request_id = insert_request(cursor, None, "CANCELLATION", None, now, document, None, data['customer_name'],
                                     data['customer_address'])
         logging.info(request_id)
         # Set cancelled_on to now
-        original_detl_id = get_register_details_id(cursor, registration_no, date)
+        original_detl_id = get_head_of_chain(cursor, registration_no, date)
+            #get_register_details_id(cursor, registration_no, date)
+        logging.debug("Retrieved details id {}".format(original_detl_id))
         logging.info(original_detl_id)
 
         original_regs = get_all_registration_nos(cursor, original_detl_id)

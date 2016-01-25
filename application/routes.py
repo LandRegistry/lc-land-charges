@@ -196,21 +196,7 @@ def get_searches():
         complete(cursor)
 
     return Response(json.dumps(result), status=200, mimetype='application/json')
-# @app.route('/migrated_registration/<int:db2_reg_no>', methods=['GET'])
-# def migrated_registration(db2_reg_no):
-#     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-#     new_reg_no = get_new_registration_number(cursor, db2_reg_no)
-#
-#     registrations = []
-#     for number in new_reg_no:
-#         registrations.append(get_registration_details(cursor, number))
-#
-#     complete(cursor)
-#
-#     if len(registrations) > 0:
-#         return Response(json.dumps(registrations), status=200, mimetype='application/json')
-#     else:
-#         return Response(status=404)
+
 
 migrated_schema = {
     "type": "object",
@@ -247,7 +233,7 @@ def insert():
         return Response(status=415)
 
     data = request.get_json(force=True)
-    logging.info(data)
+    # logging.info(data)
     # TODO: is there a need to validate the migration schema???
     """try:
         validate(data, migrated_schema)
@@ -255,19 +241,22 @@ def insert():
         message = "{}\n{}".format(error.message, error.path)
         return Response(message, status=400)"""
 
+    previous_id = None
     for reg in data:
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         try:
             details_id, request_id = insert_migrated_record(cursor, reg)
-            #if reg['type'] == 'AM' or reg['type'] == 'CN' or reg['type'] == 'CP':
             if reg['type'] in ['AM', 'CN', 'CP', 'RN']:
-                cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
-                               "id = %(id)s AND cancelled_by IS NULL",
-                               {
-                                   "canc": request_id, "id": previous_id
-                               })
+                if details_id is not None:
+                    cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+                                   "id = %(id)s AND cancelled_by IS NULL",
+                                   {
+                                       "canc": request_id, "id": previous_id
+                                   })
+                else:
+                    pass
+
                 if reg['type'] == 'AM':
-                    # TODO: need an amendment type column or similar...
                     cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
                                    "id = %(id)s",
                                    {
@@ -275,7 +264,6 @@ def insert():
                                    })
 
                 if reg['type'] == 'RN':
-                    # TODO: need an amendment type column or similar...
                     cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
                                    "id = %(id)s",
                                    {
