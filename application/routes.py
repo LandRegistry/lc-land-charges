@@ -71,6 +71,7 @@ def after_request(response):
 
 # ============== /registrations ===============
 
+
 @app.route('/registrations/<date>/<int:reg_no>', methods=['GET'])
 def registration(date, reg_no):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -102,6 +103,7 @@ def register():
     else:
         errors = validate(json_data, BANKRUPTCY_SCHEMA)
 
+    print(json.dumps(json_data))
     if len(errors) > 0:
         logging.error("Input data failed validation")
         return Response(json.dumps(errors), status=400, mimetype='application/json')
@@ -118,7 +120,7 @@ def register():
     if not suppress:
         publish_new_bankruptcy(producer, new_regns)
 
-    return Response(json.dumps({'new_registrations': new_regns, 'request_id': request_id}), status=200)
+    return Response(json.dumps({'new_registrations': new_regns, 'request_id': request_id}), status=200, mimetype='application/json')
 
 
 @app.route('/registrations/<date>/<reg_no>', methods=["PUT"])

@@ -76,12 +76,11 @@ def insert_name(cursor, name, party_id, is_alias=False):
         name_string, forename, middle_names, surname, company = ('',) * 5
         local_auth, local_auth_area, complex_name, other = ('',) * 4
         complex_number = 0
-        if name['private']['forenames'] != '' or name['private']['surname'] != '':
-            name_string = "{} {}".format(name['private']['forenames'], name['private']['surname'])
-            first, _, rest = name['private']['forenames'].partition(" ")
-            forename = first
-            middle_names = rest
+        if len(name['private']['forenames']) > 0 or name['private']['surname'] != '':
+            forename = name['private']['forenames'][0]
+            middle_names = " ".join(name['private']['forenames'][1:])
             surname = name['private']['surname']
+            name_string = " ".join(name['private']['forenames']) + " " + name['private']['surname']
         else:
             company = name['company'] if name['company'] != '' else None
             local_auth = name['local']['name'] if name['local']['name'] != '' else None
@@ -147,7 +146,7 @@ def insert_name(cursor, name, party_id, is_alias=False):
     return return_data
 
 
-def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
+def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_no=None):
     if orig_reg_no is None:
         # Get the next registration number
         year = date[:4]  # date is a string
@@ -168,13 +167,14 @@ def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
         reg_no = orig_reg_no
 
     # Cap it all off with the actual legal "one registration per name":
-    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, date) " +
-                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(date)s ) RETURNING id",
+    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, date, county_id) " +
+                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(date)s, %(county)s ) RETURNING id",
                    {
                        "regno": reg_no,
                        "debtor": name_id,
                        "details": details_id,
-                       'date': date
+                       'date': date,
+                       'county': county_id
                    })
     reg_id = cursor.fetchone()[0]
     return reg_no, reg_id
@@ -292,10 +292,14 @@ def insert_details(cursor, request_id, data, amends_id):
     # party_name, party_name_rel
     if 'lc_register_details' in data:
         # TODO: insert county here???
+        data['county_ids'] = []
         for item in data['lc_register_details']['county']:
-            county_detl_id = insert_lc_county(cursor, register_details_id, item)
+            county_detl_id, county_id = insert_lc_county(cursor, register_details_id, item)
+            data['county_ids'].append({'id': county_id, 'name': item})  # for use later...
+
         names = [insert_name(cursor, data['lc_register_details']['estate_owner'], party_id)]
         names[0]['county_detl_id'] = county_detl_id
+
     elif 'complex' in data:
         names = [insert_name(cursor, data['complex'], party_id)]
     else:
@@ -317,27 +321,52 @@ def insert_details(cursor, request_id, data, amends_id):
     return names, register_details_id
 
 
-def insert_record(cursor, data, request_id, amends=None, orig_reg_no=None):
-    names, register_details_id = insert_details(cursor, request_id, data, amends)
+def insert_bankruptcy_regn(cursor, details_id, names, date, orig_reg_no):
     reg_nos = []
-
-    # pylint: disable=unused-variable
     for name in names:
-        reg_no, reg_id = insert_registration(cursor, register_details_id, name['id'], data['date'], orig_reg_no)
-
+        reg_no, reg_id = insert_registration(cursor, details_id, name['id'], date, None, orig_reg_no)
         if 'forenames' in name:
             reg_nos.append({
                 'number': reg_no,
-                'date': data['date'],
+                'date': date,
                 'forenames': name['forenames'],
                 'surname': name['surname']
             })
         else:
             reg_nos.append({
                 'number': reg_no,
-                'date': data['date'],
+                'date': date,
                 'name': name['name']
             })
+    return reg_nos
+
+
+def insert_landcharge_regn(cursor, details_id, names, county_ids, date, orig_reg_no):
+    if len(names) != 1:
+        raise RuntimeError("Invalid number of names")
+
+    reg_nos = []
+    for county in county_ids:
+        logging.debug(county['id'])
+        name = names[0]
+        reg_no, reg_id = insert_registration(cursor, details_id, name['id'], date, county['id'], orig_reg_no)
+
+        reg_nos.append({
+            'number': reg_no,
+            'date': date,
+            'county': county['name'],
+        })
+
+    return reg_nos
+
+
+def insert_record(cursor, data, request_id, amends=None, orig_reg_no=None):
+    names, register_details_id = insert_details(cursor, request_id, data, amends)
+
+    if data['class_of_charge'] in ['PA(B)', 'WO(B)']:
+        reg_nos = insert_bankruptcy_regn(cursor, register_details_id, names, data['date'], orig_reg_no)
+    else:
+        reg_nos = insert_landcharge_regn(cursor, register_details_id, names, data['county_ids'], data['date'], orig_reg_no)
 
     # TODO: audit-log not done. Not sure it belongs here?
     return reg_nos, register_details_id
@@ -354,6 +383,7 @@ def insert_new_registration(cursor, data):
         original = data['original_request']
     request_id = insert_request(cursor, data['key_number'], data["class_of_charge"], data['application_ref'],
                                 data['date'], document, original, data['customer_name'], data['customer_address'])
+
     reg_nos, details_id = insert_record(cursor, data, request_id)
     return reg_nos, details_id, request_id
 
@@ -480,16 +510,20 @@ def get_party_names(cursor, party_id):
     result = []
     for row in rows:
         name = {}
+        pname = {}
         if row['forename'] != "":
-            name['forenames'] = [row['forename']]
+            pname['forenames'] = [row['forename']]
 
         if row['middle_names'] != "":
-            if 'forenames' not in name:
-                name['forenames'] = ['']
-            name['forenames'] += row['middle_names'].split(' ')
+            if 'forenames' not in pname:
+                pname['forenames'] = ['']
+            pname['forenames'] += row['middle_names'].split(' ')
 
         if row['surname'] != "":
-            name['surname'] = row['surname']
+            pname['surname'] = row['surname']
+
+        if 'forenames' in pname:
+            name['private'] = pname
 
         if row['complex_number'] is not None or row['complex_name'] != "":
             name['complex'] = {'number': row['complex_number'], 'name': row['complex_name']}
@@ -516,7 +550,7 @@ def get_parties(cursor, data, details_id):
     cursor.execute("select p.party_type, p.occupation, p.date_of_birth, pt.trading_name, p.id "
                    "from party p left outer join party_trading pt on p.id = pt.party_id "
                    "where p.register_detl_id=%(id)s", {'id': details_id})
-    rows = cursor.fetchall();
+    rows = cursor.fetchall()
 
     party_ids = []
     for row in rows:
@@ -528,6 +562,7 @@ def get_parties(cursor, data, details_id):
             data['trading'] = row['trading_name']
             data['occupation'] = row['occupation']
         elif row['party_type'] == 'Estate Owner':
+            data['occupation'] = row['occupation']
             if len(names) > 1:
                 logging.debug(names)
                 raise RuntimeError("Too many estate owner names returned")
@@ -820,7 +855,7 @@ def insert_lc_county(cursor, register_details_id, county):
                    {
                        "county_id": county_id, "details_id": register_details_id
                    })
-    return cursor.fetchone()[0]
+    return cursor.fetchone()[0], county_id
 
 
 def get_county_id(cursor, county):
