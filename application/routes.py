@@ -209,10 +209,9 @@ def create_search():
         # Store the search request
         search_request_id = store_search_request(cursor, data)
 
-        # name_string = "{} {}".format(name['private']['forenames'], name['private']['surname'])
         # Run the queries
-        # results = perform_search(cursor, data['parameters'])
-        # print(results)
+        results = perform_search(cursor, data['parameters'])
+        print(results)
 
         # store_search_result(cursor, search_request_id, results)
 
@@ -343,6 +342,8 @@ def delete_all_regs():  # pragma: no cover
         cursor.execute("DELETE FROM detl_county_rel")
         cursor.execute("DELETE FROM register_details")
         cursor.execute("DELETE FROM audit_log")
+        cursor.execute("DELETE FROM search_results")
+        cursor.execute("DELETE FROM search_name")
         cursor.execute("DELETE FROM search_details")
         cursor.execute("DELETE FROM request")
         cursor.execute("DELETE FROM ins_bankruptcy_request")
