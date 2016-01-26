@@ -42,7 +42,6 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to):
                        "Where UPPER(pn.party_name)=%(fullname)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id and p.id=pa.party_id " +
                        "and pa.address_id=a.id and a.detail_id=ad.id " +
-                       # "and UPPER(ad.county) IN ('" + "', '".join((str(n) for n in counties)) + "') " +
                        "and UPPER(ad.county) = ANY(%(counties)s) "
                        "and p.register_detl_id=rd.id " +
                        "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
@@ -54,6 +53,7 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to):
 
     rows = cursor.fetchall()
     result = [row['id'] for row in rows]
+    print('the result is', result)
     return result
 
 
@@ -95,7 +95,6 @@ def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_
                        "Where UPPER(pn.complex_name)=%(complex_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id and p.id=pa.party_id " +
                        "and pa.address_id=a.id and a.detail_id=ad.id " +
-                       # "and UPPER(ad.county) IN ('" + "', '".join((str(n) for n in counties)) + "') " +
                        "and UPPER(ad.county) = ANY(%(counties)s) "
                        "and p.register_detl_id=rd.id " +
                        "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
@@ -188,7 +187,7 @@ def store_search_result(cursor, search_request_id, data):
 def perform_search(cursor, parameters):
     if "counties" not in parameters:
         parameters["counties"] = []
-    
+
     if len(parameters['counties']) == 0:
         parameters['counties'].append('ALL')
 
@@ -197,18 +196,25 @@ def perform_search(cursor, parameters):
     if parameters['search_type'] == 'full':
         logging.info('Perform full search')
         for item in parameters['search_items']:
-            if 'complex_no' in item:
+            print('this is the item', item)
+            if item['name_type'] == "Complex":
+                print('we made it into complex')
                 # Do complex name search
-                search_results.append({item['name']: search_full_by_complex_name(cursor, item['name'],
-                                                                                 parameters['counties'],
-                                                                                 item['year_from'],
-                                                                                 item['year_to'])})
+                # Search against the variations of the complex name
+                for name in item['name']['complex_variations']:
+                    search_results.append({name['complex_name']: search_full_by_complex_name(cursor,
+                                                                                             name['complex_name'],
+                                                                                             parameters['counties'],
+                                                                                             item['year_from'],
+                                                                                             item['year_to'])})
             else:
                 # Do full search by name
-                search_results.append({item['name']: search_full_by_name(cursor, item['name'],
-                                                                         parameters['counties'],
-                                                                         item['year_from'],
-                                                                         item['year_to'])})
+                print('we made it into full name')
+                name_string = "{} {}".format(item['name']['forenames'], item['name']['surname'])
+                search_results.append({name_string: search_full_by_name(cursor, name_string,
+                                                                        parameters['counties'],
+                                                                        item['year_from'],
+                                                                        item['year_to'])})
     else:
         logging.info('Perform bankruptcy search')
         for item in parameters['search_items']:
@@ -219,6 +225,7 @@ def perform_search(cursor, parameters):
                 # Do search by name
                 search_results.append({item['name']: search_by_name(cursor, item['name'])})
 
+    print('these are the results', search_results)
     return search_results
 
     
