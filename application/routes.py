@@ -5,6 +5,8 @@ import psycopg2
 import psycopg2.extras
 import json
 import logging
+import traceback
+import kombu
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
@@ -12,7 +14,6 @@ from application.data import connect, get_registration_details, complete, \
     insert_amendment, insert_new_registration, get_req_details, rollback
 from application.schema import SEARCH_SCHEMA, validate, BANKRUPTCY_SCHEMA, LANDCHARGE_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result, read_searches
-
 
 
 @app.route('/', methods=["GET"])
@@ -29,12 +30,49 @@ def health():
     return Response(json.dumps(result), status=200, mimetype='application/json')
 
 
+def raise_error(error):
+    hostname = "amqp://{}:{}@{}:{}".format(app.config['MQ_USERNAME'], app.config['MQ_PASSWORD'],
+                                           app.config['MQ_HOSTNAME'], app.config['MQ_PORT'])
+    connection = kombu.Connection(hostname=hostname)
+    connection.SimpleQueue('errors').put(error)
+    logging.warning('Error successfully raised.')
+
+
+@app.errorhandler(Exception)
+def error_handler(err):
+    logging.error('Unhandled exception: ' + str(err))
+    call_stack = traceback.format_exc()
+
+    lines = call_stack.split("\n")
+    for line in lines:
+        logging.error(line)
+
+    error = {
+        "type": "F",
+        "message": str(err),
+        "stack": call_stack
+    }
+    raise_error(error)
+    return Response(json.dumps(error), status=500)
+
+
+@app.before_request
+def before_request():
+    logging.info("BEGIN %s %s [%s] (%s)",
+                 request.method, request.url, request.remote_addr, request.__hash__())
+
+
+@app.after_request
+def after_request(response):
+    logging.info('END %s %s [%s] (%s) -- %s',
+                 request.method, request.url, request.remote_addr, request.__hash__(),
+                 response.status)
+    return response
+
 # ============== /registrations ===============
 
 @app.route('/registrations/<date>/<int:reg_no>', methods=['GET'])
 def registration(date, reg_no):
-    logging.debug("GET registration")
-
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         details = get_registration_details(cursor, reg_no, date)
@@ -63,6 +101,7 @@ def register():
         errors = validate(json_data, LANDCHARGE_SCHEMA)
     else:
         errors = validate(json_data, BANKRUPTCY_SCHEMA)
+
     if len(errors) > 0:
         logging.error("Input data failed validation")
         return Response(json.dumps(errors), status=400, mimetype='application/json')

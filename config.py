@@ -3,6 +3,7 @@ import os
 
 class Config(object):
     DEBUG = False
+    APPLICATION_NAME = "lc-land-charges"
 
 
 class DevelopmentConfig(Config):

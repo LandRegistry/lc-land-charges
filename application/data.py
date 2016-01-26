@@ -352,7 +352,7 @@ def insert_new_registration(cursor, data):
     original = None
     if 'original_request' in data:
         original = data['original_request']
-    request_id = insert_request(cursor, data['key_number'], data["application_type"], data['application_ref'],
+    request_id = insert_request(cursor, data['key_number'], data["class_of_charge"], data['application_ref'],
                                 data['date'], document, original, data['customer_name'], data['customer_address'])
     reg_nos, details_id = insert_record(cursor, data, request_id)
     return reg_nos, details_id, request_id
@@ -470,39 +470,77 @@ def get_registration(cursor, reg_id, date):
 #
 #     return reg_nos
 
-
-def get_name_details(cursor, data, details_id, name_id):
-    cursor.execute("select forename, middle_names, surname, complex_number, complex_name " +
-                   "from party_name where id = %(id)s", {'id': name_id})
+def get_party_names(cursor, party_id):
+    cursor.execute("select forename, middle_names, surname, alias_name, complex_number, complex_name, "
+                   "name_type_ind, company_name, local_authority_name, local_authority_area, other_name "
+                   "from party_name pn, party_name_rel pnr where pnr.party_id=%(id)s and "
+                   "pnr.party_name_id = pn.id order by alias_name desc", {"id": party_id})
     rows = cursor.fetchall()
-    if not rows[0]['complex_number']:
-        forenames = [rows[0]['forename']]
-        if rows[0]['middle_names'] is not None and rows[0]['middle_names'] != "":
-            forenames += rows[0]['middle_names'].split(" ")
-        data['debtor_names'] = [{'forenames': forenames, 'surname': rows[0]['surname']}]
-    else:
-        data['debtor_names'] = [{'forenames': [], 'surname': ""}]
-        data['complex'] = {'name': rows[0]['complex_name'], 'number': rows[0]['complex_number']}
 
-    cursor.execute("select occupation, id from party where (party_type='Debtor' or party_type='Estate Owner') and register_detl_id=%(id)s",
-                   {'id': details_id})
-    rows = cursor.fetchall()
-    data['occupation'] = rows[0]['occupation']
-    party_id = rows[0]['id']
-
-    cursor.execute("select n.forename, n.middle_names, n.surname from party_name n, party_name_rel r " +
-                   "where n.id = r.party_name_id and r.party_id = %(party_id)s and n.id != %(id)s ",
-                   {'party_id': party_id, 'id': name_id})
-    rows = cursor.fetchall()
-    #data['debtor_alternative_name'] = []
+    result = []
     for row in rows:
-        forenames = [row['forename']]
+        name = {}
+        if row['forename'] != "":
+            name['forenames'] = [row['forename']]
+
         if row['middle_names'] != "":
-            forenames += row['middle_names'].split(" ")
-        data['debtor_names'].append({
-            'forenames': forenames, 'surname': row['surname']
-        })
-    return party_id
+            if 'forenames' not in name:
+                name['forenames'] = ['']
+            name['forenames'] += row['middle_names'].split(' ')
+
+        if row['surname'] != "":
+            name['surname'] = row['surname']
+
+        if row['complex_number'] is not None or row['complex_name'] != "":
+            name['complex'] = {'number': row['complex_number'], 'name': row['complex_name']}
+
+        name['type'] = row['name_type_ind']
+
+        if row['company_name'] != "":
+            name['company'] = row['company_name']
+
+        if row['local_authority_name'] != "" or row['local_authority_area'] != "":
+            name['local'] = {
+                'name': row['local_authority_name'],
+                'area': row['local_authority_area']
+            }
+
+        if row['other_name'] != "":
+            name['other'] = row['other_name']
+        result.append(name)
+
+    return result
+
+
+def get_parties(cursor, data, details_id):
+    cursor.execute("select p.party_type, p.occupation, p.date_of_birth, pt.trading_name, p.id "
+                   "from party p left outer join party_trading pt on p.id = pt.party_id "
+                   "where p.register_detl_id=%(id)s", {'id': details_id})
+    rows = cursor.fetchall();
+
+    party_ids = []
+    for row in rows:
+        party_id = row['id']
+        party_ids.append(party_id)
+        names = get_party_names(cursor, party_id)
+        if row['party_type'] == 'Debtor':
+            data['debtor_names'] = names
+            data['trading'] = row['trading_name']
+            data['occupation'] = row['occupation']
+        elif row['party_type'] == 'Estate Owner':
+            if len(names) > 1:
+                logging.debug(names)
+                raise RuntimeError("Too many estate owner names returned")
+            elif len(names) == 0:
+                raise RuntimeError("No names returned")
+
+            name = names[0]
+            data['estate_owner_ind'] = name['type']
+            del(name['type'])
+            data['estate_owner'] = name
+        else:
+            raise RuntimeError("Unknown party type: " + row['party_type'])
+    return party_ids
 
 
 def get_registration_no_from_details_id(cursor, details_id):
@@ -588,12 +626,7 @@ def get_registration_details(cursor, reg_no, date):
             counties.append(row['name'])
         data['counties'] = counties
 
-    party_id = get_name_details(cursor, data, details_id, name_id)
-
-    cursor.execute("select trading_name from party_trading where party_id = %(id)s", {'id': party_id})
-    rows = cursor.fetchall()
-    if len(rows) != 0:
-        data['trading_name'] = rows[0]['trading_name']
+    party_ids = get_parties(cursor, data, details_id)
 
     cursor.execute("select r.key_number, r.application_reference, r.document_ref, r.customer_name, " +
                    "r.customer_address " +
@@ -605,6 +638,11 @@ def get_registration_details(cursor, reg_no, date):
     data['key_number'] = rows[0]['key_number']
     data['customer_name'] = rows[0]['customer_name']
     data['customer_address'] = rows[0]['customer_address']
+
+    if len(party_ids) > 1:
+        raise RuntimeError("Unexpected multitude of party ids")
+
+    party_id = party_ids[0]
     cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, d.county, " +
                    "d.postcode, a.address_string, a.address_type " +
                    "from address a " +

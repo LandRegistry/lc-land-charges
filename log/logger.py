@@ -13,12 +13,29 @@ class OutputFilter(logging.Filter):
             return self.is_error
 
 
-def setup_logging(debug=True):
-    print("Logging set up. Debug is {}".format(debug))
-    level = logging.DEBUG if debug else logging.WARN
+old_factory = logging.getLogRecordFactory()
+app_name = ""
+
+
+def record_factory(*args, **kwargs):
+    record = old_factory(*args, **kwargs)
+    record.appname = app_name
+    return record
+
+
+def setup_logging(config):
+    level = logging.DEBUG if config['DEBUG'] else logging.INFO
+    # Our logging routines signal the start and end of the routes,
+    # so the Werkzeug defaults aren't required. Keep warnings and above.
+    logging.getLogger('werkzeug').setLevel(logging.WARN)
+
+    global app_name
+    app_name = config['APPLICATION_NAME']
 
     root_logger = logging.getLogger()
-    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s',
+    logging.setLogRecordFactory(record_factory)
+    formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(levelname)s [%(appname)s]'
+                                  ' (PID %(process)d) Message: %(message)s',
                                   "%Y-%m-%d %H:%M:%S")
 
     out_handler = logging.StreamHandler(sys.stdout)

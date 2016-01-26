@@ -103,7 +103,7 @@ BANKRUPTCY_SCHEMA = {
             "type": "string",
             "pattern": "^\d+$"
         },
-        "application_type": {
+        "class_of_charge": {
             "type": "string",
             "enum": ["PA(B)", "WO(B)"]
         },
@@ -134,13 +134,14 @@ BANKRUPTCY_SCHEMA = {
             "type": "string"
         }
     },
-    "required": ["key_number", "application_type", "application_ref", "date", "debtor_names",
+    "required": ["key_number", "class_of_charge", "application_ref", "date", "debtor_names",
                  "residence_withheld"]
 }
 
 LANDCHARGE_SCHEMA = {
     "type": "object",
     "properties": {
+        "estate_owner": {"type": "object"},
         "key_number": {
             "type": "string",
             "pattern": "^\d+$"
@@ -153,7 +154,7 @@ LANDCHARGE_SCHEMA = {
         "gender": {"type": "string"},
         "occupation": {"type": "string"}
     },
-    "required": ["key_number", "class_of_charge", "application_ref", "date"]
+    "required": ["key_number", "class_of_charge", "application_ref", "date"] # TODO: eo as required
 }
 
 
