@@ -207,13 +207,13 @@ def create_search():
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         # Store the search request
-        search_request_id = store_search_request(cursor, data)
+        search_request_id, search_details_id, search_data = store_search_request(cursor, data)
 
         # Run the queries
-        results = perform_search(cursor, data['parameters'])
-        print(results)
-
-        # store_search_result(cursor, search_request_id, results)
+        results = perform_search(cursor, search_data['parameters'])
+        for item in results:
+            print('this is the item', item)
+            store_search_result(cursor, search_request_id, search_details_id, item['name_id'], item['name_result'])
 
         complete(cursor)
     except:
