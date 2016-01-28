@@ -400,6 +400,31 @@ def load_counties():  # pragma: no cover
     return Response(status=200)
 
 
+@app.route('/counties', methods=['GET'])
+def get_counties_list():
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    welsh_req = ""
+    try:
+        if 'welsh' in request.args:
+            welsh_req = request.args['welsh']
+
+        if welsh_req == "yes":
+            cursor.execute("SELECT name, welsh_name FROM COUNTY")
+        else:
+            cursor.execute("SELECT name FROM COUNTY")
+
+        rows = cursor.fetchall()
+        counties = list()
+        for row in rows:
+            counties.append(row['name'])
+            if welsh_req == "yes" and row['welsh_name'] and (row['welsh_name'] != row['name']):
+                counties.append(row['welsh_name'])
+        counties.sort()
+    finally:
+        complete(cursor)
+    return Response(json.dumps(counties), status=200, mimetype='application/json')
+
+
 # Get details of a request for printing
 @app.route('/request_details/<request_id>', methods=["GET"])
 def get_request_details(request_id):
