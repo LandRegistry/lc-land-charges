@@ -198,7 +198,7 @@ def create_search():
     errors = validate(data, SEARCH_SCHEMA)
     if len(errors) > 0:
         return Response(json.dumps(errors), status=400)
-
+    print(data['parameters']['search_type'])
     if data['parameters']['search_type'] not in ['full', 'banks']:
         message = "Invalid search type supplied"
         logging.error(message)
