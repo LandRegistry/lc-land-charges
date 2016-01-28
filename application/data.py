@@ -1,9 +1,10 @@
 from application import app
 import psycopg2
 import json
-import re
 import datetime
 import logging
+import re
+from application.search import get_searchable_string
 
 
 def connect(cursor_factory=None):
@@ -73,34 +74,49 @@ def insert_address(cursor, address, address_type, party_id):
 
 def insert_name(cursor, name, party_id, is_alias=False):
     if 'estate_owner_ind' in name:
-        name_string, forename, middle_names, surname, company = ('',) * 5
-        local_auth, local_auth_area, complex_name, other = ('',) * 4
-        complex_number = 0
+        # name_string, forename, middle_names, surname, company = (None,) * 5
+        # local_auth, local_auth_area, complex_name, other, searchable_string = (None,) * 5
+        # complex_number = None
         if len(name['private']['forenames']) > 0 or name['private']['surname'] != '':
             forename = name['private']['forenames'][0]
             middle_names = " ".join(name['private']['forenames'][1:])
             surname = name['private']['surname']
-            name_string = " ".join(name['private']['forenames']) + " " + name['private']['surname']
+            name_join = " ".join(name['private']['forenames']) + " " + name['private']['surname']
+            # store the name without punctuation or spaces for searching
+            # searchable_string = re.sub('[^A-Za-z0-9]+', '', name_string)
         else:
-            company = name['company'] if name['company'] != '' else None
-            local_auth = name['local']['name'] if name['local']['name'] != '' else None
-            local_auth_area = name['local']['area'] if name['local']['area'] != '' else None
-            other = name['other'] if name['other'] != '' else None
-            complex_name = name['complex']['name'] if name['complex']['name'] != '' else None
-            complex_number = name['complex']['number'] if name['complex']['number'] != '' else None
+            forename = None
+            middle_names = None
+            surname = None
+            name_join = ''
+
+        name_string = name_join if name_join != '' else None
+        company = name['company'] if name['company'] != '' else None
+        local_auth = name['local']['name'] if name['local']['name'] != '' else None
+        local_auth_area = name['local']['area'] if name['local']['area'] != '' else None
+        other = name['other'] if name['other'] != '' else None
+        complex_name = name['complex']['name'] if name['complex']['name'] != '' else None
+        complex_number = name['complex']['number'] if name['complex']['number'] != '' else None
+
+        if complex_name is None:
+            searchable_string = get_searchable_string(name_string, company, local_auth, local_auth_area, other)
+        else:
+            searchable_string = None
+        print(searchable_string)
 
         cursor.execute("INSERT INTO party_name ( party_name, forename, " +
                        "middle_names, surname, alias_name, complex_number, complex_name, " +
-                       "name_type_ind, company_name, local_authority_name, local_authority_area, other_name ) " +
+                       "name_type_ind, company_name, local_authority_name, local_authority_area, other_name, " +
+                       "searchable_string ) " +
                        "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s, " +
                        "%(comp_num)s, %(comp_name)s, %(type)s, %(company)s, " +
-                       "%(loc_auth)s, %(loc_auth_area)s, %(other)s ) " +
+                       "%(loc_auth)s, %(loc_auth_area)s, %(other)s, %(search_name)s ) " +
                        "RETURNING id",
                        {
                            "name": name_string, "forename": forename, "midnames": middle_names,
                            "surname": surname, "alias": is_alias, "comp_num":complex_number, "comp_name": complex_name,
                            "type": name['estate_owner_ind'], "company": company, "loc_auth": local_auth,
-                           "loc_auth_area": local_auth_area, "other": other
+                           "loc_auth_area": local_auth_area, "other": other, "search_name": searchable_string
                        })
         name['id'] = cursor.fetchone()[0]
         return_data = {'id': name['id'],
@@ -120,15 +136,16 @@ def insert_name(cursor, name, party_id, is_alias=False):
         }
     else:
         name_string = "{} {}".format(" ".join(name['forenames']), name['surname'])
+        searchable_string = re.sub('[^A-Za-z0-9]+', '', name_string)
         forename = name['forenames'][0]
         middle_names = " ".join(name['forenames'][1:])
         cursor.execute("INSERT INTO party_name ( party_name, forename, " +
-                       "middle_names, surname, alias_name ) " +
-                       "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s ) " +
+                       "middle_names, surname, alias_name, searchable_string ) " +
+                       "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s, %(search)s ) " +
                        "RETURNING id",
                        {
                            "name": name_string, "forename": forename, "midnames": middle_names,
-                           "surname": name['surname'], "alias": is_alias
+                           "surname": name['surname'], "alias": is_alias, "search": searchable_string
                        })
         name['id'] = cursor.fetchone()[0]
         return_data = {
