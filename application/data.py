@@ -491,16 +491,22 @@ def get_all_registration_nos(cursor, details_id):
     return results
 
 
-def get_registration(cursor, reg_id, date):
-    cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.class_of_charge, rd.id, " +
-                   "r.id as register_id from register r, register_details rd " +
-                   "where r.details_id = rd.id " +
-                   "and r.id=%(id)s and r.date=%(date)s", {'id': reg_id, 'date': date})
+def get_registration(cursor, reg_id, date=None):
+    if date is None:
+        cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.class_of_charge, rd.id, " +
+                       "r.id as register_id from register r, register_details rd " +
+                       "where r.details_id = rd.id " +
+                       "and r.id=%(id)s", {'id': reg_id})
+    else:
+        cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.class_of_charge, rd.id, " +
+                       "r.id as register_id from register r, register_details rd " +
+                       "where r.details_id = rd.id " +
+                       "and r.id=%(id)s and r.date=%(date)s", {'id': reg_id, 'date': date})
     rows = cursor.fetchall()
     row = rows[0]
     result = {
         "registration_date": str(row['registration_date']),
-        "application_type": row['application_type'],
+        "class_of_charge": row['class_of_charge'],
         "registration_no": row['registration_no'],
     }
     return result
