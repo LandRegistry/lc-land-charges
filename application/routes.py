@@ -213,7 +213,7 @@ def create_search():
         search_request_id, search_details_id, search_data = store_search_request(cursor, data)
 
         # Run the queries
-        results = perform_search(cursor, search_data['parameters'])
+        results = perform_search(cursor, search_data['parameters'], search_data['search_date'])
         for item in results:
             store_search_result(cursor, search_request_id, search_details_id, item['name_id'], item['name_result'])
 
