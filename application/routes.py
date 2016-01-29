@@ -227,12 +227,12 @@ def create_search():
         
 @app.route('/searches', methods=['GET'])
 def get_searches():
-    nonissued = False
-    if 'filter' in request.args:
-        nonissued = (request.args['filter'] == 'nonissued')
+    # if 'filter' in request.args:
+    #    nonissued = (request.args['filter'] == 'nonissued')
+    name = request.args['name']
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        result = read_searches(cursor, nonissued)
+        result = read_searches(cursor, name)
     finally:
         complete(cursor)
 
@@ -419,6 +419,30 @@ def get_counties_list():
             if welsh_req == "yes" and row['welsh_name'] and (row['welsh_name'] != row['name']):
                 counties.append(row['welsh_name'])
         counties.sort()
+    finally:
+        complete(cursor)
+    return Response(json.dumps(counties), status=200, mimetype='application/json')
+
+@app.route('/county/<county_name>', methods=['GET'])
+def get_translated_county(county_name):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        counties = list()
+        counties.append(county_name)
+
+        cursor.execute("SELECT name FROM COUNTY where UPPER(welsh_name) = %(n)s", {'n': county_name.upper()})
+        rows = cursor.fetchall()
+
+        for row in rows:
+            if row['name']:
+                counties.append(row['name'])
+        else:
+            cursor.execute("SELECT welsh_name FROM COUNTY where UPPER(name) = %(n)s", {'n': county_name.upper()})
+            rows = cursor.fetchall()
+
+            for row in rows:
+                if row['welsh_name']:
+                    counties.append(row['welsh_name'])
     finally:
         complete(cursor)
     return Response(json.dumps(counties), status=200, mimetype='application/json')

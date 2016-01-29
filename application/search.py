@@ -481,10 +481,18 @@ def perform_search(cursor, parameters, cert_date):
     return search_results
 
     
-def read_searches(cursor,nonissued):
-    # TODO: handle the unprinted/unissued thing
-    cursor.execute("SELECT id, request_id, parameters, result FROM search_details")
-    # Generate the results here...
+def read_searches(cursor, name):
+    cursor.execute("SELECT sr.result " +
+                   "FROM search_name sn, search_results sr " +
+                   "WHERE (UPPER(sn.forenames||' '||sn.surname)=%(name)s " +
+                   " or UPPER(sn.complex_name)=%(name)s " +
+                   " or UPPER(sn.company_name)=%(name)s " +
+                   " or UPPER(sn.local_authority_name)=%(name)s " +
+                   " or UPPER(sn.other_name)=%(name)s) " +
+                   "and sn.id=sr.name_id",
+                   {
+                       'name': name.upper()
+                   })
     rows = cursor.fetchall()
     results = []
     for row in rows:
