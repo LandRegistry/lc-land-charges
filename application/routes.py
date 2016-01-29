@@ -11,7 +11,7 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
-    insert_amendment, insert_new_registration, get_req_details, rollback
+    insert_amendment, insert_new_registration, get_register_request_details, get_search_request_details, rollback
 from application.schema import SEARCH_SCHEMA, validate, BANKRUPTCY_SCHEMA, LANDCHARGE_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result, read_searches
 
@@ -452,15 +452,22 @@ def get_translated_county(county_name):
 
 
 # Get details of a request for printing
-@app.route('/request_details/<request_id>', methods=["GET"])
-def get_request_details(request_id):
-    reqs = get_req_details(request_id)
+@app.route('/request_details/<request_type>/<request_id>', methods=["GET"])
+def get_request_details(request_type, request_id):
+    print('requested details of ...' + request_type)
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        reg = get_registration_details(cursor, reqs[0]["registration_no"], reqs[0]["registration_date"])
+        if request_type == 'registration':
+            reqs = get_register_request_details(request_id)
+            data = get_registration_details(cursor, reqs[0]["registration_no"], reqs[0]["registration_date"])
+        elif request_type == 'search':
+            print('call search request')
+            data = get_search_request_details(request_id)
+        else:
+            return Response("invalid request_type " + request_type, status=500)
     finally:
         complete(cursor)
-    return Response(json.dumps(reg), status=200, mimetype='application/json')
+    return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
 # Route exists purely for testing purposes - get some valid request ids for test data
