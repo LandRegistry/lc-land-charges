@@ -103,6 +103,7 @@ def register():
     else:
         errors = validate(json_data, BANKRUPTCY_SCHEMA)
 
+    print('this is what we are registering', json_data)
     print(json.dumps(json_data))
     if len(errors) > 0:
         logging.error("Input data failed validation")
@@ -119,6 +120,8 @@ def register():
 
     if not suppress:
         publish_new_bankruptcy(producer, new_regns)
+
+    print('these are the new registrations', new_regns)
 
     return Response(json.dumps({'new_registrations': new_regns, 'request_id': request_id}), status=200, mimetype='application/json')
 
@@ -233,6 +236,8 @@ def get_searches():
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         result = read_searches(cursor, name)
+        for ids in result:
+            reg_no, date
     finally:
         complete(cursor)
 
