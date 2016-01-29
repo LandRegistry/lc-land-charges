@@ -227,12 +227,12 @@ def create_search():
         
 @app.route('/searches', methods=['GET'])
 def get_searches():
-    nonissued = False
-    if 'filter' in request.args:
-        nonissued = (request.args['filter'] == 'nonissued')
+    # if 'filter' in request.args:
+    #    nonissued = (request.args['filter'] == 'nonissued')
+    name = request.args['name']
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        result = read_searches(cursor, nonissued)
+        result = read_searches(cursor, name)
     finally:
         complete(cursor)
 
