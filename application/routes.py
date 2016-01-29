@@ -236,8 +236,6 @@ def get_searches():
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         result = read_searches(cursor, name)
-        for ids in result:
-            reg_no, date
     finally:
         complete(cursor)
 
