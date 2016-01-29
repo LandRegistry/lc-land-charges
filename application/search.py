@@ -64,7 +64,7 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to):
 def search_by_company(cursor, name):
     cursor.execute("SELECT r.id "
                    "FROM party_name n, register r, register_details rd "
-                   "WHERE UPPER(n.company_name) = %(name)s "
+                   "WHERE UPPER(n.searchable_string) = %(name)s "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null"
@@ -82,10 +82,11 @@ def search_full_by_company(cursor, name, counties, year_from, year_to):
         logging.info("all counties search")
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd " +
-                       "Where UPPER(pn.company_name)=%(company_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where UPPER(pn.searchable_string)=%(company_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and (extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
                        "and rd.cancelled_by is null",
                        {
                            'company_name': name.upper(), 'from_date': year_from, 'to_date': year_to
@@ -97,13 +98,14 @@ def search_full_by_company(cursor, name, counties, year_from, year_to):
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
                        "detl_county_rel dcr, county c, register_details rd " +
-                       "Where UPPER(pn.company_name)=%(company_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where UPPER(pn.searchable_string)=%(company_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=dcr.details_id " +
                        "and dcr.county_id=c.id " +
-                       "and UPPER(c.name) = ANY(%(counties)s) "
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and ((UPPER(c.name) = ANY(%(counties)s) "
+                       "    and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s) " +
+                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
                        "and rd.cancelled_by is null",
                        {
                            'company_name': name.upper(), 'from_date': year_from, 'to_date': year_to,
@@ -116,18 +118,15 @@ def search_full_by_company(cursor, name, counties, year_from, year_to):
 
 
 def search_by_local_authority(cursor, name):
-    loc_name = name['local_authority_name']
-    loc_area = name['local_authority_area']
     cursor.execute("SELECT r.id "
                    "FROM party_name n, register r, register_details rd "
-                   "WHERE UPPER(n.local_authority_name) = %(name)s "
-                   "  AND UPPER(n.local_authority_area) = %(area)s "
+                   "WHERE UPPER(n.searchable_string) = %(name)s "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null"
                    "  AND rd.class_of_charge in ('PA(B)', 'WO(B)', 'PA', 'WO', 'DA')",
                    {
-                       'name': loc_name.upper(), 'area': loc_area.upper()
+                       'name': name.upper()
                    })
     rows = cursor.fetchall()
     result = [row['id'] for row in rows]
@@ -135,21 +134,19 @@ def search_by_local_authority(cursor, name):
 
 
 def search_full_by_local_authority(cursor, name, counties, year_from, year_to):
-    loc_name = name['local_authority_name']
-    loc_area = name['local_authority_area']
     if counties[0] == 'ALL':
         logging.info("all counties search")
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd " +
-                       "Where UPPER(pn.local_authority_name)=%(loc_name)s " +
-                       "and UPPER(pn.local_authority_area)=%(loc_area)s " +
+                       "Where UPPER(pn.searchable_string)=%(loc_name)s " +
                        "and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and (extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
                        "and rd.cancelled_by is null",
                        {
-                           'loc_name': loc_name.upper(), 'loc_area': loc_area.upper(),
+                           'loc_name': name.upper(),
                            'from_date': year_from, 'to_date': year_to
                        })
     else:
@@ -159,18 +156,18 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to):
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
                        "detl_county_rel dcr, county c, register_details rd " +
-                       "Where UPPER(pn.local_authority_name)=%(loc_name)s " +
-                       "and UPPER(pn.local_authority_area)=%(loc_area)s " +
+                       "Where UPPER(pn.searchable_string)=%(loc_name)s " +
                        "and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=dcr.details_id " +
                        "and dcr.county_id=c.id " +
-                       "and UPPER(c.name) = ANY(%(counties)s) "
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and ((UPPER(c.name) = ANY(%(counties)s) "
+                       "    and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s) " +
+                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
                        "and rd.cancelled_by is null",
                        {
-                           'loc_name': loc_name.upper(), 'loc_area': loc_area.upper(),
+                           'loc_name': name.upper(),
                            'from_date': year_from, 'to_date': year_to, 'counties': uc_counties
                        })
 
@@ -182,7 +179,7 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to):
 def search_by_other_name(cursor, name):
     cursor.execute("SELECT r.id "
                    "FROM party_name n, register r, register_details rd "
-                   "WHERE UPPER(n.other_name) = %(name)s "
+                   "WHERE UPPER(n.searchable_string) = %(name)s "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null"
@@ -200,10 +197,11 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to):
         logging.info("all counties search")
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd " +
-                       "Where UPPER(pn.other_name)=%(other_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where UPPER(pn.searchable_string)=%(other_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and (extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
                        "and rd.cancelled_by is null",
                        {
                            'other_name': name.upper(), 'from_date': year_from, 'to_date': year_to
@@ -215,13 +213,14 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to):
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
                        "detl_county_rel dcr, county c, register_details rd " +
-                       "Where UPPER(pn.other_name)=%(other_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where UPPER(pn.searchable_string)=%(other_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=dcr.details_id " +
                        "and dcr.county_id=c.id " +
-                       "and UPPER(c.name) = ANY(%(counties)s) "
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and ((UPPER(c.name) = ANY(%(counties)s) "
+                       "    and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s) " +
+                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
                        "and rd.cancelled_by is null",
                        {
                            'other_name': name.upper(), 'from_date': year_from, 'to_date': year_to,
@@ -257,7 +256,8 @@ def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_
                        "Where UPPER(pn.complex_name)=%(complex_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and (extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
                        "and rd.cancelled_by is null",
                        {
                            'complex_name': complex_name.upper(), 'from_date': year_from, 'to_date': year_to
@@ -274,8 +274,9 @@ def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=dcr.details_id " +
                        "and dcr.county_id=c.id " +
-                       "and UPPER(c.name) = ANY(%(counties)s) "
-                       "and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
+                       "and ((UPPER(c.name) = ANY(%(counties)s) "
+                       "    and extract(year from rd.registration_date) between %(from_date)s and %(to_date)s) " +
+                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
                        "and rd.cancelled_by is null",
                        {
                            'complex_name': complex_name.upper(), 'from_date': year_from, 'to_date': year_to,
@@ -389,8 +390,7 @@ def perform_search(cursor, parameters):
             elif item['name_type'] == "Private Individual":
                 # Do full search by name
                 name_string = "{} {}".format(item['name']['forenames'], item['name']['surname'])
-                # remove all punctuation and spaces from the full name and search against the result
-                search_name = re.sub('[^A-Za-z0-9]+', '', name_string)
+                search_name = get_searchable_string(name_string, ' ', ' ', ' ', ' ')
                 search_results.append({'name_result': search_full_by_name(cursor, search_name,
                                                                           parameters['counties'],
                                                                           item['year_from'],
@@ -399,7 +399,8 @@ def perform_search(cursor, parameters):
 
             elif item['name_type'] == "Company":
                 # Do full search by Company
-                search_results.append({'name_result': search_full_by_company(cursor, item['name']['company_name'],
+                search_name = get_searchable_string(' ', item['name']['company_name'], ' ', ' ', ' ')
+                search_results.append({'name_result': search_full_by_company(cursor,search_name,
                                                                              parameters['counties'],
                                                                              item['year_from'],
                                                                              item['year_to']),
@@ -407,7 +408,10 @@ def perform_search(cursor, parameters):
 
             elif item['name_type'] == "Local Authority":
                 # Do full search by Local Authority
-                search_results.append({'name_result': search_full_by_local_authority(cursor, item['name'],
+                loc_auth = item['name']['local_authority_name']
+                loc_area = item['name']['local_authority_area']
+                search_name = get_searchable_string(' ', ' ', loc_auth, loc_area, ' ')
+                search_results.append({'name_result': search_full_by_local_authority(cursor, search_name,
                                                                                      parameters['counties'],
                                                                                      item['year_from'],
                                                                                      item['year_to']),
@@ -415,7 +419,8 @@ def perform_search(cursor, parameters):
 
             elif item['name_type'] == "Other":
                 # Do full search by Other
-                search_results.append({'name_result': search_full_by_other_name(cursor, item['name']['other_name'],
+                search_name = get_searchable_string(' ', ' ', ' ', ' ', item['name']['other_name'])
+                search_results.append({'name_result': search_full_by_other_name(cursor, search_name,
                                                                                 parameters['counties'],
                                                                                 item['year_from'],
                                                                                 item['year_to']),
@@ -438,23 +443,28 @@ def perform_search(cursor, parameters):
             elif item['name_type'] == "Private Individual":
                 # Do full search by name
                 name_string = "{} {}".format(item['name']['forenames'], item['name']['surname'])
-                search_name = re.sub('[^A-Za-z0-9]+', '', name_string)
+                search_name = get_searchable_string(name_string, ' ', ' ', ' ', ' ')
                 search_results.append({'name_result': search_by_name(cursor, search_name),
                                        'name_id': item['name_id']})
 
             elif item['name_type'] == "Company":
                 # Do full search by Company
-                search_results.append({'name_result': search_by_company(cursor, item['name']['company_name']),
+                search_name = get_searchable_string(' ', item['name']['company_name'], ' ', ' ', ' ')
+                search_results.append({'name_result': search_by_company(cursor, search_name),
                                        'name_id': item['name_id']})
 
             elif item['name_type'] == "Local Authority":
                 # Do full search by Local Authority
-                search_results.append({'name_result': search_by_local_authority(cursor, item['name']),
+                loc_auth = item['name']['local_authority_name']
+                loc_area = item['name']['local_authority_area']
+                search_name = get_searchable_string(' ', ' ', loc_auth, loc_area, ' ')
+                search_results.append({'name_result': search_by_local_authority(cursor, search_name),
                                        'name_id': item['name_id']})
 
             elif item['name_type'] == "Other":
                 # Do full search by Other
-                search_results.append({'name_result': search_by_other_name(cursor, item['name']['other_name']),
+                search_name = get_searchable_string(' ', ' ', ' ', ' ', item['name']['other_name'])
+                search_results.append({'name_result': search_by_other_name(cursor, search_name),
                                        'name_id': item['name_id']})
 
     return search_results
@@ -496,10 +506,59 @@ def get_searchable_string(name_string=None, company=None, local_auth=None, local
 
 
 def get_abbrev_name(name):
-    abbrev_name = name
+    abbrev_list = []
     common_names = [
         'ASS', 'ASSOC', 'ASSOCS', 'ASSOCIATE', 'ASSOCIATED', 'ASSOCIATES', 'ASSOCIATION', 'ASSOCIATIONS',
         'LD', 'PUBLIC LIMITED COMPANY', 'CWMNI CYFYNGEDIG CYHOEDDUS', 'CWMNI CYF CYHOEDDUS', 'LTD', 'LIMITED',
-        'CYFYNGEDIG', 'CYF', 'CCC', 'C C C', ''
+        'CYFYNGEDIG', 'CYF', 'CCC', 'C C C', 'PLC', 'P L C',
+        'SOC', 'SOCS', 'SOCY', 'SOCYS', 'SOCIETY', 'SOCIETYS', 'SOCIETIES',
+        'ST', 'STREET', 'SAINT',
+        'CO', 'COS', 'COY', 'COMP', 'COYS', 'COMPS', 'COMPANY', 'COMPANIES',
+        'DR', 'DOC', 'DOCTOR',
+        'BRO', 'BROS', 'BROTHER', 'BROTHERS',
+        '&', 'AND',
+        'BROKERS', 'BUILDERS', 'COLLEGES', 'COMMISSIONERS', 'CONSTRUCTIONS', 'CONTRACTORS', 'DECORATORS',
+        'DEVELOPERS', 'DEVELOPMENTS',
+        'ENTERPRISES', 'ESTATES', 'GARAGES', 'HOLDINGS', 'HOTELS', 'INVESTMENTS', 'MOTORS', 'PRODUCTIONS',
+        'SCHOOLS', 'SONS', 'STORES', 'TRUSTS', 'WARDENS', 'CHARITIES', 'PROPERTIES', 'INDUSTRIES'
     ]
+
+    replace_names = [
+        'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS',
+        'LD', 'LD', 'LD', 'LD', 'LD', 'LD',
+        'LD', 'LD', 'LD', 'LD', 'LD', 'LD',
+        'SOC', 'SOC', 'SOC', 'SOC', 'SOC', 'SOC', 'SOC',
+        'ST', 'ST', 'ST',
+        'CO', 'CO', 'CO', 'CO', 'CO', 'CO', 'CO', 'CO',
+        'DR', 'DR', 'DR',
+        'BRO', 'BRO', 'BRO', 'BRO',
+        'AND', 'AND',
+        'BROKER', 'BUILDER', 'COLLEGE', 'COMMISSIONER', 'CONSTRUCTION', 'CONTRACTOR', 'DECORATOR',
+        'DEVELOPER', 'DEVELOPMENT',
+        'ENTERPRISE', 'ESTATE', 'GARAGE', 'HOLDING', 'HOTEL', 'INVESTMENT', 'MOTOR', 'PRODUCTION',
+        'SCHOOL', 'SON', 'STORE', 'TRUST', 'WARDEN', 'CHARITY', 'PROPERTY', 'INDUSTRY'
+    ]
+
+    problem_names = [
+        'PUBLIC LIMITED COMPANY', 'CWMNI CYFYNGEDIG CYHOEDDUS', 'CWMNI CYF CYHOEDDUS', 'C C C', 'P L C'
+    ]
+
+    name = name.upper()
+    for names in problem_names:
+        if names in name:
+            name = name.replace(names, 'LD')
+
+    print('this is the name', name)
+    for word in name.split():
+        print('this is the word', word)
+        if word in common_names:
+            x = common_names.index(word)
+            print(x)
+            curr_name = replace_names[x]
+            abbrev_list.append(curr_name)
+        else:
+            abbrev_list.append(word)
+
+    abbrev_name = "".join(abbrev_list)
+    print('this is the abbrev name', abbrev_name)
     return abbrev_name
