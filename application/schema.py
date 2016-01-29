@@ -21,6 +21,12 @@ COMPLEX_SCHEMA = {
 }
 
 
+DATE_SCHEMA = {
+    "type": "string",
+    "pattern": "^([0-9]{4}-[0-9]{2}-[0-9]{2})$"
+}
+
+
 PARAMETER_SCHEMA = {
     "type": "object",
     "properties": {
@@ -50,6 +56,8 @@ SEARCH_SCHEMA = {
     "properties": {
         "customer": CUSTOMER_SCHEMA,
         "document_id": {"type": "integer"},
+        "expiry_date": DATE_SCHEMA,
+        "search_date": DATE_SCHEMA,
         "parameters": {
             "type": "object",
             "properties": {
@@ -62,7 +70,7 @@ SEARCH_SCHEMA = {
             }
         }
     },
-    "required": ["customer", "parameters"]
+    "required": ["customer", "parameters", "expiry_date", "search_date"]
 }
 
 NAME_SCHEMA = {
@@ -89,11 +97,6 @@ ADDRESS_SCHEMA = {
         "postcode": {"type": "string"}
     },
     "required": ["address_lines", "postcode", "county"]
-}
-
-DATE_SCHEMA = {
-    "type": "string",
-    "pattern": "^([0-9]{4}-[0-9]{2}-[0-9]{2})$"
 }
 
 BANKRUPTCY_SCHEMA = {
