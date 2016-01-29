@@ -854,23 +854,6 @@ def insert_cancellation(registration_no, date, data):
     return rows, original_regs
 
 
-def get_req_details(request_id):
-    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    try:
-        sql = "Select request_id, registration_date, registration_no "\
-              " from register_details a, register b "\
-              " where a.request_id = %(request_id)s and a.id = b.details_id "
-        cursor.execute(sql, {"request_id": request_id})
-        rows = cursor.fetchall()
-    finally:
-        complete(cursor)
-    registrations = []
-    for row in rows:
-        registration = {"request_id": row["request_id"], "registration_date": row["registration_date"], "registration_no": row["registration_no"]}
-        registrations.append(registration)
-    return registrations
-
-
 def insert_lc_county(cursor, register_details_id, county):
     county_id = get_county_id(cursor, county)
     cursor.execute("INSERT INTO detl_county_rel (county_id, details_id) " +
@@ -888,3 +871,111 @@ def get_county_id(cursor, county):
                    })
     rows = cursor.fetchone()[0]
     return rows
+
+def get_register_request_details(request_id):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        sql = "Select request_id, registration_date, registration_no "\
+              " from register_details a, register b "\
+              " where a.request_id = %(request_id)s and a.id = b.details_id "
+        cursor.execute(sql, {"request_id": request_id})
+        rows = cursor.fetchall()
+    finally:
+        complete(cursor)
+    registrations = []
+    for row in rows:
+        registration = {"request_id": row["request_id"], "registration_date": row["registration_date"], "registration_no": row["registration_no"]}
+        registrations.append(registration)
+    return registrations
+
+
+def get_search_request_details(request_id):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    print("get  search request details")
+    try:
+        sql = " Select a.id as request_id, b.id as search_details_id, b.search_timestamp, b.type, b.counties, "\
+              " a.key_number, a.application_type, a.application_reference, a.application_date, a.customer_name, "\
+              " a.customer_address "\
+              " from request a, search_details b "\
+              " where a.id = %(request_id)s and a.id = b.request_id "
+        cursor.execute(sql, {"request_id": request_id})
+        rows = cursor.fetchall()
+        print('sql 1')
+    finally:
+        complete(cursor)
+    request = {}
+    print('rows ' + str(len(rows)))
+    for row in rows:
+        request = {'request_id': row['request_id'], 'key_number': row['key_number'],
+                   'customer_name': row['customer_name'], 'customer_address': row['customer_address'],
+                   'application_reference': row['application_reference'],
+                   'application_date': str(row['application_date']),
+                   'search_details_id': row['search_details_id'],
+                   'search_timestamp': str(row['search_timestamp']), 'type': row['type'],
+                   'counties': row['counties'], 'search_details':[]}
+        print(str(request))
+        if request['search_details_id'] == None:
+            request ={'noresult':'nosearchdetlid'}
+        else:
+            search_details = get_search_details(request["search_details_id"])
+            request['search_details'] = search_details
+    return request
+
+
+def get_search_details(search_details_id):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    sql = ' select a.id as search_name_id, a.name_type, a.forenames, a.surname, a.complex_name, a.complex_number, '\
+          ' a.company_name, a.local_authority_name, a.local_authority_area, a.other_name, a.year_from, a.year_to, '\
+          ' b.result '\
+          ' from search_name a, search_results b '\
+          ' where a.details_id = %(search_details_id)s and  a.id = b.name_id '
+    cursor.execute(sql, {"search_details_id": search_details_id})
+    rows = cursor.fetchall()
+    complete(cursor)
+    sn_data = []
+    for row in rows: # for each name searched against
+        name_data = {'id':row['search_name_id'],
+                     'name':{'name_type':row['name_type'],
+                             'forenames':row['forenames'], 'surname':row['surname'], 'complex_name':row['complex_name'],
+                             'complex_number':row['complex_number'], 'company_name':row['company_name'],
+                             'local_authority_name':row['local_authority_name'],
+                             'local_authority_area':row['local_authority_area'],'other_name':row['other_name']},
+                     'year_from':row['year_from'],'year_to':row['year_to'], 'results':[]}
+        results = []
+        # sn_data['search_names']['results'] = results
+        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+        print("res_id ", str(row['result']))
+        for res_id in row['result']:
+            #get regsiter details from id and add to searchresults array in search name block
+            #regs= get_all_registration_nos(cursor, res_id)
+            #print("regs ", regs)
+            #for reg_no in regs: #TO what if multiple register bought back????
+            #    results_data = get_registration_details(cursor, reg['number'], reg['date'])
+            #    results.append(results_data)
+
+            results.append(get_registration_details_from_register_id(res_id))
+        name_data['results'] = results
+        sn_data.append(name_data)
+        #sn_data = {'search_names:':name_data}
+        complete(cursor)
+    return sn_data
+
+def get_registration_details_from_register_id(register_id):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    sql = 'select registration_no, date from register where id = %(register_id)s '
+    cursor.execute(sql, {"register_id": register_id})
+    rows = cursor.fetchall()
+    complete(cursor)
+    results = []
+    for row in rows:
+        results.append({
+            'number': str(row['registration_no']),
+            'date': str(row['date'])
+        })
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    data = []
+    for res in results:
+        res_data = get_registration_details(cursor, res['number'], res['date'])
+        data.append(res_data)
+    complete(cursor)
+    return data
