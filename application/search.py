@@ -312,10 +312,11 @@ def store_search_request(cursor, data):
     request_id = cursor.fetchone()[0]
 
     # Row on search details
-    cursor.execute("INSERT INTO search_details (request_id, search_timestamp, type, counties) "
-                   "VALUES ( %(request_id)s, current_timestamp, %(type)s, %(counties)s ) RETURNING id",
+    cursor.execute("INSERT INTO search_details (request_id, search_timestamp, type, counties, certificate_date, expiry_date) "
+                   "VALUES ( %(request_id)s, current_timestamp, %(type)s, %(counties)s, %(cdate)s, %(edate)s ) RETURNING id",
                    {
-                       'request_id': request_id, 'type': search_type, 'counties': counties
+                       'request_id': request_id, 'type': search_type, 'counties': counties,
+                       'cdate': data['search_date'], 'edate': data['expiry_date']
                    })
     details_id = cursor.fetchone()[0]
 
