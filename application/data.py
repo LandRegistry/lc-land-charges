@@ -136,7 +136,7 @@ def insert_name(cursor, name, party_id, is_alias=False):
         }
     else:
         name_string = "{} {}".format(" ".join(name['forenames']), name['surname'])
-        searchable_string = re.sub('[^A-Za-z0-9]+', '', name_string)
+        searchable_string = re.sub('[^A-Za-z0-9]+', '', name_string).upper()
         forename = name['forenames'][0]
         middle_names = " ".join(name['forenames'][1:])
         cursor.execute("INSERT INTO party_name ( party_name, forename, " +
@@ -531,7 +531,7 @@ def get_party_names(cursor, party_id):
         if row['forename'] != "":
             pname['forenames'] = [row['forename']]
 
-        if row['middle_names'] != "":
+        if row['middle_names']:
             if 'forenames' not in pname:
                 pname['forenames'] = ['']
             pname['forenames'] += row['middle_names'].split(' ')

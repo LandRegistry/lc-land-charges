@@ -8,7 +8,7 @@ import re
 def search_by_name(cursor, full_name, cert_date):
     cursor.execute("SELECT r.id "
                    "FROM party_name n, register r, register_details rd "
-                   "WHERE UPPER(n.searchable_string) = %(name)s "
+                   "WHERE n.searchable_string = %(name)s "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null"
@@ -27,7 +27,7 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
         logging.info("all counties search")
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd " +
-                       "Where UPPER(pn.searchable_string)=%(name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where pn.searchable_string=%(name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and (extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
@@ -44,7 +44,7 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
                        "detl_county_rel dcr, county c, register_details rd " +
-                       "Where UPPER(pn.searchable_string)=%(name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where pn.searchable_string=%(name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=dcr.details_id " +
@@ -66,7 +66,7 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
 def search_by_company(cursor, name, cert_date):
     cursor.execute("SELECT r.id "
                    "FROM party_name n, register r, register_details rd "
-                   "WHERE UPPER(n.searchable_string) = %(name)s "
+                   "WHERE n.searchable_string = %(name)s "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null and r.date <= %(date)s"
@@ -84,7 +84,7 @@ def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date
         logging.info("all counties search")
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd " +
-                       "Where UPPER(pn.searchable_string)=%(company_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where pn.searchable_string=%(company_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and (extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
@@ -101,7 +101,7 @@ def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
                        "detl_county_rel dcr, county c, register_details rd " +
-                       "Where UPPER(pn.searchable_string)=%(company_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where pn.searchable_string=%(company_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=dcr.details_id " +
@@ -123,7 +123,7 @@ def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date
 def search_by_local_authority(cursor, name, cert_date):
     cursor.execute("SELECT r.id "
                    "FROM party_name n, register r, register_details rd "
-                   "WHERE UPPER(n.searchable_string) = %(name)s "
+                   "WHERE n.searchable_string = %(name)s "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null and r.date <= %(date)s"
@@ -141,7 +141,7 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to, c
         logging.info("all counties search")
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd " +
-                       "Where UPPER(pn.searchable_string)=%(loc_name)s " +
+                       "Where pn.searchable_string=%(loc_name)s " +
                        "and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
@@ -159,7 +159,7 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to, c
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
                        "detl_county_rel dcr, county c, register_details rd " +
-                       "Where UPPER(pn.searchable_string)=%(loc_name)s " +
+                       "Where pn.searchable_string=%(loc_name)s " +
                        "and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
@@ -182,7 +182,7 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to, c
 def search_by_other_name(cursor, name, cert_date):
     cursor.execute("SELECT r.id "
                    "FROM party_name n, register r, register_details rd "
-                   "WHERE UPPER(n.searchable_string) = %(name)s "
+                   "WHERE n.searchable_string = %(name)s "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null and r.date <= %(date)s"
@@ -200,7 +200,7 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to, cert_d
         logging.info("all counties search")
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd " +
-                       "Where UPPER(pn.searchable_string)=%(other_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where pn.searchable_string=%(other_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and (extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
@@ -217,7 +217,7 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to, cert_d
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
                        "detl_county_rel dcr, county c, register_details rd " +
-                       "Where UPPER(pn.searchable_string)=%(other_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where pn.searchable_string=%(other_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=dcr.details_id " +
@@ -239,7 +239,7 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to, cert_d
 def search_by_complex_name(cursor, complex_name, cert_date):
     cursor.execute("SELECT r.id "
                    "FROM party_name n, register r, register_details rd "
-                   "WHERE UPPER(n.complex_name) = %(name)s "
+                   "WHERE n.complex_name = %(name)s "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null and r.date <= %(date)s"
@@ -257,7 +257,7 @@ def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_
         logging.info("all counties search")
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd " +
-                       "Where UPPER(pn.complex_name)=%(complex_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where pn.complex_name=%(complex_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and (extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
@@ -274,7 +274,7 @@ def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
                        "detl_county_rel dcr, county c, register_details rd " +
-                       "Where UPPER(pn.complex_name)=%(complex_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where pn.complex_name=%(complex_name)s and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=dcr.details_id " +
@@ -521,7 +521,7 @@ def get_searchable_string(name_string=None, company=None, local_auth=None, local
         name = get_abbrev_name(other)
 
     searchable_string = re.sub('[^A-Za-z0-9]+', '', name)
-    return searchable_string
+    return searchable_string.upper()
 
 
 def get_abbrev_name(name):
