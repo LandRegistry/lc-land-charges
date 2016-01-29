@@ -5,7 +5,7 @@ import re
 
 
 # TODO: the banks searches don't just search banks (needs more filtering)
-def search_by_name(cursor, full_name, cert_date):
+def bankruptcy_search(cursor, full_name, cert_date):
     cursor.execute("SELECT r.id "
                    "FROM party_name n, register r, register_details rd "
                    "WHERE n.searchable_string = %(name)s "
@@ -63,22 +63,6 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
     return result
 
 
-def search_by_company(cursor, name, cert_date):
-    cursor.execute("SELECT r.id "
-                   "FROM party_name n, register r, register_details rd "
-                   "WHERE n.searchable_string = %(name)s "
-                   "  AND r.debtor_reg_name_id = n.id "
-                   "  AND r.details_id = rd.id "
-                   "  AND rd.cancelled_by is null and r.date <= %(date)s"
-                   "  AND rd.class_of_charge in ('PA(B)', 'WO(B)', 'PA', 'WO', 'DA')",
-                   {
-                       'name': name.upper(), 'date': cert_date
-                   })
-    rows = cursor.fetchall()
-    result = [row['id'] for row in rows]
-    return result
-
-
 def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date):
     if counties[0] == 'ALL':
         logging.info("all counties search")
@@ -115,22 +99,6 @@ def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date
                            'counties': uc_counties, 'date': cert_date
                        })
 
-    rows = cursor.fetchall()
-    result = [row['id'] for row in rows]
-    return result
-
-
-def search_by_local_authority(cursor, name, cert_date):
-    cursor.execute("SELECT r.id "
-                   "FROM party_name n, register r, register_details rd "
-                   "WHERE n.searchable_string = %(name)s "
-                   "  AND r.debtor_reg_name_id = n.id "
-                   "  AND r.details_id = rd.id "
-                   "  AND rd.cancelled_by is null and r.date <= %(date)s"
-                   "  AND rd.class_of_charge in ('PA(B)', 'WO(B)', 'PA', 'WO', 'DA')",
-                   {
-                       'name': name.upper(), 'date': cert_date
-                   })
     rows = cursor.fetchall()
     result = [row['id'] for row in rows]
     return result
@@ -174,22 +142,6 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to, c
                            'from_date': year_from, 'to_date': year_to, 'counties': uc_counties
                        })
 
-    rows = cursor.fetchall()
-    result = [row['id'] for row in rows]
-    return result
-
-
-def search_by_other_name(cursor, name, cert_date):
-    cursor.execute("SELECT r.id "
-                   "FROM party_name n, register r, register_details rd "
-                   "WHERE n.searchable_string = %(name)s "
-                   "  AND r.debtor_reg_name_id = n.id "
-                   "  AND r.details_id = rd.id "
-                   "  AND rd.cancelled_by is null and r.date <= %(date)s"
-                   "  AND rd.class_of_charge in ('PA(B)', 'WO(B)', 'PA', 'WO', 'DA')",
-                   {
-                       'name': name.upper(), 'date': cert_date
-                   })
     rows = cursor.fetchall()
     result = [row['id'] for row in rows]
     return result
@@ -455,13 +407,13 @@ def perform_search(cursor, parameters, cert_date):
                 # Do full search by name
                 name_string = "{} {}".format(item['name']['forenames'], item['name']['surname'])
                 search_name = get_searchable_string(name_string, ' ', ' ', ' ', ' ')
-                search_results.append({'name_result': search_by_name(cursor, search_name, cert_date),
+                search_results.append({'name_result': bankruptcy_search(cursor, search_name, cert_date),
                                        'name_id': item['name_id']})
 
             elif item['name_type'] == "Company":
                 # Do full search by Company
                 search_name = get_searchable_string(' ', item['name']['company_name'], ' ', ' ', ' ')
-                search_results.append({'name_result': search_by_company(cursor, search_name, cert_date),
+                search_results.append({'name_result': bankruptcy_search(cursor, search_name, cert_date),
                                        'name_id': item['name_id']})
 
             elif item['name_type'] == "Local Authority":
@@ -469,13 +421,13 @@ def perform_search(cursor, parameters, cert_date):
                 loc_auth = item['name']['local_authority_name']
                 loc_area = item['name']['local_authority_area']
                 search_name = get_searchable_string(' ', ' ', loc_auth, loc_area, ' ')
-                search_results.append({'name_result': search_by_local_authority(cursor, search_name, cert_date),
+                search_results.append({'name_result': bankruptcy_search(cursor, search_name, cert_date),
                                        'name_id': item['name_id']})
 
             elif item['name_type'] == "Other":
                 # Do full search by Other
                 search_name = get_searchable_string(' ', ' ', ' ', ' ', item['name']['other_name'])
-                search_results.append({'name_result': search_by_other_name(cursor, search_name, cert_date),
+                search_results.append({'name_result': bankruptcy_search(cursor, search_name, cert_date),
                                        'name_id': item['name_id']})
 
     return search_results
