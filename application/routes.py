@@ -533,7 +533,7 @@ def get_search_type(request_id):
        rows = cursor.fetchall()
    finally:
        complete(cursor)
-   search_type = {'search_type':'search_nr'}
+   search_type = {'search_type':'search nr'}
    for row in rows:
        if row['result']:
            search_type = {'search_type':'search'}
