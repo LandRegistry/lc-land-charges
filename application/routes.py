@@ -11,7 +11,8 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
-    insert_amendment, insert_new_registration, get_req_details, rollback
+    insert_amendment, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
+    get_registrations_by_date
 from application.schema import SEARCH_SCHEMA, validate, BANKRUPTCY_SCHEMA, LANDCHARGE_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result, read_searches
 
@@ -72,6 +73,20 @@ def after_request(response):
 # ============== /registrations ===============
 
 
+@app.route('/registrations/<date>', methods=['GET'])
+def registrations_by_date(date):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        details = get_registrations_by_date(cursor, date)
+    finally:
+        complete(cursor)
+    if details is None:
+        logging.warning("Returning 404")
+        return Response(status=404)
+    else:
+        return Response(json.dumps(details), status=200, mimetype='application/json')
+
+
 @app.route('/registrations/<date>/<int:reg_no>', methods=['GET'])
 def registration(date, reg_no):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -88,12 +103,19 @@ def registration(date, reg_no):
 
 @app.route('/registrations', methods=['POST'])
 def register():
+
+    logging.info("Received: %s", request.data.decode('utf-8'))
     suppress = False
     if 'suppress_queue' in request.args:
         logging.info('Queue suppressed')
         suppress = True
 
     if request.headers['Content-Type'] != "application/json":
+        raise_error({
+            "type": "E",
+            "message": "Received invalid input data (non-JSON)",
+            "stack": ""
+        })
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
@@ -103,8 +125,12 @@ def register():
     else:
         errors = validate(json_data, BANKRUPTCY_SCHEMA)
 
-    print(json.dumps(json_data))
     if len(errors) > 0:
+        raise_error({
+            "type": "E",
+            "message": "Input data failed validation",
+            "stack": ""
+        })
         logging.error("Input data failed validation")
         return Response(json.dumps(errors), status=400, mimetype='application/json')
 
@@ -198,7 +224,7 @@ def create_search():
     errors = validate(data, SEARCH_SCHEMA)
     if len(errors) > 0:
         return Response(json.dumps(errors), status=400)
-
+    print(data['parameters']['search_type'])
     if data['parameters']['search_type'] not in ['full', 'banks']:
         message = "Invalid search type supplied"
         logging.error(message)
@@ -210,7 +236,7 @@ def create_search():
         search_request_id, search_details_id, search_data = store_search_request(cursor, data)
 
         # Run the queries
-        results = perform_search(cursor, search_data['parameters'])
+        results = perform_search(cursor, search_data['parameters'], search_data['search_date'])
         for item in results:
             store_search_result(cursor, search_request_id, search_details_id, item['name_id'], item['name_result'])
 
@@ -227,16 +253,25 @@ def create_search():
         
 @app.route('/searches', methods=['GET'])
 def get_searches():
-    nonissued = False
-    if 'filter' in request.args:
-        nonissued = (request.args['filter'] == 'nonissued')
+    # if 'filter' in request.args:
+    #    nonissued = (request.args['filter'] == 'nonissued')
+    name = request.args['name']
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        result = read_searches(cursor, nonissued)
+        result = read_searches(cursor, name)
+        data = []
+        for results in result:
+            for ids in results['result']:
+                reg_data = get_registration(cursor, ids, None)
+                data.append({'reg_id': ids,
+                             'reg_no': reg_data['registration_no'],
+                             'reg_date': reg_data['registration_date'],
+                             'class': reg_data['class_of_charge']
+                             })
     finally:
         complete(cursor)
 
-    return Response(json.dumps(result), status=200, mimetype='application/json')
+    return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
 migrated_schema = {
@@ -423,17 +458,48 @@ def get_counties_list():
         complete(cursor)
     return Response(json.dumps(counties), status=200, mimetype='application/json')
 
-
-# Get details of a request for printing
-@app.route('/request_details/<request_id>', methods=["GET"])
-def get_request_details(request_id):
-    reqs = get_req_details(request_id)
+@app.route('/county/<county_name>', methods=['GET'])
+def get_translated_county(county_name):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        reg = get_registration_details(cursor, reqs[0]["registration_no"], reqs[0]["registration_date"])
+        counties = list()
+        counties.append(county_name)
+
+        cursor.execute("SELECT name FROM COUNTY where UPPER(welsh_name) = %(n)s", {'n': county_name.upper()})
+        rows = cursor.fetchall()
+
+        for row in rows:
+            if row['name']:
+                counties.append(row['name'])
+        else:
+            cursor.execute("SELECT welsh_name FROM COUNTY where UPPER(name) = %(n)s", {'n': county_name.upper()})
+            rows = cursor.fetchall()
+
+            for row in rows:
+                if row['welsh_name']:
+                    counties.append(row['welsh_name'])
     finally:
         complete(cursor)
-    return Response(json.dumps(reg), status=200, mimetype='application/json')
+    return Response(json.dumps(counties), status=200, mimetype='application/json')
+
+
+# Get details of a request for printing
+@app.route('/request_details/<request_type>/<request_id>', methods=["GET"])
+def get_request_details(request_type, request_id):
+    print('requested details of ...' + request_type)
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        if request_type == 'registration':
+            reqs = get_register_request_details(request_id)
+            data = get_registration_details(cursor, reqs[0]["registration_no"], reqs[0]["registration_date"])
+        elif request_type == 'search':
+            print('call search request')
+            data = get_search_request_details(request_id)
+        else:
+            return Response("invalid request_type " + request_type, status=500)
+    finally:
+        complete(cursor)
+    return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
 # Route exists purely for testing purposes - get some valid request ids for test data
@@ -455,3 +521,20 @@ def get_request_ids(count):
             job = {'request_id': row['request_id']}
             data.append(job)
     return Response(json.dumps(data), status=200, mimetype='application/json')
+
+
+@app.route('/search_type/<request_id>', methods=["GET"])
+def get_search_type(request_id):
+   cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+   #get all rows for this request id, if none contain results then search type is 'search_nr'
+   try:
+       sql = "Select result from search_results where request_id = %(request_id)s"
+       cursor.execute(sql,{"request_id": request_id})
+       rows = cursor.fetchall()
+   finally:
+       complete(cursor)
+   search_type = {'search_type':'search nr'}
+   for row in rows:
+       if row['result']:
+           search_type = {'search_type':'search'}
+   return Response(json.dumps(search_type), status=200,mimetype='application/json')
