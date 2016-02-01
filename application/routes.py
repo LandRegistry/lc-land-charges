@@ -91,7 +91,7 @@ def registrations_by_date(date):
 def registration(date, reg_no):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        details = get_register_request_details(cursor, reg_no, date)
+        details = get_registration_details(cursor, reg_no, date)
     finally:
         complete(cursor)
     if details is None:
