@@ -31,7 +31,8 @@ def publish_new_bankruptcy(producer, data):
         }
         logging.info("Sending: %s", publish)
         producer.publish(publish)
-
+    else:
+        logging.info("Suppressing publication")
 
 def publish_amendment(producer, data):
     if producer is not None:

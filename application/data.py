@@ -531,7 +531,7 @@ def get_party_names(cursor, party_id):
         if row['forename'] != "":
             pname['forenames'] = [row['forename']]
 
-        if row['middle_names'] != "":
+        if row['middle_names']:
             if 'forenames' not in pname:
                 pname['forenames'] = ['']
             pname['forenames'] += row['middle_names'].split(' ')
@@ -766,20 +766,23 @@ def insert_migrated_record(cursor, data):
         details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
         party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
 
-        if 'complex' in data:
-            name_id = insert_name(cursor, data['complex'], party_id)
-        elif 'debtor_names' in data:
-            name_id = insert_name(cursor, data['debtor_names'][0], party_id)
-        else:
-            data['complex'] = {"number": 0, "name": ""}
-            name_id = insert_name(cursor, data['complex'], party_id)
+        name_id = insert_name(cursor, data['eo_name'], party_id)
+        # if 'complex' in data:
+            # name_id = insert_name(cursor, data['complex'], party_id)
+        # elif 'debtor_names' in data:
+            # name_id = insert_name(cursor, data['debtor_names'][0], party_id)
+        # else:
+            # data['complex'] = {"number": 0, "name": ""}
+            # name_id = insert_name(cursor, data['complex'], party_id)
 
         insert_address(cursor, data['residence'], "Debtor Residence", party_id)
-        #def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
+
         logging.debug(data['date'])
+        county_id = None
+        
+        registration_no, registration_id = insert_registration(cursor, details_id, name_id['id'], data['date'], county_id, data['reg_no'])
 
-        registration_no, registration_id = insert_registration(cursor, details_id, name_id['id'], data['date'], data['reg_no'])
-
+    
     insert_migration_status(cursor, registration_id, data['registration']['registration_no'], data['registration']['date'],
                             data['class_of_charge'], data['migration_data'])
     return details_id, request_id
