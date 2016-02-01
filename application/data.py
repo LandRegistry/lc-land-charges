@@ -570,7 +570,7 @@ def get_party_names(cursor, party_id):
 
 
 def get_parties(cursor, data, details_id):
-    cursor.execute("select p.party_type, p.occupation, p.date_of_birth, pt.trading_name, p.id "
+    cursor.execute("select p.party_type, p.occupation, p.date_of_birth, pt.trading_name, p.id, p.residence_withheld  "
                    "from party p left outer join party_trading pt on p.id = pt.party_id "
                    "where p.register_detl_id=%(id)s", {'id': details_id})
     rows = cursor.fetchall()
@@ -584,8 +584,10 @@ def get_parties(cursor, data, details_id):
             data['debtor_names'] = names
             data['trading'] = row['trading_name']
             data['occupation'] = row['occupation']
+            data['residence_withheld'] = row['residence_withheld']
         elif row['party_type'] == 'Estate Owner':
             data['occupation'] = row['occupation']
+            data['residence_withheld'] = row['residence_withheld']
             if len(names) > 1:
                 logging.debug(names)
                 raise RuntimeError("Too many estate owner names returned")
