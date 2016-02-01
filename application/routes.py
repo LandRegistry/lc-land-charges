@@ -521,3 +521,20 @@ def get_request_ids(count):
             job = {'request_id': row['request_id']}
             data.append(job)
     return Response(json.dumps(data), status=200, mimetype='application/json')
+
+
+@app.route('/search_type/<request_id>', methods=["GET"])
+def get_search_type(request_id):
+   cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+   #get all rows for this request id, if none contain results then search type is 'search_nr'
+   try:
+       sql = "Select result from search_results where request_id = %(request_id)s"
+       cursor.execute(sql,{"request_id": request_id})
+       rows = cursor.fetchall()
+   finally:
+       complete(cursor)
+   search_type = {'search_type':'search_nr'}
+   for row in rows:
+       if row['result']:
+           search_type = {'search_type':'search'}
+   return Response(json.dumps(search_type), status=200,mimetype='application/json')
