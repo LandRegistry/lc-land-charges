@@ -616,6 +616,25 @@ def get_registration_no_from_details_id(cursor, details_id):
         }
 
 
+def get_registrations_by_date(cursor, date):
+    cursor.execute('select r.registration_no, r.date, d.class_of_charge '
+                   'from register r, register_details d '
+                   'where d.id = r.details_id '
+                   'and date=%(date)s', {'date': date})
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        return None
+
+    results = []
+    for row in rows:
+        results.append({
+            'number': row['registration_no'],
+            'date': row['date'].strftime('%Y-%m-%d'),
+            'class': row['class_of_charge']
+        })
+    return results
+
+
 def get_registration_details(cursor, reg_no, date):
     cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.class_of_charge, rd.id, " +
                    " r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, " +

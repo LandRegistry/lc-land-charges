@@ -11,7 +11,8 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
-    insert_amendment, insert_new_registration, get_register_request_details, get_search_request_details, rollback
+    insert_amendment, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
+    get_registrations_by_date
 from application.schema import SEARCH_SCHEMA, validate, BANKRUPTCY_SCHEMA, LANDCHARGE_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result, read_searches
 
@@ -72,11 +73,25 @@ def after_request(response):
 # ============== /registrations ===============
 
 
+@app.route('/registrations/<date>', methods=['GET'])
+def registrations_by_date(date):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        details = get_registrations_by_date(cursor, date)
+    finally:
+        complete(cursor)
+    if details is None:
+        logging.warning("Returning 404")
+        return Response(status=404)
+    else:
+        return Response(json.dumps(details), status=200, mimetype='application/json')
+
+
 @app.route('/registrations/<date>/<int:reg_no>', methods=['GET'])
 def registration(date, reg_no):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        details = get_registration_details(cursor, reg_no, date)
+        details = get_register_request_details(cursor, reg_no, date)
     finally:
         complete(cursor)
     if details is None:
@@ -88,12 +103,19 @@ def registration(date, reg_no):
 
 @app.route('/registrations', methods=['POST'])
 def register():
+
+    logging.info("Received: %s", request.data.decode('utf-8'))
     suppress = False
     if 'suppress_queue' in request.args:
         logging.info('Queue suppressed')
         suppress = True
 
     if request.headers['Content-Type'] != "application/json":
+        raise_error({
+            "type": "E",
+            "message": "Received invalid input data (non-JSON)",
+            "stack": ""
+        })
         logging.error('Content-Type is not JSON')
         return Response(status=415)
 
@@ -103,8 +125,12 @@ def register():
     else:
         errors = validate(json_data, BANKRUPTCY_SCHEMA)
 
-    print(json.dumps(json_data))
     if len(errors) > 0:
+        raise_error({
+            "type": "E",
+            "message": "Input data failed validation",
+            "stack": ""
+        })
         logging.error("Input data failed validation")
         return Response(json.dumps(errors), status=400, mimetype='application/json')
 
