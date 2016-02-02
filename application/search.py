@@ -188,36 +188,38 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to, cert_d
     return result
 
 
-def search_by_complex_name(cursor, complex_name, cert_date):
+def search_by_complex_name(cursor, complex_name, complex_number, cert_date):
     cursor.execute("SELECT r.id "
                    "FROM party_name n, register r, register_details rd "
                    "WHERE n.complex_name = %(name)s "
+                   "  AND n.complex_number = %(number)s "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null and r.date <= %(date)s"
                    "  AND rd.class_of_charge in ('PA(B)', 'WO(B)', 'PA', 'WO', 'DA')",
                    {
-                       'name': complex_name.upper(), 'date': cert_date
+                       'name': complex_name.upper(), 'number': complex_number, 'date': cert_date
                    })
     rows = cursor.fetchall()
     result = [row['id'] for row in rows]
     return result
 
 
-def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_to, cert_date):
+def search_full_by_complex_name(cursor, complex_name, complex_number, counties, year_from, year_to, cert_date):
     if counties[0] == 'ALL':
         logging.info("all counties search")
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd " +
-                       "Where pn.complex_name=%(complex_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where pn.complex_name=%(complex_name)s and pn.complex_number=%(number)s " +
+                       "and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and (extract(year from rd.registration_date) between %(from_date)s and %(to_date)s " +
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
                        "and rd.cancelled_by is null and r.date <= %(date)s",
                        {
-                           'complex_name': complex_name.upper(), 'from_date': year_from, 'to_date': year_to,
-                           'date': cert_date
+                           'complex_name': complex_name.upper(), 'number': complex_number,
+                           'from_date': year_from, 'to_date': year_to, 'date': cert_date
                        })
     else:
         logging.info("not all counties search")
@@ -226,7 +228,8 @@ def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
                        "detl_county_rel dcr, county c, register_details rd " +
-                       "Where pn.complex_name=%(complex_name)s and r.debtor_reg_name_id=pn.id " +
+                       "Where pn.complex_name=%(complex_name)s and pn.complex_number=%(number)s " +
+                       "and r.debtor_reg_name_id=pn.id " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=dcr.details_id " +
@@ -236,7 +239,8 @@ def search_full_by_complex_name(cursor, complex_name, counties, year_from, year_
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
                        "and rd.cancelled_by is null and r.date <= %(date)s",
                        {
-                           'complex_name': complex_name.upper(), 'from_date': year_from, 'to_date': year_to,
+                           'complex_name': complex_name.upper(), 'number': complex_number,
+                           'from_date': year_from, 'to_date': year_to,
                            'counties': uc_counties, 'date': cert_date
                        })
 
@@ -337,6 +341,7 @@ def perform_search(cursor, parameters, cert_date):
                 for name in item['name']['complex_variations']:
                     comp_results = (search_full_by_complex_name(cursor,
                                                                 name['complex_name'],
+                                                                name['complex_number'],
                                                                 parameters['counties'],
                                                                 item['year_from'],
                                                                 item['year_to'],
@@ -397,7 +402,8 @@ def perform_search(cursor, parameters, cert_date):
                 # Do complex name search
                 # Search against the variations of the complex name
                 for name in item['name']['complex_variations']:
-                    comp_results = (search_by_complex_name(cursor, name['complex_name'], cert_date))
+                    comp_results = (search_by_complex_name(cursor, name['complex_name'], name['complex_number'],
+                                                           cert_date))
 
                     if len(comp_results) > 0:
                         for ids in comp_results:
