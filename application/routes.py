@@ -12,7 +12,7 @@ from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_amendment, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
-    get_registrations_by_date
+    get_registrations_by_date, get_all_registrations
 from application.schema import SEARCH_SCHEMA, validate, BANKRUPTCY_SCHEMA, LANDCHARGE_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result, read_searches
 
@@ -86,6 +86,20 @@ def registrations_by_date(date):
     else:
         return Response(json.dumps(details), status=200, mimetype='application/json')
 
+        
+@app.route('/registrations', methods=['GET'])
+def all_registrations():
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        details = get_all_registrations(cursor)
+    finally:
+        complete(cursor)
+    if details is None:
+        logging.warning("Returning 404")
+        return Response(status=404)
+    else:
+        return Response(json.dumps(details), status=200, mimetype='application/json')
+        
 
 @app.route('/registrations/<date>/<int:reg_no>', methods=['GET'])
 def registration(date, reg_no):

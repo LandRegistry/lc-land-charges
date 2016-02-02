@@ -618,6 +618,26 @@ def get_registration_no_from_details_id(cursor, details_id):
         }
 
 
+def get_all_registrations(cursor):
+    cursor.execute('select r.registration_no, r.date, d.class_of_charge '
+                   'from register r, register_details d '
+                   'where d.id = r.details_id')
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        return None
+
+    results = []
+    for row in rows:
+        results.append({
+            'number': row['registration_no'],
+            'date': row['date'].strftime('%Y-%m-%d'),
+            'class': row['class_of_charge'],
+            'uri': row['date'].strftime('%Y-%m-%d') + '/' + str(row['registration_no'])
+        })
+    return results
+
+ 
+        
 def get_registrations_by_date(cursor, date):
     cursor.execute('select r.registration_no, r.date, d.class_of_charge '
                    'from register r, register_details d '
@@ -793,7 +813,10 @@ def insert_migrated_record(cursor, data):
         details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
         party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
 
-        name_id = insert_name(cursor, data['eo_name'], party_id)
+        name_id = None
+        if 'eo_name' in data:
+            name_id = insert_name(cursor, data['eo_name'], party_id)
+            name_id = name_id['id']
         # if 'complex' in data:
             # name_id = insert_name(cursor, data['complex'], party_id)
         # elif 'debtor_names' in data:
@@ -807,7 +830,7 @@ def insert_migrated_record(cursor, data):
         logging.debug(data['date'])
         county_id = None
         
-        registration_no, registration_id = insert_registration(cursor, details_id, name_id['id'], data['date'], county_id, data['reg_no'])
+        registration_no, registration_id = insert_registration(cursor, details_id, name_id, data['date'], county_id, data['reg_no'])
 
     
     insert_migration_status(cursor, registration_id, data['registration']['registration_no'], data['registration']['date'],
