@@ -235,6 +235,7 @@ def create_search():
         return Response(status=415)
 
     data = request.get_json(force=True)
+    print('this is search data', json.dumps(data))
     errors = validate(data, SEARCH_SCHEMA)
     if len(errors) > 0:
         return Response(json.dumps(errors), status=400)
@@ -270,6 +271,7 @@ def get_searches():
     # if 'filter' in request.args:
     #    nonissued = (request.args['filter'] == 'nonissued')
     name = request.args['name']
+    print('this is name))))))', name)
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         result = read_searches(cursor, name)

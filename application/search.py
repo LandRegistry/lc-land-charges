@@ -272,7 +272,7 @@ def store_search_request(cursor, data):
     cursor.execute("INSERT INTO search_details (request_id, search_timestamp, type, counties, certificate_date, expiry_date) "
                    "VALUES ( %(request_id)s, current_timestamp, %(type)s, %(counties)s, %(cdate)s, %(edate)s ) RETURNING id",
                    {
-                       'request_id': request_id, 'type': search_type, 'counties': counties,
+                       'request_id': request_id, 'type': search_type, 'counties': json.dumps(counties),
                        'cdate': data['search_date'], 'edate': data['expiry_date']
                    })
     details_id = cursor.fetchone()[0]
@@ -456,20 +456,15 @@ def read_searches(cursor, name):
 
 def get_searchable_string(name_string=None, company=None, local_auth=None, local_auth_area=None, other=None):
     name = ''
-    print('name_string is', name_string)
     if name_string is not None and name_string != ' ':
-        print('name string not none', name_string)
         name = get_abbrev_name(name_string)
     elif company is not None and company != ' ':
-        print('company not none', company)
         name = get_abbrev_name(company)
     elif local_auth is not None and local_auth != ' ':
-        print('local auth not none', local_auth)
         loc_name = get_abbrev_name(local_auth)
         loc_area = get_abbrev_name(local_auth_area)
         name = get_abbrev_name(loc_name + " " + loc_area)
     elif other is not None and other != ' ':
-        print('other not none', other)
         name = get_abbrev_name(other)
 
     searchable_string = re.sub('[^A-Za-z0-9]+', '', name)
@@ -491,7 +486,8 @@ def get_abbrev_name(name):
         'BROKERS', 'BUILDERS', 'COLLEGES', 'COMMISSIONERS', 'CONSTRUCTIONS', 'CONTRACTORS', 'DECORATORS',
         'DEVELOPERS', 'DEVELOPMENTS',
         'ENTERPRISES', 'ESTATES', 'GARAGES', 'HOLDINGS', 'HOTELS', 'INVESTMENTS', 'MOTORS', 'PRODUCTIONS',
-        'SCHOOLS', 'SONS', 'STORES', 'TRUSTS', 'WARDENS', 'CHARITIES', 'PROPERTIES', 'INDUSTRIES'
+        'SCHOOLS', 'SONS', 'STORES', 'TRUSTS', 'WARDENS', 'CHARITIES', 'PROPERTIES', 'INDUSTRIES',
+        'ST', 'STREET', 'SAINT'
     ]
 
     replace_names = [
@@ -507,7 +503,8 @@ def get_abbrev_name(name):
         'BROKER', 'BUILDER', 'COLLEGE', 'COMMISSIONER', 'CONSTRUCTION', 'CONTRACTOR', 'DECORATOR',
         'DEVELOPER', 'DEVELOPMENT',
         'ENTERPRISE', 'ESTATE', 'GARAGE', 'HOLDING', 'HOTEL', 'INVESTMENT', 'MOTOR', 'PRODUCTION',
-        'SCHOOL', 'SON', 'STORE', 'TRUST', 'WARDEN', 'CHARITY', 'PROPERTY', 'INDUSTRY'
+        'SCHOOL', 'SON', 'STORE', 'TRUST', 'WARDEN', 'CHARITY', 'PROPERTY', 'INDUSTRY',
+        'ST', 'ST', 'ST'
     ]
 
     problem_names = [
@@ -519,17 +516,13 @@ def get_abbrev_name(name):
         if names in name:
             name = name.replace(names, 'LD')
 
-    print('this is the name', name)
     for word in name.split():
-        print('this is the word', word)
         if word in common_names:
             x = common_names.index(word)
-            print(x)
             curr_name = replace_names[x]
             abbrev_list.append(curr_name)
         else:
             abbrev_list.append(word)
 
     abbrev_name = "".join(abbrev_list)
-    print('this is the abbrev name', abbrev_name)
     return abbrev_name
