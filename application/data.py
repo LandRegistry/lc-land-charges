@@ -570,7 +570,7 @@ def get_party_names(cursor, party_id):
 
 
 def get_parties(cursor, data, details_id):
-    cursor.execute("select p.party_type, p.occupation, p.date_of_birth, pt.trading_name, p.id "
+    cursor.execute("select p.party_type, p.occupation, p.date_of_birth, pt.trading_name, p.id, p.residence_withheld  "
                    "from party p left outer join party_trading pt on p.id = pt.party_id "
                    "where p.register_detl_id=%(id)s", {'id': details_id})
     rows = cursor.fetchall()
@@ -584,8 +584,10 @@ def get_parties(cursor, data, details_id):
             data['debtor_names'] = names
             data['trading'] = row['trading_name']
             data['occupation'] = row['occupation']
+            data['residence_withheld'] = row['residence_withheld']
         elif row['party_type'] == 'Estate Owner':
             data['occupation'] = row['occupation']
+            data['residence_withheld'] = row['residence_withheld']
             if len(names) > 1:
                 logging.debug(names)
                 raise RuntimeError("Too many estate owner names returned")
@@ -614,6 +616,25 @@ def get_registration_no_from_details_id(cursor, details_id):
             'date': str(rows[0]['registration_date']),
             'type': rows[0]['amendment_type']
         }
+
+
+def get_registrations_by_date(cursor, date):
+    cursor.execute('select r.registration_no, r.date, d.class_of_charge '
+                   'from register r, register_details d '
+                   'where d.id = r.details_id '
+                   'and date=%(date)s', {'date': date})
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        return None
+
+    results = []
+    for row in rows:
+        results.append({
+            'number': row['registration_no'],
+            'date': row['date'].strftime('%Y-%m-%d'),
+            'class': row['class_of_charge']
+        })
+    return results
 
 
 def get_registration_details(cursor, reg_no, date):
@@ -772,20 +793,23 @@ def insert_migrated_record(cursor, data):
         details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
         party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
 
-        if 'complex' in data:
-            name_id = insert_name(cursor, data['complex'], party_id)
-        elif 'debtor_names' in data:
-            name_id = insert_name(cursor, data['debtor_names'][0], party_id)
-        else:
-            data['complex'] = {"number": 0, "name": ""}
-            name_id = insert_name(cursor, data['complex'], party_id)
+        name_id = insert_name(cursor, data['eo_name'], party_id)
+        # if 'complex' in data:
+            # name_id = insert_name(cursor, data['complex'], party_id)
+        # elif 'debtor_names' in data:
+            # name_id = insert_name(cursor, data['debtor_names'][0], party_id)
+        # else:
+            # data['complex'] = {"number": 0, "name": ""}
+            # name_id = insert_name(cursor, data['complex'], party_id)
 
         insert_address(cursor, data['residence'], "Debtor Residence", party_id)
-        #def insert_registration(cursor, details_id, name_id, date, orig_reg_no=None):
+
         logging.debug(data['date'])
+        county_id = None
+        
+        registration_no, registration_id = insert_registration(cursor, details_id, name_id['id'], data['date'], county_id, data['reg_no'])
 
-        registration_no, registration_id = insert_registration(cursor, details_id, name_id['id'], data['date'], data['reg_no'])
-
+    
     insert_migration_status(cursor, registration_id, data['registration']['registration_no'], data['registration']['date'],
                             data['class_of_charge'], data['migration_data'])
     return details_id, request_id
