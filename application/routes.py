@@ -474,6 +474,7 @@ def get_counties_list():
         complete(cursor)
     return Response(json.dumps(counties), status=200, mimetype='application/json')
 
+
 @app.route('/county/<county_name>', methods=['GET'])
 def get_translated_county(county_name):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -554,3 +555,21 @@ def get_search_type(request_id):
        if row['result']:
            search_type = {'search_type':'search'}
    return Response(json.dumps(search_type), status=200,mimetype='application/json')
+
+
+# test route
+@app.route('/last_search', methods=["GET"])
+def last_search():
+   cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+   #get all rows for this request id, if none contain results then search type is 'search_nr'
+   try:
+       sql = "Select id as search_details_id, request_id, search_timestamp " \
+             "from search_details where id = (select max(id) from search_details) "
+       cursor.execute(sql)
+       rows = cursor.fetchall()
+   finally:
+       complete(cursor)
+   for row in rows:
+       data = {'search_details_id':row['search_details_id'],'request_id':row['request_id'],
+               'timestamp':str(row['search_timestamp'])}
+   return Response(json.dumps(data), status=200, mimetype='application/json')
