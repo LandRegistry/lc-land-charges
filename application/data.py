@@ -971,7 +971,7 @@ def get_search_request_details(request_id):
     try:
         sql = " Select a.id as request_id, b.id as search_details_id, b.search_timestamp, b.type, b.counties, "\
               " a.key_number, a.application_type, a.application_reference, a.application_date, a.customer_name, "\
-              " a.customer_address "\
+              " a.customer_address, b.certificate_date, b.expiry_date "\
               " from request a, search_details b "\
               " where a.id = %(request_id)s and a.id = b.request_id "
         cursor.execute(sql, {"request_id": request_id})
@@ -983,6 +983,7 @@ def get_search_request_details(request_id):
     print('rows ' + str(len(rows)))
     for row in rows:
         request = {'request_id': row['request_id'], 'key_number': row['key_number'],
+                   'certificte_date': str(row['certificate_date']), 'expiry_date': str(row['expiry_date']),
                    'customer_name': row['customer_name'], 'customer_address': row['customer_address'],
                    'application_reference': row['application_reference'],
                    'application_date': str(row['application_date']),
