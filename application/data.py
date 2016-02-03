@@ -983,7 +983,7 @@ def get_search_request_details(request_id):
     print('rows ' + str(len(rows)))
     for row in rows:
         request = {'request_id': row['request_id'], 'key_number': row['key_number'],
-                   'certificte_date': str(row['certificate_date']), 'expiry_date': str(row['expiry_date']),
+                   'certificate_date': str(row['certificate_date']), 'expiry_date': str(row['expiry_date']),
                    'customer_name': row['customer_name'], 'customer_address': row['customer_address'],
                    'application_reference': row['application_reference'],
                    'application_date': str(row['application_date']),
