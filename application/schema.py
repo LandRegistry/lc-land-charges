@@ -24,7 +24,7 @@ PRIVATE_INDIVIDUAL_SCHEMA = {
 AUTHORITY_SCHEMA = {
     "type": "object",
     "properties": {
-        "local": {"type": "string"},
+        "name": {"type": "string"},
         "area": {"type": "string"}
     },
     "required": ["local", "area"],
@@ -77,23 +77,6 @@ NAME_SCHEMA = {
 }
 
 
-PARTY_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "type": {
-            "type": "string",
-            "enum": [
-                "Debtor",
-                "Estate Owner",
-                "Court"
-            ]
-        },
-        "name": NAME_SCHEMA,
-    },
-    "required": ["type", "name"],
-    "additionalProperties": False
-}
-
 ADDRESS_SCHEMA = {
     "type": "object",
     "properties": {
@@ -111,6 +94,36 @@ ADDRESS_SCHEMA = {
         "address_string": {"type": "string"}
     },
     "required": ["type", "address_lines", "postcode", "county"],
+    "additionalProperties": False
+}
+
+
+PARTY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": [
+                "Debtor",
+                "Estate Owner",
+                "Court"
+            ]
+        },
+        "names": {
+            "type": "array",
+            "items": NAME_SCHEMA
+        },
+        "addresses": {
+            "type": "array",
+            "items": ADDRESS_SCHEMA,
+        },
+        "occupation": {"type": "string"},
+        "trading_name": {"type": "string"},
+        "residence_withheld": {"type": "boolean"},
+        "case_reference": {"type": "string"},
+        "date_of_birth": DATE_SCHEMA
+    },
+    "required": ["type", "names"],
     "additionalProperties": False
 }
 
@@ -135,7 +148,8 @@ DEBTOR_SCHEMA = {
         "occupation": {"type": "string"},
         "trading_name": {"type": "string"},
         "residence_withheld": {"type": "boolean"},
-        "legal_reference": {"type": "string"}
+        "legal_reference": {"type": "string"},
+        "date_of_birth": DATE_SCHEMA
 
     },
     "required": [
@@ -170,24 +184,24 @@ REGISTRATION_SCHEMA = {
             "type": "array",
             "items": PARTY_SCHEMA
         },
-        "addresses": {
-            "type": "array",
-            "items": ADDRESS_SCHEMA
-        },
+        # "debtor_addresses": {
+        #     "type": "array",
+        #     "items": ADDRESS_SCHEMA
+        # },
         "class_of_charge": {
             "type": "string",
             "enum": ["C1", "C2", "C3", "C4", "D1", "D2", "D3", "A", "B", "E", "F", "PA", "WO", "DA",
                      "ANN", "LC", "PAB", "WOB"]
         },
         "particulars": PARTICULARS_SCHEMA,
-        "debtor": DEBTOR_SCHEMA,
+        #"debtor": DEBTOR_SCHEMA,
         "applicant": APPLICANT_SCHEMA,
         "additional_information": {
             "type": "string"
         }
     },
     "required": [
-        "parties", "addresses", "class_of_charge", "applicant"
+        "parties", "class_of_charge", "applicant"
     ],
     "additionalProperties": False
 }
@@ -260,41 +274,44 @@ def validate(data, schema):
         })
 
     # Ensure PAB/WOB has a 'debtor' entry (already assured that class_of_charge is valid)
-    if data['class_of_charge'] in ['PAB', 'WOB'] and 'debtor' not in data:
-        errors.append({'error_message': "Attribute 'debtor' required for bankruptcy"})
-
+    # if data['class_of_charge'] in ['PAB', 'WOB'] and 'debtor' not in data:
+    #     errors.append({'error_message': "Attribute 'debtor' required for bankruptcy"})
+    # TODO ensure debtor party present on bankruptcy
+    # TODO ensure occupation, trading, res_wh & ref on debtor party
+    # TODO ensure consistency of addresses and res_wh on debtor party
+    # TODO ensure only addresses on Debtor party
     # If not a PAB/WOB, it's a land charge - make sure it has a 'particulars' entry
     if data['class_of_charge'] not in ['PAB', 'WOB'] and 'particulars' not in data:
         errors.append({'error_message': "Attribute 'particulars' required for land charge"})
 
     # Check that party types and name structure supplied match
     for party in data['parties']:
-        name = party['name']
-        if name['type'] == 'Private Individual' and 'private' not in name:
-            errors.append({'error_message': "Attribute 'private' required for private individual"})
+        for name in party['names']:
+            if name['type'] == 'Private Individual' and 'private' not in name:
+                errors.append({'error_message': "Attribute 'private' required for private individual"})
 
-        if name['type'] == "County Council" and 'local' not in name:
-            errors.append({'error_message': "Attribute 'local' required for county council"})
+            if name['type'] == "County Council" and 'local' not in name:
+                errors.append({'error_message': "Attribute 'local' required for county council"})
 
-        if name['type'] == "Parish Council" and 'local' not in name:
-            errors.append({'error_message': "Attribute 'local' required for parish council"})
+            if name['type'] == "Parish Council" and 'local' not in name:
+                errors.append({'error_message': "Attribute 'local' required for parish council"})
 
-        if name['type'] == "Rural Council" and 'local' not in name:
-            errors.append({'error_message': "Attribute 'local' required for rural council"})
+            if name['type'] == "Rural Council" and 'local' not in name:
+                errors.append({'error_message': "Attribute 'local' required for rural council"})
 
-        if name['type'] == "Other Council" and 'local' not in name:
-            errors.append({'error_message': "Attribute 'local' required for other council"})
+            if name['type'] == "Other Council" and 'local' not in name:
+                errors.append({'error_message': "Attribute 'local' required for other council"})
 
-        if name['type'] == "Development Corporation" and 'other' not in name:
-            errors.append({'error_message': "Attribute 'other' required for development corporation"})
+            if name['type'] == "Development Corporation" and 'other' not in name:
+                errors.append({'error_message': "Attribute 'other' required for development corporation"})
 
-        if name['type'] == "Limited Company" and 'company' not in name:
-            errors.append({'error_message': "Attribute 'company' required for limited company"})
+            if name['type'] == "Limited Company" and 'company' not in name:
+                errors.append({'error_message': "Attribute 'company' required for limited company"})
 
-        if name['type'] == "Complex Name" and 'complex' not in name:
-            errors.append({'error_message': "Attribute 'complex' required for complex names"})
+            if name['type'] == "Complex Name" and 'complex' not in name:
+                errors.append({'error_message': "Attribute 'complex' required for complex names"})
 
-        if name['type'] == "Other" and 'other' not in name:
-            errors.append({'error_message': "Attribute 'other' required for other"})
+            if name['type'] == "Other" and 'other' not in name:
+                errors.append({'error_message': "Attribute 'other' required for other"})
 
     return errors
