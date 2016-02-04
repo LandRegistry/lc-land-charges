@@ -13,7 +13,7 @@ from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_amendment, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
     get_registrations_by_date, get_all_registrations
-from application.schema import SEARCH_SCHEMA, validate, BANKRUPTCY_SCHEMA, LANDCHARGE_SCHEMA
+from application.schema import SEARCH_SCHEMA, validate, REGISTRATION_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result, read_searches
 
 
@@ -134,10 +134,7 @@ def register():
         return Response(status=415)
 
     json_data = request.get_json(force=True)
-    if 'lc_register_details' in json_data:
-        errors = validate(json_data, LANDCHARGE_SCHEMA)
-    else:
-        errors = validate(json_data, BANKRUPTCY_SCHEMA)
+    errors = validate(json_data, REGISTRATION_SCHEMA)
 
     if len(errors) > 0:
         raise_error({

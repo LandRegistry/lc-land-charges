@@ -1,29 +1,205 @@
 from jsonschema import Draft4Validator
 
-CUSTOMER_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "key_number": {"type": "string"},
-        "name": {"type": "string"},
-        "address": {"type": "string"},
-        "reference": {"type": "string"},
-    },
-    "required": ["name", "address", "reference", "key_number"]
-}
-
-
-COMPLEX_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "complex_name": {"type": "string"},
-        "complex_number": {"type": "integer"}
-    }
-}
-
 
 DATE_SCHEMA = {
     "type": "string",
     "pattern": "^([0-9]{4}-[0-9]{2}-[0-9]{2})$"
+}
+
+
+PRIVATE_INDIVIDUAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "forenames": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 1
+        },
+        "surname": {"type": "string"}
+    },
+    "required": ["forenames", "surname"],
+    "additionalProperties": False
+}
+
+AUTHORITY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "area": {"type": "string"}
+    },
+    "required": ["local", "area"],
+    "additionalProperties": False
+}
+
+COMPLEX_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "number": {"type": "string"}
+    },
+    "required": ["name", "number"],
+    "additionalProperties": False
+}
+
+
+NAME_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": [
+                "Private Individual",
+                "County Council",
+                "Parish Council",
+                "Rural Council",
+                "Other Council",
+                "Development Corporation",
+                "Limited Company",
+                "Complex Name",
+                "Other"
+            ]
+        },
+        "private": PRIVATE_INDIVIDUAL_SCHEMA,
+        "local": AUTHORITY_SCHEMA,
+        "other": {"type": "string"},
+        "company": {"type": "string"},
+        "complex": COMPLEX_SCHEMA
+    },
+    "required": ["type"],
+    "oneOf": [
+        {"required": ["private"]},
+        {"required": ["local"]},
+        {"required": ["company"]},
+        {"required": ["other"]},
+        {"required": ["complex"]}
+    ],
+    "additionalProperties": False
+}
+
+
+ADDRESS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": ["Residence", "Business", "Investment"]
+        },
+        "address_lines": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 1
+        },
+        "county": {"type": "string"},
+        "postcode": {"type": "string"},
+        "address_string": {"type": "string"}
+    },
+    "required": ["type", "address_lines", "postcode", "county"],
+    "additionalProperties": False
+}
+
+
+PARTY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": [
+                "Debtor",
+                "Estate Owner",
+                "Court"
+            ]
+        },
+        "names": {
+            "type": "array",
+            "items": NAME_SCHEMA
+        },
+        "addresses": {
+            "type": "array",
+            "items": ADDRESS_SCHEMA,
+        },
+        "occupation": {"type": "string"},
+        "trading_name": {"type": "string"},
+        "residence_withheld": {"type": "boolean"},
+        "case_reference": {"type": "string"},
+        "date_of_birth": DATE_SCHEMA
+    },
+    "required": ["type", "names"],
+    "additionalProperties": False
+}
+
+PARTICULARS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "counties": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 1
+        },
+        "district": {"type": "string"},
+        "description": {"type": "string"}
+    },
+    "required": ["counties", "district", "description"],
+    "additionalProperties": False
+}
+
+DEBTOR_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "occupation": {"type": "string"},
+        "trading_name": {"type": "string"},
+        "residence_withheld": {"type": "boolean"},
+        "legal_reference": {"type": "string"},
+        "date_of_birth": DATE_SCHEMA
+
+    },
+    "required": [
+        "occupation", "trading_name", "residence_withheld", "legal_reference"
+    ],
+    "additionalProperties": False
+}
+
+APPLICANT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "address": {"type": "string"},
+        "key_number": {
+            "type": "string",
+            "pattern": "^\d{3,7}$"
+        },
+        "reference": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "name", "address", "key_number", "reference"
+    ],
+    "additionalProperties": False
+}
+
+REGISTRATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "parties": {
+            "type": "array",
+            "items": PARTY_SCHEMA
+        },
+        "class_of_charge": {
+            "type": "string",
+            "enum": ["C1", "C2", "C3", "C4", "D1", "D2", "D3", "A", "B", "E", "F", "PA", "WO", "DA",
+                     "ANN", "LC", "PAB", "WOB"]
+        },
+        "particulars": PARTICULARS_SCHEMA,
+        "applicant": APPLICANT_SCHEMA,
+        "additional_information": {
+            "type": "string"
+        },
+        "original_request": {"type": "string"}
+    },
+    "required": [
+        "parties", "class_of_charge", "applicant"
+    ],
+    "additionalProperties": False
 }
 
 
@@ -54,7 +230,7 @@ PARAMETER_SCHEMA = {
 SEARCH_SCHEMA = {
     "type": "object",
     "properties": {
-        "customer": CUSTOMER_SCHEMA,
+        "customer": APPLICANT_SCHEMA,
         "document_id": {"type": "integer"},
         "expiry_date": DATE_SCHEMA,
         "search_date": DATE_SCHEMA,
@@ -71,93 +247,6 @@ SEARCH_SCHEMA = {
         }
     },
     "required": ["customer", "parameters", "expiry_date", "search_date"]
-}
-
-NAME_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "forenames": {
-            "type": "array",
-            "items": {"type": "string"}
-        },
-        "surname": {"type": "string"}
-    },
-    "required": ["forenames", "surname"]
-}
-
-ADDRESS_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "address_lines": {
-            "type": "array",
-            "items": {"type": "string"},
-            "minItems": 1
-        },
-        "county": {"type": "string"},
-        "postcode": {"type": "string"}
-    },
-    "required": ["address_lines", "postcode", "county"]
-}
-
-BANKRUPTCY_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "key_number": {
-            "type": "string",
-            "pattern": "^\d+$"
-        },
-        "class_of_charge": {
-            "type": "string",
-            "enum": ["PA(B)", "WO(B)"]
-        },
-        "application_ref": {"type": "string"},
-        "date": DATE_SCHEMA,
-        "debtor_names": {
-            "type": "array",
-            "items": NAME_SCHEMA
-        },
-        "gender": {"type": "string"},
-        "occupation": {"type": "string"},
-        "trading_name": {"type": "string"},
-        "residence": {
-            "type": "array",
-            "items": ADDRESS_SCHEMA
-        },
-        "residence_withheld": {"type": "boolean"},
-        "business_address": {
-            "type": "array",
-            "items": ADDRESS_SCHEMA
-        },
-        "date_of_birth": DATE_SCHEMA,
-        "investment_property": {
-            "type": "array",
-            "items": ADDRESS_SCHEMA
-        },
-        "original_request": {
-            "type": "string"
-        }
-    },
-    "required": ["key_number", "class_of_charge", "application_ref", "date", "debtor_names",
-                 "residence_withheld"]
-}
-
-LANDCHARGE_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "estate_owner": {"type": "object"},
-        "key_number": {
-            "type": "string",
-            "pattern": "^\d+$"
-        },
-        "class_of_charge": {
-            "type": "string"
-        },
-        "application_ref": {"type": "string"},
-        "date": DATE_SCHEMA,
-        "gender": {"type": "string"},
-        "occupation": {"type": "string"}
-    },
-    "required": ["key_number", "class_of_charge", "application_ref", "date"] # TODO: eo as required
 }
 
 
@@ -179,16 +268,51 @@ def validate(data, schema):
             "location": path,
             "error_message": error.message
         })
-    return errors
 
-# {'date': '2016-01-01', 'residence_withheld': False, 'key_number': '1234567',
-#  'occupation': 'Civil Servant', 'original_request': '{"key_number":"1234567",'
-# "application_ref":"APP01","application_type":"PA(B)","application_date":"2016-01-01",\n
-# "debtor_names":[{"forenames":["Bob","Oscar","Francis"],"surname":"Howard"}, {"forenames":
-# ["Robert"], "surname": "Howard"}],\n\n"gender":"Unknown",\n"occupation":"Civil Servant",
-# "trading_name":"","residence_withheld":false,"date_of_birth":"1980-01-01",\n\n
-# "residence":[{"address_lines": ["1 The Street","The Town"],"postcode":"AA1 1AA","county":
-#     "The County"},\n    {"address_lines": ["2 The Road","The Village"],"postcode":"AA2 2AA",
-#                          "county":"The County"}\n    ]\n    \n}', 'debtor_names':' \
-#  [{'forenames': ['Bob', 'Oscar', 'Francis'], 'surname': 'Howard'}, {'forenames': ['Robert'],
-# 'surname': 'Howard'}], 'date_of_birth': '1980-01-01', 'application_ref': 'APP01', 'trading_name': '', 'gender': 'Unknown', 'residence': [{'county': 'The County', 'postcode': 'AA1 1AA', 'address_lines': ['1 The Street', 'The Town']}, {'county': 'The County', 'postcode': 'AA2 2AA', 'address_lines': ['2 The Road', 'The Village']}], 'application_type': 'PA(B)'}
+    # Fail before performing in-depth checks
+    if len(errors) > 0:
+        return errors
+
+    # Ensure PAB/WOB has a 'debtor' entry (already assured that class_of_charge is valid)
+    # if data['class_of_charge'] in ['PAB', 'WOB'] and 'debtor' not in data:
+    #     errors.append({'error_message': "Attribute 'debtor' required for bankruptcy"})
+    # TODO ensure debtor party present on bankruptcy
+    # TODO ensure occupation, trading, res_wh & ref on debtor party
+    # TODO ensure consistency of addresses and res_wh on debtor party
+    # TODO ensure only addresses on Debtor party
+    # TODO allow aliases only on Debtor party
+    # If not a PAB/WOB, it's a land charge - make sure it has a 'particulars' entry
+    if data['class_of_charge'] not in ['PAB', 'WOB'] and 'particulars' not in data:
+        errors.append({'error_message': "Attribute 'particulars' required for land charge"})
+
+    # Check that party types and name structure supplied match
+    for party in data['parties']:
+        for name in party['names']:
+            if name['type'] == 'Private Individual' and 'private' not in name:
+                errors.append({'error_message': "Attribute 'private' required for private individual"})
+
+            if name['type'] == "County Council" and 'local' not in name:
+                errors.append({'error_message': "Attribute 'local' required for county council"})
+
+            if name['type'] == "Parish Council" and 'local' not in name:
+                errors.append({'error_message': "Attribute 'local' required for parish council"})
+
+            if name['type'] == "Rural Council" and 'local' not in name:
+                errors.append({'error_message': "Attribute 'local' required for rural council"})
+
+            if name['type'] == "Other Council" and 'local' not in name:
+                errors.append({'error_message': "Attribute 'local' required for other council"})
+
+            if name['type'] == "Development Corporation" and 'other' not in name:
+                errors.append({'error_message': "Attribute 'other' required for development corporation"})
+
+            if name['type'] == "Limited Company" and 'company' not in name:
+                errors.append({'error_message': "Attribute 'company' required for limited company"})
+
+            if name['type'] == "Complex Name" and 'complex' not in name:
+                errors.append({'error_message': "Attribute 'complex' required for complex names"})
+
+            if name['type'] == "Other" and 'other' not in name:
+                errors.append({'error_message': "Attribute 'other' required for other"})
+
+    return errors

@@ -26,7 +26,7 @@ def rollback(cursor):
     cursor.connection.close()
 
 
-def insert_address(cursor, address, address_type, party_id):
+def insert_address(cursor, address, party_id):
     if 'address_lines' in address:
         lines = address['address_lines'][0:5]   # First five lines
         remaining = ", ".join(address['address_lines'][5:])
@@ -58,7 +58,7 @@ def insert_address(cursor, address, address_type, party_id):
                    "VALUES( %(type)s, %(string)s, %(detail)s ) " +
                    "RETURNING id",
                    {
-                       "type": address_type,
+                       "type": address['type'],
                        "string": address_string,
                        "detail": detail_id
                    })
@@ -72,95 +72,159 @@ def insert_address(cursor, address, address_type, party_id):
     return address['id']
 
 
-def insert_name(cursor, name, party_id, is_alias=False):
-    if 'estate_owner_ind' in name:
-        # name_string, forename, middle_names, surname, company = (None,) * 5
-        # local_auth, local_auth_area, complex_name, other, searchable_string = (None,) * 5
-        # complex_number = None
-        if len(name['private']['forenames']) > 0 or name['private']['surname'] != '':
-            forename = name['private']['forenames'][0]
-            middle_names = " ".join(name['private']['forenames'][1:])
-            surname = name['private']['surname']
-            name_join = " ".join(name['private']['forenames']) + " " + name['private']['surname']
-            # store the name without punctuation or spaces for searching
-            # searchable_string = re.sub('[^A-Za-z0-9]+', '', name_string)
-        else:
-            forename = None
-            middle_names = None
-            surname = None
-            name_join = ''
+def insert_party_name(cursor, party_id, name):
+    name_string = None
+    forename = None
+    middle_names = None
+    surname = None
+    is_alias = False
+    complex_number = None
+    complex_name = None
+    company = None
+    local_auth = None
+    local_auth_area = None
+    other = None
 
-        name_string = name_join if name_join != '' else None
-        company = name['company'] if name['company'] != '' else None
-        local_auth = name['local']['name'] if name['local']['name'] != '' else None
-        local_auth_area = name['local']['area'] if name['local']['area'] != '' else None
-        other = name['other'] if name['other'] != '' else None
-        complex_name = name['complex']['name'] if name['complex']['name'] != '' else None
-        complex_number = name['complex']['number'] if name['complex']['number'] != '' else None
-
-        if complex_name is None:
-            searchable_string = get_searchable_string(name_string, company, local_auth, local_auth_area, other)
-        else:
-            searchable_string = None
-        print(searchable_string)
-
-        cursor.execute("INSERT INTO party_name ( party_name, forename, " +
-                       "middle_names, surname, alias_name, complex_number, complex_name, " +
-                       "name_type_ind, company_name, local_authority_name, local_authority_area, other_name, " +
-                       "searchable_string ) " +
-                       "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s, " +
-                       "%(comp_num)s, %(comp_name)s, %(type)s, %(company)s, " +
-                       "%(loc_auth)s, %(loc_auth_area)s, %(other)s, %(search_name)s ) " +
-                       "RETURNING id",
-                       {
-                           "name": name_string, "forename": forename, "midnames": middle_names,
-                           "surname": surname, "alias": is_alias, "comp_num":complex_number, "comp_name": complex_name,
-                           "type": name['estate_owner_ind'], "company": company, "loc_auth": local_auth,
-                           "loc_auth_area": local_auth_area, "other": other, "search_name": searchable_string
-                       })
-        name['id'] = cursor.fetchone()[0]
-        return_data = {'id': name['id'],
-                       'name': name}
-    elif 'number' in name:
-        cursor.execute("INSERT INTO party_name (alias_name, complex_number, complex_name) " +
-                       "VALUES ( %(alias)s, %(number)s, %(name)s ) " +
-                       "RETURNING id",
-                       {
-                           "alias": is_alias, "number": name['number'], "name": name['name']
-                       })
-        name['id'] = cursor.fetchone()[0]
-        return_data = {
-            'id': name['id'],
-            'name': name['name'],
-            'number': name['number']
-        }
+    if name['type'] == 'Private Individual':
+        forename = name['private']['forenames'][0]
+        middle_names = ' '.join(name['private']['forenames'][1:])
+        surname = name['private']['surname']
+        name_string = " ".join(name['private']['forenames']) + " " + name['private']['surname']
+    elif name['type'] in ['County Council', 'Rural Council', 'Parish Council', 'Other Council']:
+        local_auth = name['local']['name']
+        local_auth_area = name['local']['area']
+    elif name['type'] in ['Development Corporation', 'Other']:
+        other = name['other']
+    elif name['type'] == 'Limited Company':
+        company = name['company']
+    elif name['type'] == 'Complex':
+        complex_number = name['complex']['number']
+        complex_name = name['complex']['name']
     else:
-        name_string = "{} {}".format(" ".join(name['forenames']), name['surname'])
-        searchable_string = re.sub('[^A-Za-z0-9]+', '', name_string).upper()
-        forename = name['forenames'][0]
-        middle_names = " ".join(name['forenames'][1:])
-        cursor.execute("INSERT INTO party_name ( party_name, forename, " +
-                       "middle_names, surname, alias_name, searchable_string ) " +
-                       "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s, %(search)s ) " +
-                       "RETURNING id",
-                       {
-                           "name": name_string, "forename": forename, "midnames": middle_names,
-                           "surname": name['surname'], "alias": is_alias, "search": searchable_string
-                       })
-        name['id'] = cursor.fetchone()[0]
-        return_data = {
-            'id': name['id'],
-            'forenames': name['forenames'],
-            'surname': name['surname']
-        }
+        raise RuntimeError('Unknown name type: {}'.format(name['type']))
+
+    if name['type'] != 'Complex Name':
+        searchable_string = get_searchable_string(name_string, company, local_auth, local_auth_area, other)
+
+    #get_searchable_string(name_string=None, company=None, local_auth=None, local_auth_area=None, other=None):
+    cursor.execute("INSERT INTO party_name ( party_name, forename, middle_names, surname, alias_name, "
+                   "complex_number, complex_name, name_type_ind, company_name, local_authority_name, "
+                   "local_authority_area, other_name, searchable_string ) "
+                   "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s, "
+                   "%(comp_num)s, %(comp_name)s, %(type)s, %(company)s, "
+                   "%(loc_auth)s, %(loc_auth_area)s, %(other)s, %(search_name)s ) "
+                   "RETURNING id", {
+                       "name": name_string, "forename": forename, "midnames": middle_names,
+                       "surname": surname, "alias": is_alias, "comp_num": complex_number, "comp_name": complex_name,
+                       "type": name['type'], "company": company, "loc_auth": local_auth,
+                       "loc_auth_area": local_auth_area, "other": other, "search_name": searchable_string,
+                   })
+
+    name_id = cursor.fetchone()[0]
+    return_data = {
+        'id': name_id,
+        'name': name
+    }
 
     cursor.execute("INSERT INTO party_name_rel (party_name_id, party_id) " +
                    "VALUES( %(name)s, %(party)s ) RETURNING id",
                    {
-                       "name": name['id'], "party": party_id
+                       "name": name_id, "party": party_id
                    })
 
     return return_data
+
+
+# def insert_name(cursor, name, party_id, is_alias=False):
+#     logging.warning('THIS IS DEPRECATED')
+#     if 'estate_owner_ind' in name:
+#         # name_string, forename, middle_names, surname, company = (None,) * 5
+#         # local_auth, local_auth_area, complex_name, other, searchable_string = (None,) * 5
+#         # complex_number = None
+#         if len(name['private']['forenames']) > 0 or name['private']['surname'] != '':
+#             forename = name['private']['forenames'][0]
+#             middle_names = " ".join(name['private']['forenames'][1:])
+#             surname = name['private']['surname']
+#             name_join = " ".join(name['private']['forenames']) + " " + name['private']['surname']
+#             # store the name without punctuation or spaces for searching
+#             # searchable_string = re.sub('[^A-Za-z0-9]+', '', name_string)
+#         else:
+#             forename = None
+#             middle_names = None
+#             surname = None
+#             name_join = ''
+#
+#         name_string = name_join if name_join != '' else None
+#         company = name['company'] if name['company'] != '' else None
+#         local_auth = name['local']['name'] if name['local']['name'] != '' else None
+#         local_auth_area = name['local']['area'] if name['local']['area'] != '' else None
+#         other = name['other'] if name['other'] != '' else None
+#         complex_name = name['complex']['name'] if name['complex']['name'] != '' else None
+#         complex_number = name['complex']['number'] if name['complex']['number'] != '' else None
+#
+#         if complex_name is None:
+#             searchable_string = get_searchable_string(name_string, company, local_auth, local_auth_area, other)
+#         else:
+#             searchable_string = None
+#         print(searchable_string)
+#
+#         cursor.execute("INSERT INTO party_name ( party_name, forename, " +
+#                        "middle_names, surname, alias_name, complex_number, complex_name, " +
+#                        "name_type_ind, company_name, local_authority_name, local_authority_area, other_name, " +
+#                        "searchable_string ) " +
+#                        "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s, " +
+#                        "%(comp_num)s, %(comp_name)s, %(type)s, %(company)s, " +
+#                        "%(loc_auth)s, %(loc_auth_area)s, %(other)s, %(search_name)s ) " +
+#                        "RETURNING id",
+#                        {
+#                            "name": name_string, "forename": forename, "midnames": middle_names,
+#                            "surname": surname, "alias": is_alias, "comp_num":complex_number, "comp_name": complex_name,
+#                            "type": name['estate_owner_ind'], "company": company, "loc_auth": local_auth,
+#                            "loc_auth_area": local_auth_area, "other": other, "search_name": searchable_string
+#                        })
+#         name['id'] = cursor.fetchone()[0]
+#         return_data = {'id': name['id'],
+#                        'name': name}
+#     elif 'number' in name:
+#         cursor.execute("INSERT INTO party_name (alias_name, complex_number, complex_name) " +
+#                        "VALUES ( %(alias)s, %(number)s, %(name)s ) " +
+#                        "RETURNING id",
+#                        {
+#                            "alias": is_alias, "number": name['number'], "name": name['name']
+#                        })
+#         name['id'] = cursor.fetchone()[0]
+#         return_data = {
+#             'id': name['id'],
+#             'name': name['name'],
+#             'number': name['number']
+#         }
+#     else:
+#         name_string = "{} {}".format(" ".join(name['forenames']), name['surname'])
+#         searchable_string = re.sub('[^A-Za-z0-9]+', '', name_string).upper()
+#         forename = name['forenames'][0]
+#         middle_names = " ".join(name['forenames'][1:])
+#         cursor.execute("INSERT INTO party_name ( party_name, forename, " +
+#                        "middle_names, surname, alias_name, searchable_string ) " +
+#                        "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s, %(search)s ) " +
+#                        "RETURNING id",
+#                        {
+#                            "name": name_string, "forename": forename, "midnames": middle_names,
+#                            "surname": name['surname'], "alias": is_alias, "search": searchable_string
+#                        })
+#         name['id'] = cursor.fetchone()[0]
+#         return_data = {
+#             'id': name['id'],
+#             'forenames': name['forenames'],
+#             'surname': name['surname']
+#         }
+#
+#     cursor.execute("INSERT INTO party_name_rel (party_name_id, party_id) " +
+#                    "VALUES( %(name)s, %(party)s ) RETURNING id",
+#                    {
+#                        "name": name['id'], "party": party_id
+#                    })
+#
+#     return return_data
 
 
 def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_no=None):
@@ -197,64 +261,105 @@ def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_n
     return reg_no, reg_id
 
 
-def insert_register_details(cursor, request_id, data, amends):
-    if 'lc_register_details' in data:
-        class_of_charge = data['lc_register_details']['class']
-        bank_date = None
-    else:
-        class_of_charge = data['class_of_charge']
-        bank_date = data['date']
-    date = data['date']
-    legal_body = data['legal_body'] if 'legal_body' in data else ""
-    legal_body_ref = data['legal_body_ref'] if 'legal_body_ref' in data else ""
-    district = data['lc_register_details']['district'] if 'lc_register_details' in data else ""
-    short_description = data['lc_register_details']['short_description'] if 'lc_register_details' in data else ""
-    additional_info = data['lc_register_details']['additional_info'] if 'lc_register_details' in data else ""
+def insert_register_details(cursor, request_id, data, date, amends):
+    additional_info = data['additional_information'] if 'additional_information' in data else None
 
-    cursor.execute("INSERT INTO register_details (request_id, registration_date, class_of_charge, " +
-                   "bankruptcy_date, legal_body, legal_body_ref, amends, district, short_description, "
-                   "additional_info) " +
-                   "VALUES ( %(req_id)s, %(reg_date)s, %(charge)s, %(bank_date)s, " +
-                   " %(lbody)s, %(lbodyref)s, %(amends)s, %(district)s, %(short_desc)s, " +
-                   "%(addl_info)s )" +
-                   "RETURNING id",
-                   {
-                       "req_id": request_id, "reg_date": date,
-                       "charge": class_of_charge, "bank_date": bank_date,
-                       "lbody": legal_body, "lbodyref": legal_body_ref,
-                       "amends": amends, "district": district, "short_desc": short_description,
-                       "addl_info": additional_info
-                   })   # TODO: Seems probable we won't need both dates
+    if 'particulars' in data:
+        district = data['particulars']['district']
+        short_description = data['particulars']['description']
+    else:
+        district = None
+        short_description = None
+
+    debtor = None
+    for party in data['parties']:
+        if party['type'] == 'Debtor':
+            debtor = party
+
+    if debtor is not None:
+        legal_ref = debtor['case_reference']
+    else:
+        legal_ref = None
+
+    cursor.execute("INSERT INTO register_details (request_id, class_of_charge, legal_body_ref, "
+                   "amends, district, short_description, additional_info) "
+                   "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s) "
+                   "RETURNING id", {
+                       "rid": request_id, "coc": data['class_of_charge'],
+                       "legal_ref": legal_ref, "amends": amends, "dist": district,
+                       "sdesc": short_description, "addl": additional_info
+                   })
     return cursor.fetchone()[0]
+
+    # if 'lc_register_details' in data:
+    #     class_of_charge = data['lc_register_details']['class']
+    #     bank_date = None
+    # else:
+    #     class_of_charge = data['class_of_charge']
+    #     bank_date = data['date']
+    # date = data['date']
+    # legal_body = data['legal_body'] if 'legal_body' in data else ""
+    # legal_body_ref = data['legal_body_ref'] if 'legal_body_ref' in data else ""
+    # district = data['lc_register_details']['district'] if 'lc_register_details' in data else ""
+    # short_description = data['lc_register_details']['short_description'] if 'lc_register_details' in data else ""
+    # additional_info = data['lc_register_details']['additional_info'] if 'lc_register_details' in data else ""
+    #
+    #
+    #
+    # cursor.execute("INSERT INTO register_details (request_id, registration_date, class_of_charge, " +
+    #                "bankruptcy_date, legal_body, legal_body_ref, amends, district, short_description, "
+    #                "additional_info) " +
+    #                "VALUES ( %(req_id)s, %(reg_date)s, %(charge)s, %(bank_date)s, " +
+    #                " %(lbody)s, %(lbodyref)s, %(amends)s, %(district)s, %(short_desc)s, " +
+    #                "%(addl_info)s )" +
+    #                "RETURNING id",
+    #                {
+    #                    "req_id": request_id, "reg_date": date,
+    #                    "charge": class_of_charge, "bank_date": bank_date,
+    #                    "lbody": legal_body, "lbodyref": legal_body_ref,
+    #                    "amends": amends, "district": district, "short_desc": short_description,
+    #                    "addl_info": additional_info
+    #                })   # TODO: Seems probable we won't need both dates
+    # return cursor.fetchone()[0]
 
 
 # pylint: disable=too-many-arguments
-def insert_request(cursor, key_number, application_type, reference, date, document=None, insolvency_data=None,
-                   customer_name=None, customer_address=None):
-    if insolvency_data is not None:
+#def insert_request(cursor, key_number, application_type, reference, date, document=None, insolvency_data=None,
+#                   customer_name=None, customer_address=None):
+def insert_request(cursor, applicant, application_type, date, original_data=None):
+    if original_data is not None:
         cursor.execute("INSERT INTO ins_bankruptcy_request (request_data) VALUES (%(json)s) RETURNING id",
-                       {"json": json.dumps(insolvency_data)})
+                       {"json": json.dumps(original_data)})
         ins_request_id = cursor.fetchone()[0]
     else:
         ins_request_id = None  # TODO: consider when ins data should be added...
 
     cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
-                   "ins_request_id, document_ref, customer_name, customer_address) " +
-                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s, %(doc)s, " +
+                   "ins_request_id, customer_name, customer_address) " +
+                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s, " +
                    "%(cust_name)s, %(cust_addr)s ) RETURNING id",
                    {
-                       "key": key_number, "app_type": application_type, "app_ref": reference,
-                       "app_date": date, "ins_id": ins_request_id, "doc": document, "cust_name": customer_name,
-                       "cust_addr": customer_address
+                       "key": applicant['key_number'], "app_type": application_type, "app_ref": applicant['reference'],
+                       "app_date": date, "ins_id": ins_request_id, "cust_name": applicant['name'],
+                       "cust_addr": applicant['address']
                    })
     return cursor.fetchone()[0]
 
 
-def insert_party(cursor, details_id, party_type, occupation, date_of_birth, residence_withheld):
+#def insert_party(cursor, details_id, party_type, occupation, date_of_birth, residence_withheld):
+def insert_party(cursor, details_id, party):
+    occupation = None
+    date_of_birth = None
+    residence_withheld = False
+    if party['type'] == 'Debtor':
+        occupation = party['occupation']
+        date_of_birth = party['date_of_birth']
+        residence_withheld = party['residence_withheld']
+
     cursor.execute("INSERT INTO party (register_detl_id, party_type, occupation, date_of_birth, residence_withheld) " +
                    "VALUES( %(reg_id)s, %(type)s, %(occupation)s, %(dob)s, %(rw)s ) RETURNING id",
                    {
-                       "reg_id": details_id, "type": party_type, "occupation": occupation,
+                       "reg_id": details_id, "type": party['type'], "occupation": occupation,
                        "dob": date_of_birth, "rw": residence_withheld
                    })
     return cursor.fetchone()[0]
@@ -274,56 +379,70 @@ def insert_migration_status(cursor, register_id, registration_number, registrati
     return cursor.fetchone()[0]
 
 
-def insert_details(cursor, request_id, data, amends_id):
+def insert_details(cursor, request_id, data, date, amends_id):
     logging.debug("Insert details")
     # register details
-    register_details_id = insert_register_details(cursor, request_id, data, amends_id)
+    register_details_id = insert_register_details(cursor, request_id, data, date, amends_id)
 
     # party
-    if 'lc_register_details' in data:
-        party_type = 'Estate Owner'
-        occupation = data['lc_register_details']['occupation']
-    else:
-        party_type = 'Debtor'
-        occupation = data['occupation']
+    # if 'lc_register_details' in data:
+    #     party_type = 'Estate Owner'
+    #     occupation = data['lc_register_details']['occupation']
+    # else:
+    #     party_type = 'Debtor'
+    #     occupation = data['occupation']
+    #
+    # party_id = insert_party(cursor, register_details_id, party_type, occupation, data['date_of_birth'],
+    #                         data['residence_withheld'])
 
-    party_id = insert_party(cursor, register_details_id, party_type, occupation, data['date_of_birth'],
-                            data['residence_withheld'])
+    debtor_id = None
+    debtor = None
+    names = []
+    for party in data['parties']:
+        party_id = insert_party(cursor, register_details_id, party)
 
-    # party_address, address, address_detail
-    if 'residence' in data:
-        for address in data['residence']:
-            insert_address(cursor, address, "Debtor Residence", party_id)
+        if party['type'] == 'Debtor':
+            debtor_id = party_id
+            debtor = party
+            for address in party['addresses']:
+                insert_address(cursor, address, party_id)
 
-    if "business_address" in data:
-        for address in data["investment_property"]:
-            insert_address(cursor, address, "Debtor Business", party_id)
+        for name in party['names']:
+            names.append(insert_party_name(cursor, party_id, name))
 
-    if "investment_property" in data:
-        if not isinstance(data['investment_property'], list):
-            data['investment_property'] = [data['investment_property']]
-
-        for address in data["investment_property"]:
-            insert_address(cursor, address, "Investment", party_id)
+    # if 'residence' in data:
+    #     for address in data['residence']:
+    #         insert_address(cursor, address, "Debtor Residence", party_id)
+    #
+    # if "business_address" in data:
+    #     for address in data["investment_property"]:
+    #         insert_address(cursor, address, "Debtor Business", party_id)
+    #
+    # if "investment_property" in data:
+    #     if not isinstance(data['investment_property'], list):
+    #         data['investment_property'] = [data['investment_property']]
+    #
+    #     for address in data["investment_property"]:
+    #         insert_address(cursor, address, "Investment", party_id)
 
     # party_name, party_name_rel
-    if 'lc_register_details' in data:
-        # TODO: insert county here???
-        data['county_ids'] = []
-        for item in data['lc_register_details']['county']:
-            county_detl_id, county_id = insert_lc_county(cursor, register_details_id, item)
-            data['county_ids'].append({'id': county_id, 'name': item})  # for use later...
-
-        names = [insert_name(cursor, data['lc_register_details']['estate_owner'], party_id)]
-        names[0]['county_detl_id'] = county_detl_id
-
-    elif 'complex' in data:
-        names = [insert_name(cursor, data['complex'], party_id)]
-    else:
-        # if 'debtor_names' in data: # Handle array input
-        names = [insert_name(cursor, data['debtor_names'][0], party_id)]
-        for name in data['debtor_names'][1:]:
-            names.append(insert_name(cursor, name, party_id, True))
+    # if 'lc_register_details' in data:
+    #     # TODO: insert county here???
+    #     data['county_ids'] = []
+    #     for item in data['lc_register_details']['county']:
+    #         county_detl_id, county_id = insert_lc_county(cursor, register_details_id, item)
+    #         data['county_ids'].append({'id': county_id, 'name': item})  # for use later...
+    #
+    #     names = [insert_name(cursor, data['lc_register_details']['estate_owner'], party_id)]
+    #     names[0]['county_detl_id'] = county_detl_id
+    #
+    # elif 'complex' in data:
+    #     names = [insert_name(cursor, data['complex'], party_id)]
+    # else:
+    #     # if 'debtor_names' in data: # Handle array input
+    #     names = [insert_name(cursor, data['debtor_names'][0], party_id)]
+    #     for name in data['debtor_names'][1:]:
+    #         names.append(insert_name(cursor, name, party_id, True))
 
         # else:  # TODO: retire this leg
         #     names = [insert_name(cursor, data['debtor_name'], party_id)]
@@ -331,10 +450,11 @@ def insert_details(cursor, request_id, data, amends_id):
         #         names.append(insert_name(cursor, name, party_id, True))
 
     # party_trading
-    if "trading_name" in data:
+    if debtor_id is not None:
+        trading_name = debtor['trading_name']
         cursor.execute("INSERT INTO party_trading (party_id, trading_name) " +
                        "VALUES ( %(party)s, %(trading)s ) RETURNING id",
-                       {"party": party_id, "trading": data['trading_name']})
+                       {"party": debtor_id, "trading": trading_name})
     return names, register_details_id
 
 
@@ -377,31 +497,55 @@ def insert_landcharge_regn(cursor, details_id, names, county_ids, date, orig_reg
     return reg_nos
 
 
-def insert_record(cursor, data, request_id, amends=None, orig_reg_no=None):
-    names, register_details_id = insert_details(cursor, request_id, data, amends)
+# def insert_registration(cursor, details_id, names, county_ids, date, orig_reg_no):
 
-    if data['class_of_charge'] in ['PA(B)', 'WO(B)']:
-        reg_nos = insert_bankruptcy_regn(cursor, register_details_id, names, data['date'], orig_reg_no)
+
+def insert_counties(cursor, details_id, counties):
+    ids = []
+    for county in counties:
+        county_detl_id, county_id = insert_lc_county(cursor, details_id, county)
+        ids.append({'id': county_id, 'name': county})
+    return ids
+
+    # if 'lc_register_details' in data:
+    #     # 2do: insert county here???
+    #     data['county_ids'] = []
+    #     for item in data['lc_register_details']['county']:
+    #         county_detl_id, county_id = insert_lc_county(cursor, register_details_id, item)
+    #         data['county_ids'].append({'id': county_id, 'name': item})  # for use later...
+    #
+
+
+def insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None):
+    names, register_details_id = insert_details(cursor, request_id, data, date, amends)
+
+    if data['class_of_charge'] in ['PAB', 'WOB']:
+        reg_nos = insert_bankruptcy_regn(cursor, register_details_id, names, date, orig_reg_no)
     else:
-        reg_nos = insert_landcharge_regn(cursor, register_details_id, names, data['county_ids'], data['date'], orig_reg_no)
+        county_ids = insert_counties(cursor, register_details_id, data['particulars']['counties'])
+        reg_nos = insert_landcharge_regn(cursor, register_details_id, names, county_ids, date, orig_reg_no)
 
     # TODO: audit-log not done. Not sure it belongs here?
     return reg_nos, register_details_id
 
 
 def insert_new_registration(cursor, data):
-    document = None
-    if 'document_id' in data:
-        document = data['document_id']
+    # document = None
+    # if 'document_id' in data:
+    #     document = data['document_id']
+
+    date = datetime.datetime.now().strftime('%Y-%m-%d')
 
     # request
     original = None
     if 'original_request' in data:
         original = data['original_request']
-    request_id = insert_request(cursor, data['key_number'], data["class_of_charge"], data['application_ref'],
-                                data['date'], document, original, data['customer_name'], data['customer_address'])
 
-    reg_nos, details_id = insert_record(cursor, data, request_id)
+    request_id = insert_request(cursor, data['applicant'], 'New registration', date, original)
+    # request_id = insert_request(cursor, data['key_number'], data["class_of_charge"], data['application_ref'],
+    #                             data['date'], document, original, data['customer_name'], data['customer_address'])
+
+    reg_nos, details_id = insert_record(cursor, data, request_id, date)
     return reg_nos, details_id, request_id
 
 
@@ -523,84 +667,86 @@ def get_registration(cursor, reg_id, date=None):
 #
 #     return reg_nos
 
-def get_party_names(cursor, party_id):
-    cursor.execute("select forename, middle_names, surname, alias_name, complex_number, complex_name, "
-                   "name_type_ind, company_name, local_authority_name, local_authority_area, other_name "
-                   "from party_name pn, party_name_rel pnr where pnr.party_id=%(id)s and "
-                   "pnr.party_name_id = pn.id order by alias_name desc", {"id": party_id})
-    rows = cursor.fetchall()
+# def get_party_names(cursor, party_id):
+#     logging.warning("DEPRECATED - get_party_names")
+#     cursor.execute("select forename, middle_names, surname, alias_name, complex_number, complex_name, "
+#                    "name_type_ind, company_name, local_authority_name, local_authority_area, other_name "
+#                    "from party_name pn, party_name_rel pnr where pnr.party_id=%(id)s and "
+#                    "pnr.party_name_id = pn.id order by alias_name desc", {"id": party_id})
+#     rows = cursor.fetchall()
+#
+#     result = []
+#     for row in rows:
+#         name = {}
+#         pname = {}
+#         if row['forename'] != "":
+#             pname['forenames'] = [row['forename']]
+#
+#         if row['middle_names']:
+#             if 'forenames' not in pname:
+#                 pname['forenames'] = ['']
+#             pname['forenames'] += row['middle_names'].split(' ')
+#
+#         if row['surname'] != "":
+#             pname['surname'] = row['surname']
+#
+#         if 'forenames' in pname:
+#             name['private'] = pname
+#
+#         if row['complex_number'] is not None or row['complex_name'] != "":
+#             name['complex'] = {'number': row['complex_number'], 'name': row['complex_name']}
+#
+#         name['type'] = row['name_type_ind']
+#
+#         if row['company_name'] != "":
+#             name['company'] = row['company_name']
+#
+#         if row['local_authority_name'] != "" or row['local_authority_area'] != "":
+#             name['local'] = {
+#                 'name': row['local_authority_name'],
+#                 'area': row['local_authority_area']
+#             }
+#
+#         if row['other_name'] != "":
+#             name['other'] = row['other_name']
+#         result.append(name)
+#
+#     return result
 
-    result = []
-    for row in rows:
-        name = {}
-        pname = {}
-        if row['forename'] != "":
-            pname['forenames'] = [row['forename']]
 
-        if row['middle_names']:
-            if 'forenames' not in pname:
-                pname['forenames'] = ['']
-            pname['forenames'] += row['middle_names'].split(' ')
-
-        if row['surname'] != "":
-            pname['surname'] = row['surname']
-
-        if 'forenames' in pname:
-            name['private'] = pname
-
-        if row['complex_number'] is not None or row['complex_name'] != "":
-            name['complex'] = {'number': row['complex_number'], 'name': row['complex_name']}
-
-        name['type'] = row['name_type_ind']
-
-        if row['company_name'] != "":
-            name['company'] = row['company_name']
-
-        if row['local_authority_name'] != "" or row['local_authority_area'] != "":
-            name['local'] = {
-                'name': row['local_authority_name'],
-                'area': row['local_authority_area']
-            }
-
-        if row['other_name'] != "":
-            name['other'] = row['other_name']
-        result.append(name)
-
-    return result
-
-
-def get_parties(cursor, data, details_id):
-    cursor.execute("select p.party_type, p.occupation, p.date_of_birth, pt.trading_name, p.id, p.residence_withheld  "
-                   "from party p left outer join party_trading pt on p.id = pt.party_id "
-                   "where p.register_detl_id=%(id)s", {'id': details_id})
-    rows = cursor.fetchall()
-
-    party_ids = []
-    for row in rows:
-        party_id = row['id']
-        party_ids.append(party_id)
-        names = get_party_names(cursor, party_id)
-        if row['party_type'] == 'Debtor':
-            data['debtor_names'] = names
-            data['trading'] = row['trading_name']
-            data['occupation'] = row['occupation']
-            data['residence_withheld'] = row['residence_withheld']
-        elif row['party_type'] == 'Estate Owner':
-            data['occupation'] = row['occupation']
-            data['residence_withheld'] = row['residence_withheld']
-            if len(names) > 1:
-                logging.debug(names)
-                raise RuntimeError("Too many estate owner names returned")
-            elif len(names) == 0:
-                raise RuntimeError("No names returned")
-
-            name = names[0]
-            data['estate_owner_ind'] = name['type']
-            del(name['type'])
-            data['estate_owner'] = name
-        else:
-            raise RuntimeError("Unknown party type: " + row['party_type'])
-    return party_ids
+# def get_parties(cursor, data, details_id):
+#     logging.warning("DEPRECATED - get_parties")
+#     cursor.execute("select p.party_type, p.occupation, p.date_of_birth, pt.trading_name, p.id, p.residence_withheld  "
+#                    "from party p left outer join party_trading pt on p.id = pt.party_id "
+#                    "where p.register_detl_id=%(id)s", {'id': details_id})
+#     rows = cursor.fetchall()
+#
+#     party_ids = []
+#     for row in rows:
+#         party_id = row['id']
+#         party_ids.append(party_id)
+#         names = get_party_names(cursor, party_id)
+#         if row['party_type'] == 'Debtor':
+#             data['debtor_names'] = names
+#             data['trading'] = row['trading_name']
+#             data['occupation'] = row['occupation']
+#             data['residence_withheld'] = row['residence_withheld']
+#         elif row['party_type'] == 'Estate Owner':
+#             data['occupation'] = row['occupation']
+#             data['residence_withheld'] = row['residence_withheld']
+#             if len(names) > 1:
+#                 logging.debug(names)
+#                 raise RuntimeError("Too many estate owner names returned")
+#             elif len(names) == 0:
+#                 raise RuntimeError("No names returned")
+#
+#             name = names[0]
+#             data['estate_owner_ind'] = name['type']
+#             del(name['type'])
+#             data['estate_owner'] = name
+#         else:
+#             raise RuntimeError("Unknown party type: " + row['party_type'])
+#     return party_ids
 
 
 def get_registration_no_from_details_id(cursor, details_id):
@@ -668,72 +814,210 @@ def get_registrations_by_date(cursor, date):
 
     return results
 
-    # cursor.execute('select r.registration_no, r.date, d.class_of_charge '
-    #                'from register r, register_details d '
-    #                'where d.id = r.details_id '
-    #                'and date=%(date)s', {'date': date})
-    # rows = cursor.fetchall()
-    # if len(rows) == 0:
-    #     return None
-    #
-    # results = []
-    # for row in rows:
-    #     results.append({
-    #         'number': row['registration_no'],
-    #         'date': row['date'].strftime('%Y-%m-%d'),
-    #         'class': row['class_of_charge']
-    #     })
-    # return results
+
+def read_names(cursor, party, party_id):
+    cursor.execute('select forename, middle_names, surname, complex_number, complex_name, '
+                   'name_type_ind, company_name, local_authority_name, local_authority_area, '
+                   'other_name '
+                   'from party_name n, party_name_rel pn '
+                   'where n.id = pn.party_name_id and pn.party_id = %(id)s', {
+                       'id': party_id
+                   })
+    rows = cursor.fetchall()
+    party['names'] = []
+    for row in rows:
+        name_type = row['name_type_ind']
+        name = {
+            'type': name_type
+        }
+
+        if name_type == 'Private Individual':
+            fornames = [row['forename']]
+            middle = row['middle_names']
+            if middle is not None and middle != "":
+                fornames.append(middle.split(' '))
+
+            name['private'] = {
+                'forenames': fornames,
+                'surname': row['surname']
+            }
+        elif name_type == 'Rural Council' or name_type == 'Parish Council' or \
+                        name_type == 'County Council' or name_type == 'Other Council':
+            name['local'] = {
+                'name': row['local_authority_name'],
+                'area': row['local_authority_area']
+            }
+        elif name_type == 'Development Corporation' or name_type == 'Other':
+            name['other'] = row['other_name']
+        elif name_type == 'Limited Company':
+            name['company'] = row['company_name']
+        elif name_type == 'Complex Name':
+            name['complex'] = {
+                'name': row['complex_name'],
+                'number': row['complex_number']
+            }
+        else:
+            raise RuntimeError("Unknown name type: {}".format(name_type))
+        party['names'].append(name)
+
+
+def get_address_detail(cursor, address, detail_id):
+    cursor.execute('SELECT line_1, line_2, line_3, line_4, line_5, line_6, country_id, county, postcode '
+                   'FROM address_detail '
+                   'WHERE id=%(id)s', {
+                       'id': detail_id
+                   })
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        return
+    if len(rows) > 1:
+        raise RuntimeError("Unexpected multitude of address details")
+
+    row = rows[0]
+    address['address_lines'] = []
+    if row['line_1'] is not None and row['line_1'] != '':
+        address['address_lines'].append(row['line_1'])
+    if row['line_2'] is not None and row['line_2'] != '':
+        address['address_lines'].append(row['line_2'])
+    if row['line_3'] is not None and row['line_3'] != '':
+        address['address_lines'].append(row['line_3'])
+    if row['line_4'] is not None and row['line_4'] != '':
+        address['address_lines'].append(row['line_4'])
+    if row['line_5'] is not None and row['line_5'] != '':
+        address['address_lines'].append(row['line_5'])
+    if row['line_6'] is not None and row['line_6'] != '':
+        address['address_lines'].append(row['line_6'])
+
+    address['county'] = row['county']
+    address['postcode'] = row['postcode']
+
+
+def read_addresses(cursor, party, party_id):
+    cursor.execute('SELECT address_type, address_string, detail_id '
+                   'FROM party_address pa, address a '
+                   'WHERE pa.party_id = %(pid)s AND pa.address_id = a.id', {
+                       'pid': party_id
+                   })
+    rows = cursor.fetchall()
+    party['addresses'] = []
+    for row in rows:
+        address = {
+            'type': row['address_type'],
+            'address_string': row['address_string']
+        }
+        get_address_detail(cursor, address, row['detail_id'])
+        party['addresses'].append(address)
+
+
+# ADDRESS_SCHEMA
+# {
+# 	"type": "object",
+#     "properties": {
+# 		"type": {
+# 			"type": "string",
+# 			"enum": ["Residence", "Business", "Investment"]
+# 		}
+#         "address_lines": {
+#             "type": "array",
+#             "items": {"type": "string"},
+#             "minItems": 1
+#         },
+#         "county": {"type": "string"},
+#         "postcode": {"type": "string"},
+# 		"address_string": {"type": "string"}
+#     },
+#     "required": ["type", "address_lines", "postcode", "county"],
+# 	"additionalProperties": false
+# }
+
+def read_parties(cursor, data, details_id, legal_ref):
+    cursor.execute('SELECT id, party_type, occupation, date_of_birth, residence_withheld '
+                   'FROM party '
+                   'WHERE register_detl_id = %(id)s', {
+                       'id': details_id
+                   })
+    rows = cursor.fetchall()
+    data['parties'] = []
+    for row in rows:
+        party = {
+            'type': row['party_type']
+        }
+
+        if party['type'] == 'Debtor':
+            party['occupation'] = row['occupation']
+            if row['date_of_birth'] is not None:
+                party['date_of_birth'] = row['date_of_birth'].strftime('%Y-%m-%d')
+            else:
+                party['date_of_birth'] = None
+            party['residence_withheld'] = row['residence_withheld']
+            party['case_reference'] = legal_ref
+            read_addresses(cursor, party, row['id'])
+            # TODO: case_reference
+
+        data['parties'].append(party)
+        read_names(cursor, party, row['id'])
+
+
+def get_lc_counties(cursor, details_id):
+    cursor.execute("select dcr.county_id, c.name  from detl_county_rel dcr, county c " +
+                   "where dcr.details_id = %(id)s and dcr.county_id = c.id ", {'id': details_id})
+    rows = cursor.fetchall()
+
+    counties = []
+    if len(rows) != 0:
+        counties = []
+        for row in rows:
+            counties.append(row['name'])
+    return counties
+
 
 
 def get_registration_details(cursor, reg_no, date):
-    cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.class_of_charge, rd.id, " +
-                   " r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, " +
-                   " rd.additional_info, rd.district, rd.short_description "
-                   "from register r, register_details rd " +
-                   "where r.registration_no = %(reg_no)s and r.details_id = rd.id " +
-                   "and rd.registration_date = %(date)s", {
-                       'reg_no': reg_no,
-                       'date': date,
+    cursor.execute("SELECT r.registration_no, r.date, rd.class_of_charge, rd.id, r.id as register_id, "
+                   "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
+                   "rd.district, rd.short_description "
+                   "from register r, register_details rd "
+                   "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id",{
+                       'reg_no': reg_no, 'date': date
                    })
     rows = cursor.fetchall()
     if len(rows) == 0:
         return None
+
+    details_id = rows[0]['id']
     data = {
         'registration': {
             'number': rows[0]['registration_no'],
-            'date': str(rows[0]['registration_date'])
+            'date': rows[0]['date'].strftime('%Y-%m-%d')
         },
         'class_of_charge': rows[0]['class_of_charge'],
-        'legal_body': rows[0]['legal_body'],
-        'legal_body_ref': rows[0]['legal_body_ref'],
-        'status': "current",
-        'additional_info': rows[0]['additional_info'],
-        'district': rows[0]['district'],
-        'short_description': rows[0]['short_description']
-
+        'status': 'current'
     }
-    details_id = rows[0]['id']
-    name_id = rows[0]['debtor_reg_name_id']
+
+    if data['class_of_charge'] not in ['PAB', 'WOB']:
+        data['particulars'] = {
+            'counties': get_lc_counties(cursor, details_id),
+            'district': rows[0]['district'],
+            'description': rows[0]['short_description']
+        }
+
     register_id = rows[0]['register_id']
-
+    legal_ref = rows[0]['legal_body_ref']
     if rows[0]['amends'] is not None:
-        data['amends_regn'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
+        data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
 
-    cancelled_by = rows[0]['cancelled_by']
-    if cancelled_by is not None:
+    if rows[0]['cancelled_by'] is not None:
         cursor.execute("select amends, amendment_type from register_details where amends=%(id)s",
                        {"id": details_id})
-
         rows = cursor.fetchall()
         if len(rows) > 0:
             data['status'] = 'superseded'
         else:
             data['status'] = 'cancelled'
-            data['cancellation_ref'] = cancelled_by
+            data['cancellation'] = {'reference': rows[0]['cancelled_by']}
             cursor.execute('select application_date from request where id=%(id)s', {'id': data['cancellation_ref']})
             cancel_rows = cursor.fetchall()
-            data['cancellation_date'] = cancel_rows[0]['application_date'].isoformat()
+            data['cancellation']['date'] = cancel_rows[0]['application_date'].isoformat()
 
     cursor.execute('select r.registration_no, r.date, d.amendment_type, d.amends FROM register r, register_details d ' +
                    'WHERE r.details_id=d.id AND d.amends=%(id)s', {'id': details_id})
@@ -745,78 +1029,119 @@ def get_registration_details(cursor, reg_no, date):
             'type': rows[0]['amendment_type']
         }
 
-    cursor.execute("select dcr.county_id, c.name  from detl_county_rel dcr, county c " +
-                   "where dcr.details_id = %(id)s and dcr.county_id = c.id ", {'id': details_id})
-    rows = cursor.fetchall()
-    if len(rows) != 0:
-        counties = []
-        for row in rows:
-            counties.append(row['name'])
-        data['counties'] = counties
-
-    party_ids = get_parties(cursor, data, details_id)
-
-    cursor.execute("select r.key_number, r.application_reference, r.document_ref, r.customer_name, " +
-                   "r.customer_address " +
-                   " from request r, register_details d where r.id = d.request_id and d.id = %(id)s",
-                   {'id': details_id})
-    rows = cursor.fetchall()
-    data['application_ref'] = rows[0]['application_reference']
-    data['document_id'] = rows[0]['document_ref']
-    data['key_number'] = rows[0]['key_number']
-    data['customer_name'] = rows[0]['customer_name']
-    data['customer_address'] = rows[0]['customer_address']
-
-    if len(party_ids) > 1:
-        raise RuntimeError("Unexpected multitude of party ids")
-
-    party_id = party_ids[0]
-    cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, d.county, " +
-                   "d.postcode, a.address_string, a.address_type " +
-                   "from address a " +
-                   "left outer join address_detail d on a.detail_id = d.id " +
-                   "inner join party_address pa on a.id = pa.address_id " +
-                   "where pa.party_id = %(id)s", {'id': party_id})
-
-    rows = cursor.fetchall()
-    data['residence'] = []
-    data['investment_property'] = []
-    data['business_address'] = []
-    for row in rows:
-        add_to = ''
-        address_type = row['address_type']
-        if address_type == 'Debtor Residence':
-            add_to = 'residence'
-        elif address_type == 'Debtor Business':
-            add_to = 'business_address'
-        elif address_type == 'Investment':
-            add_to = 'investment_property'
-
-        if row['line_1'] is None:  # Unstructured address stored as text
-            text = row['address_string']
-            data[add_to].append({'text': text})
-
-        else:
-            address = []
-            for i in range(1, 7):
-                line = row['line_{}'.format(i)]
-                if line != "":
-                    address.append(line)
-
-            data[add_to].append({
-                'address_lines': address, 'county': row['county'], 'postcode': row['postcode']
-            })
-
-    cursor.execute("SELECT original_regn_no, extra_data FROM migration_status WHERE register_id=%(id)s",
-                   {'id': register_id})
-    rows = cursor.fetchall()
-    if len(rows) > 0:
-        data['legacy'] = {
-            'original_registration': rows[0]['original_regn_no'],
-            'extra': rows[0]['extra_data']
-        }
+    read_parties(cursor, data, details_id, legal_ref)
 
     return data
+    #
+    # cursor.execute("select dcr.county_id, c.name  from detl_county_rel dcr, county c " +
+    #                "where dcr.details_id = %(id)s and dcr.county_id = c.id ", {'id': details_id})
+    # rows = cursor.fetchall()
+    # if len(rows) != 0:
+    #     counties = []
+    #     for row in rows:
+    #         counties.append(row['name'])
+    #     data['counties'] = counties
+    #
+    # party_ids = get_parties(cursor, data, details_id)
+    #
+    # cursor.execute("select r.key_number, r.application_reference, r.customer_name, " +
+    #                "r.customer_address " +
+    #                " from request r, register_details d where r.id = d.request_id and d.id = %(id)s",
+    #                {'id': details_id})
+    # rows = cursor.fetchall()
+    # data['application_ref'] = rows[0]['application_reference']
+    # data['key_number'] = rows[0]['key_number']
+    # data['customer_name'] = rows[0]['customer_name']
+    # data['customer_address'] = rows[0]['customer_address']
+    #
+    # if len(party_ids) > 1:
+    #     raise RuntimeError("Unexpected multitude of party ids")
+    #
+    # party_id = party_ids[0]
+    # cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, d.county, " +
+    #                "d.postcode, a.address_string, a.address_type " +
+    #                "from address a " +
+    #                "left outer join address_detail d on a.detail_id = d.id " +
+    #                "inner join party_address pa on a.id = pa.address_id " +
+    #                "where pa.party_id = %(id)s", {'id': party_id})
+    #
+    # rows = cursor.fetchall()
+    # data['residence'] = []
+    # data['investment_property'] = []
+    # data['business_address'] = []
+    # for row in rows:
+    #     add_to = ''
+    #     address_type = row['address_type']
+    #     if address_type == 'Debtor Residence':
+    #         add_to = 'residence'
+    #     elif address_type == 'Debtor Business':
+    #         add_to = 'business_address'
+    #     elif address_type == 'Investment':
+    #         add_to = 'investment_property'
+    #
+    #     if row['line_1'] is None:  # Unstructured address stored as text
+    #         text = row['address_string']
+    #         data[add_to].append({'text': text})
+    #
+    #     else:
+    #         address = []
+    #         for i in range(1, 7):
+    #             line = row['line_{}'.format(i)]
+    #             if line != "":
+    #                 address.append(line)
+    #
+    #         data[add_to].append({
+    #             'address_lines': address, 'county': row['county'], 'postcode': row['postcode']
+    #         })
+    #
+    # cursor.execute("SELECT original_regn_no, extra_data FROM migration_status WHERE register_id=%(id)s",
+    #                {'id': register_id})
+    # rows = cursor.fetchall()
+    # if len(rows) > 0:
+    #     data['legacy'] = {
+    #         'original_registration': rows[0]['original_regn_no'],
+    #         'extra': rows[0]['extra_data']
+    #     }
+    #
+    # return data
+
+
+
+
+
+
+
+    # cursor.execute("select r.registration_no, r.debtor_reg_name_id, r.date, rd.class_of_charge, rd.id, " +
+    #                " r.id as register_id, rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, " +
+    #                " rd.additional_info, rd.district, rd.short_description "
+    #                "from register r, register_details rd " +
+    #                "where r.registration_no = %(reg_no)s and r.details_id = rd.id " +
+    #                "and r.date = %(date)s", {
+    #                    'reg_no': reg_no,
+    #                    'date': date,
+    #                })
+    # rows = cursor.fetchall()
+    # if len(rows) == 0:
+    #     return None
+    # data = {
+    #     'registration': {
+    #         'number': rows[0]['registration_no'],
+    #         'date': str(rows[0]['date'])
+    #     },
+    #     'class_of_charge': rows[0]['class_of_charge'],
+    #     'legal_body_ref': rows[0]['legal_body_ref'],
+    #     'status': "current",
+    #     'additional_info': rows[0]['additional_info'],
+    #     'district': rows[0]['district'],
+    #     'short_description': rows[0]['short_description']
+    #
+    # }
+    # details_id = rows[0]['id']
+    # name_id = rows[0]['debtor_reg_name_id']
+    # register_id = rows[0]['register_id']
+    #
+
+
 
 
 def insert_migrated_record(cursor, data):
@@ -948,6 +1273,7 @@ def get_county_id(cursor, county):
     rows = cursor.fetchone()[0]
     return rows
 
+
 def get_register_request_details(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
@@ -1036,6 +1362,7 @@ def get_search_details(search_details_id):
         #sn_data = {'search_names:':name_data}
         complete(cursor)
     return sn_data
+
 
 def get_registration_details_from_register_id(register_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
