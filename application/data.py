@@ -270,8 +270,13 @@ def insert_register_details(cursor, request_id, data, date, amends):
         district = None
         short_description = None
 
-    if 'debtor' in data:
-        legal_ref = data['debtor']['legal_reference']
+    debtor = None
+    for party in data['parties']:
+        if party['type'] == 'Debtor':
+            debtor = party
+
+    if debtor is not None:
+        legal_ref = debtor['case_reference']
     else:
         legal_ref = None
 
@@ -662,6 +667,7 @@ def get_registration(cursor, reg_id, date=None):
 #     return reg_nos
 
 def get_party_names(cursor, party_id):
+    logging.warning("DEPRECATED - get_party_names")
     cursor.execute("select forename, middle_names, surname, alias_name, complex_number, complex_name, "
                    "name_type_ind, company_name, local_authority_name, local_authority_area, other_name "
                    "from party_name pn, party_name_rel pnr where pnr.party_id=%(id)s and "
@@ -708,6 +714,7 @@ def get_party_names(cursor, party_id):
 
 
 def get_parties(cursor, data, details_id):
+    logging.warning("DEPRECATED - get_parties")
     cursor.execute("select p.party_type, p.occupation, p.date_of_birth, pt.trading_name, p.id, p.residence_withheld  "
                    "from party p left outer join party_trading pt on p.id = pt.party_id "
                    "where p.register_detl_id=%(id)s", {'id': details_id})
@@ -807,54 +814,183 @@ def get_registrations_by_date(cursor, date):
     return results
 
 
+def read_names(cursor, party, party_id):
+    cursor.execute('select forename, middle_names, surname, complex_number, complex_name, '
+                   'name_type_ind, company_name, local_authority_name, local_authority_area, '
+                   'other_name '
+                   'from party_name n, party_name_rel pn '
+                   'where n.id = pn.party_name_id and pn.party_id = %(id)s', {
+                       'id': party_id
+                   })
+    rows = cursor.fetchall()
+    party['names'] = []
+    for row in rows:
+        name_type = row['name_type_ind']
+        name = {
+            'type': name_type
+        }
+
+        if name_type == 'Private Individual':
+            name['private'] = {
+                'forenames': [row['forename']] + row['middle_names'].split(' '),
+                'surname': row['surname']
+            }
+        elif name_type == 'Rural Council' or name_type == 'Parish Council' or \
+                        name_type == 'County Council' or name_type == 'Other Council':
+            name['local'] = {
+                'name': row['local_authority_name'],
+                'area': row['local_authority_area']
+            }
+        elif name_type == 'Development Corporation' or name_type == 'Other':
+            name['other'] = row['other_name']
+        elif name_type == 'Limited Company':
+            name['company'] = row['company_name']
+        elif name_type == 'Complex Name':
+            name['complex'] = {
+                'name': row['complex_name'],
+                'number': row['complex_number']
+            }
+        else:
+            raise RuntimeError("Unknown name type: {}".format(name_type))
+        party['names'].append(name)
+
+
+def get_address_detail(cursor, address, detail_id):
+    cursor.execute('SELECT line_1, line_2, line_3, line_4, line_5, line_6, country_id, county, postcode '
+                   'FROM address_detail '
+                   'WHERE id=%(id)s', {
+                       'id': detail_id
+                   })
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        return
+    if len(rows) > 1:
+        raise RuntimeError("Unexpected multitude of address details")
+
+    row = rows[0]
+    address['address_lines'] = []
+    if row['line_1'] is not None and row['line_1'] != '':
+        address['address_lines'].append(row['line_1'])
+    if row['line_2'] is not None and row['line_2'] != '':
+        address['address_lines'].append(row['line_2'])
+    if row['line_3'] is not None and row['line_3'] != '':
+        address['address_lines'].append(row['line_3'])
+    if row['line_4'] is not None and row['line_4'] != '':
+        address['address_lines'].append(row['line_4'])
+    if row['line_5'] is not None and row['line_5'] != '':
+        address['address_lines'].append(row['line_5'])
+    if row['line_6'] is not None and row['line_6'] != '':
+        address['address_lines'].append(row['line_6'])
+
+    address['county'] = row['county']
+    address['postcode'] = row['postcode']
+
+
+def read_addresses(cursor, party, party_id):
+    cursor.execute('SELECT address_type, address_string, detail_id '
+                   'FROM party_address pa, address a '
+                   'WHERE pa.party_id = %(pid)s AND pa.address_id = a.id', {
+                       'pid': party_id
+                   })
+    rows = cursor.fetchall()
+    party['addresses'] = []
+    for row in rows:
+        address = {
+            'type': row['address_type'],
+            'address_string': row['address_string']
+        }
+        get_address_detail(cursor, address, row['detail_id'])
+        party['addresses'].append(address)
+
+
+# ADDRESS_SCHEMA
+# {
+# 	"type": "object",
+#     "properties": {
+# 		"type": {
+# 			"type": "string",
+# 			"enum": ["Residence", "Business", "Investment"]
+# 		}
+#         "address_lines": {
+#             "type": "array",
+#             "items": {"type": "string"},
+#             "minItems": 1
+#         },
+#         "county": {"type": "string"},
+#         "postcode": {"type": "string"},
+# 		"address_string": {"type": "string"}
+#     },
+#     "required": ["type", "address_lines", "postcode", "county"],
+# 	"additionalProperties": false
+# }
+
+def read_parties(cursor, data, details_id, legal_ref):
+    cursor.execute('SELECT id, party_type, occupation, date_of_birth, residence_withheld '
+                   'FROM party '
+                   'WHERE register_detl_id = %(id)s', {
+                       'id': details_id
+                   })
+    rows = cursor.fetchall()
+    data['parties'] = []
+    for row in rows:
+        party = {
+            'type': row['party_type']
+        }
+
+        if party['type'] == 'Debtor':
+            party['occupation'] = row['occupation']
+            if row['date_of_birth'] is not None:
+                party['date_of_birth'] = row['date_of_birth'].strftime('%Y-%m-%d')
+            else:
+                party['date_of_birth'] = None
+            party['residence_withheld'] = row['residence_withheld']
+            party['case_reference'] = legal_ref
+            read_addresses(cursor, party, row['id'])
+            # TODO: case_reference
+
+        data['parties'].append(party)
+        read_names(cursor, party, row['id'])
+
+
 def get_registration_details(cursor, reg_no, date):
-    cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.class_of_charge, rd.id, " +
-                   " r.id as register_id, rd.legal_body, rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, " +
-                   " rd.additional_info, rd.district, rd.short_description "
-                   "from register r, register_details rd " +
-                   "where r.registration_no = %(reg_no)s and r.details_id = rd.id " +
-                   "and rd.registration_date = %(date)s", {
-                       'reg_no': reg_no,
-                       'date': date,
+    cursor.execute("SELECT r.registration_no, r.date, rd.class_of_charge, rd.id, r.id as register_id, "
+                   "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
+                   "rd.district, rd.short_description "
+                   "from register r, register_details rd "
+                   "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id",{
+                       'reg_no': reg_no, 'date': date
                    })
     rows = cursor.fetchall()
     if len(rows) == 0:
         return None
+
     data = {
         'registration': {
             'number': rows[0]['registration_no'],
-            'date': str(rows[0]['registration_date'])
+            'date': rows[0]['date'].strftime('%Y-%m-%d')
         },
         'class_of_charge': rows[0]['class_of_charge'],
-        'legal_body': rows[0]['legal_body'],
-        'legal_body_ref': rows[0]['legal_body_ref'],
-        'status': "current",
-        'additional_info': rows[0]['additional_info'],
-        'district': rows[0]['district'],
-        'short_description': rows[0]['short_description']
-
+        'status': 'current'
     }
+
     details_id = rows[0]['id']
-    name_id = rows[0]['debtor_reg_name_id']
     register_id = rows[0]['register_id']
-
+    legal_ref = rows[0]['legal_body_ref']
     if rows[0]['amends'] is not None:
-        data['amends_regn'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
+        data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
 
-    cancelled_by = rows[0]['cancelled_by']
-    if cancelled_by is not None:
+    if rows[0]['cancelled_by'] is not None:
         cursor.execute("select amends, amendment_type from register_details where amends=%(id)s",
                        {"id": details_id})
-
         rows = cursor.fetchall()
         if len(rows) > 0:
             data['status'] = 'superseded'
         else:
             data['status'] = 'cancelled'
-            data['cancellation_ref'] = cancelled_by
+            data['cancellation'] = {'reference': rows[0]['cancelled_by']}
             cursor.execute('select application_date from request where id=%(id)s', {'id': data['cancellation_ref']})
             cancel_rows = cursor.fetchall()
-            data['cancellation_date'] = cancel_rows[0]['application_date'].isoformat()
+            data['cancellation']['date'] = cancel_rows[0]['application_date'].isoformat()
 
     cursor.execute('select r.registration_no, r.date, d.amendment_type, d.amends FROM register r, register_details d ' +
                    'WHERE r.details_id=d.id AND d.amends=%(id)s', {'id': details_id})
@@ -866,78 +1002,120 @@ def get_registration_details(cursor, reg_no, date):
             'type': rows[0]['amendment_type']
         }
 
-    cursor.execute("select dcr.county_id, c.name  from detl_county_rel dcr, county c " +
-                   "where dcr.details_id = %(id)s and dcr.county_id = c.id ", {'id': details_id})
-    rows = cursor.fetchall()
-    if len(rows) != 0:
-        counties = []
-        for row in rows:
-            counties.append(row['name'])
-        data['counties'] = counties
 
-    party_ids = get_parties(cursor, data, details_id)
-
-    cursor.execute("select r.key_number, r.application_reference, r.document_ref, r.customer_name, " +
-                   "r.customer_address " +
-                   " from request r, register_details d where r.id = d.request_id and d.id = %(id)s",
-                   {'id': details_id})
-    rows = cursor.fetchall()
-    data['application_ref'] = rows[0]['application_reference']
-    data['document_id'] = rows[0]['document_ref']
-    data['key_number'] = rows[0]['key_number']
-    data['customer_name'] = rows[0]['customer_name']
-    data['customer_address'] = rows[0]['customer_address']
-
-    if len(party_ids) > 1:
-        raise RuntimeError("Unexpected multitude of party ids")
-
-    party_id = party_ids[0]
-    cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, d.county, " +
-                   "d.postcode, a.address_string, a.address_type " +
-                   "from address a " +
-                   "left outer join address_detail d on a.detail_id = d.id " +
-                   "inner join party_address pa on a.id = pa.address_id " +
-                   "where pa.party_id = %(id)s", {'id': party_id})
-
-    rows = cursor.fetchall()
-    data['residence'] = []
-    data['investment_property'] = []
-    data['business_address'] = []
-    for row in rows:
-        add_to = ''
-        address_type = row['address_type']
-        if address_type == 'Debtor Residence':
-            add_to = 'residence'
-        elif address_type == 'Debtor Business':
-            add_to = 'business_address'
-        elif address_type == 'Investment':
-            add_to = 'investment_property'
-
-        if row['line_1'] is None:  # Unstructured address stored as text
-            text = row['address_string']
-            data[add_to].append({'text': text})
-
-        else:
-            address = []
-            for i in range(1, 7):
-                line = row['line_{}'.format(i)]
-                if line != "":
-                    address.append(line)
-
-            data[add_to].append({
-                'address_lines': address, 'county': row['county'], 'postcode': row['postcode']
-            })
-
-    cursor.execute("SELECT original_regn_no, extra_data FROM migration_status WHERE register_id=%(id)s",
-                   {'id': register_id})
-    rows = cursor.fetchall()
-    if len(rows) > 0:
-        data['legacy'] = {
-            'original_registration': rows[0]['original_regn_no'],
-            'extra': rows[0]['extra_data']
-        }
+    read_parties(cursor, data, details_id, legal_ref)
 
     return data
+    #
+    # cursor.execute("select dcr.county_id, c.name  from detl_county_rel dcr, county c " +
+    #                "where dcr.details_id = %(id)s and dcr.county_id = c.id ", {'id': details_id})
+    # rows = cursor.fetchall()
+    # if len(rows) != 0:
+    #     counties = []
+    #     for row in rows:
+    #         counties.append(row['name'])
+    #     data['counties'] = counties
+    #
+    # party_ids = get_parties(cursor, data, details_id)
+    #
+    # cursor.execute("select r.key_number, r.application_reference, r.customer_name, " +
+    #                "r.customer_address " +
+    #                " from request r, register_details d where r.id = d.request_id and d.id = %(id)s",
+    #                {'id': details_id})
+    # rows = cursor.fetchall()
+    # data['application_ref'] = rows[0]['application_reference']
+    # data['key_number'] = rows[0]['key_number']
+    # data['customer_name'] = rows[0]['customer_name']
+    # data['customer_address'] = rows[0]['customer_address']
+    #
+    # if len(party_ids) > 1:
+    #     raise RuntimeError("Unexpected multitude of party ids")
+    #
+    # party_id = party_ids[0]
+    # cursor.execute("select d.line_1, d.line_2, d.line_3, d.line_4, d.line_5, d.line_6, d.county, " +
+    #                "d.postcode, a.address_string, a.address_type " +
+    #                "from address a " +
+    #                "left outer join address_detail d on a.detail_id = d.id " +
+    #                "inner join party_address pa on a.id = pa.address_id " +
+    #                "where pa.party_id = %(id)s", {'id': party_id})
+    #
+    # rows = cursor.fetchall()
+    # data['residence'] = []
+    # data['investment_property'] = []
+    # data['business_address'] = []
+    # for row in rows:
+    #     add_to = ''
+    #     address_type = row['address_type']
+    #     if address_type == 'Debtor Residence':
+    #         add_to = 'residence'
+    #     elif address_type == 'Debtor Business':
+    #         add_to = 'business_address'
+    #     elif address_type == 'Investment':
+    #         add_to = 'investment_property'
+    #
+    #     if row['line_1'] is None:  # Unstructured address stored as text
+    #         text = row['address_string']
+    #         data[add_to].append({'text': text})
+    #
+    #     else:
+    #         address = []
+    #         for i in range(1, 7):
+    #             line = row['line_{}'.format(i)]
+    #             if line != "":
+    #                 address.append(line)
+    #
+    #         data[add_to].append({
+    #             'address_lines': address, 'county': row['county'], 'postcode': row['postcode']
+    #         })
+    #
+    # cursor.execute("SELECT original_regn_no, extra_data FROM migration_status WHERE register_id=%(id)s",
+    #                {'id': register_id})
+    # rows = cursor.fetchall()
+    # if len(rows) > 0:
+    #     data['legacy'] = {
+    #         'original_registration': rows[0]['original_regn_no'],
+    #         'extra': rows[0]['extra_data']
+    #     }
+    #
+    # return data
+
+
+
+
+
+
+
+    # cursor.execute("select r.registration_no, r.debtor_reg_name_id, r.date, rd.class_of_charge, rd.id, " +
+    #                " r.id as register_id, rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, " +
+    #                " rd.additional_info, rd.district, rd.short_description "
+    #                "from register r, register_details rd " +
+    #                "where r.registration_no = %(reg_no)s and r.details_id = rd.id " +
+    #                "and r.date = %(date)s", {
+    #                    'reg_no': reg_no,
+    #                    'date': date,
+    #                })
+    # rows = cursor.fetchall()
+    # if len(rows) == 0:
+    #     return None
+    # data = {
+    #     'registration': {
+    #         'number': rows[0]['registration_no'],
+    #         'date': str(rows[0]['date'])
+    #     },
+    #     'class_of_charge': rows[0]['class_of_charge'],
+    #     'legal_body_ref': rows[0]['legal_body_ref'],
+    #     'status': "current",
+    #     'additional_info': rows[0]['additional_info'],
+    #     'district': rows[0]['district'],
+    #     'short_description': rows[0]['short_description']
+    #
+    # }
+    # details_id = rows[0]['id']
+    # name_id = rows[0]['debtor_reg_name_id']
+    # register_id = rows[0]['register_id']
+    #
+
+
 
 
 def insert_migrated_record(cursor, data):

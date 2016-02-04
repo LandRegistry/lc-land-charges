@@ -280,6 +280,7 @@ def validate(data, schema):
     # TODO ensure occupation, trading, res_wh & ref on debtor party
     # TODO ensure consistency of addresses and res_wh on debtor party
     # TODO ensure only addresses on Debtor party
+    # TODO allow aliases only on Debtor party
     # If not a PAB/WOB, it's a land charge - make sure it has a 'particulars' entry
     if data['class_of_charge'] not in ['PAB', 'WOB'] and 'particulars' not in data:
         errors.append({'error_message': "Attribute 'particulars' required for land charge"})
