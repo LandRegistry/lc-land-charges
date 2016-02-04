@@ -408,7 +408,9 @@ def insert_details(cursor, request_id, data, date, amends_id):
                 insert_address(cursor, address, party_id)
 
         for name in party['names']:
-            names.append(insert_party_name(cursor, party_id, name))
+            name_info = insert_party_name(cursor, party_id, name)
+            if party['type'] == 'Debtor':
+                names.append(name_info)
 
     # if 'residence' in data:
     #     for address in data['residence']:
@@ -722,8 +724,8 @@ def get_registrations_by_date(cursor, date):
     return results
 
 
-def read_names(cursor, party, party_id):
-    cursor.execute('select forename, middle_names, surname, complex_number, complex_name, '
+def read_names(cursor, party, party_id, lead_debtor_id):
+    cursor.execute('select n.id, forename, middle_names, surname, complex_number, complex_name, '
                    'name_type_ind, company_name, local_authority_name, local_authority_area, '
                    'other_name '
                    'from party_name n, party_name_rel pn '
@@ -731,8 +733,11 @@ def read_names(cursor, party, party_id):
                        'id': party_id
                    })
     rows = cursor.fetchall()
-    party['names'] = []
+
+    names_list = []
     for row in rows:
+        name_id = row['id']
+
         name_type = row['name_type_ind']
         name = {
             'type': name_type
@@ -765,7 +770,13 @@ def read_names(cursor, party, party_id):
             }
         else:
             raise RuntimeError("Unknown name type: {}".format(name_type))
-        party['names'].append(name)
+
+        if name_id == lead_debtor_id:
+            names_list.insert(0, name)
+        else:
+            names_list.append(name)
+
+    party['names'] = names_list
 
 
 def get_address_detail(cursor, address, detail_id):
@@ -816,7 +827,7 @@ def read_addresses(cursor, party, party_id):
         party['addresses'].append(address)
 
 
-def read_parties(cursor, data, details_id, legal_ref):
+def read_parties(cursor, data, details_id, legal_ref, lead_debtor_id):
     cursor.execute('SELECT id, party_type, occupation, date_of_birth, residence_withheld '
                    'FROM party '
                    'WHERE register_detl_id = %(id)s', {
@@ -841,7 +852,7 @@ def read_parties(cursor, data, details_id, legal_ref):
             # TODO: case_reference
 
         data['parties'].append(party)
-        read_names(cursor, party, row['id'])
+        read_names(cursor, party, row['id'], lead_debtor_id)
 
 
 def get_lc_counties(cursor, details_id, lead_county_id):
@@ -866,7 +877,7 @@ def get_lc_counties(cursor, details_id, lead_county_id):
 def get_registration_details(cursor, reg_no, date):
     cursor.execute("SELECT r.registration_no, r.date, rd.class_of_charge, rd.id, r.id as register_id, "
                    "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
-                   "rd.district, rd.short_description, r.county_id "
+                   "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id "
                    "from register r, register_details rd "
                    "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id", {
                        'reg_no': reg_no, 'date': date
@@ -877,6 +888,7 @@ def get_registration_details(cursor, reg_no, date):
 
     details_id = rows[0]['id']
     lead_county = rows[0]['county_id']
+    lead_debtor_id = rows[0]['debtor_reg_name_id']
     data = {
         'registration': {
             'number': rows[0]['registration_no'],
@@ -921,7 +933,7 @@ def get_registration_details(cursor, reg_no, date):
             'type': rows[0]['amendment_type']
         }
 
-    read_parties(cursor, data, details_id, legal_ref)
+    read_parties(cursor, data, details_id, legal_ref, lead_debtor_id)
 
     return data
 
