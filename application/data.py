@@ -262,7 +262,8 @@ def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_n
 
 
 def insert_register_details(cursor, request_id, data, date, amends):
-    additional_info = data['additional_information']
+    additional_info = data['additional_information'] if 'additional_information' in data else None
+
     if 'particulars' in data:
         district = data['particulars']['district']
         short_description = data['particulars']['description']
@@ -666,86 +667,86 @@ def get_registration(cursor, reg_id, date=None):
 #
 #     return reg_nos
 
-def get_party_names(cursor, party_id):
-    logging.warning("DEPRECATED - get_party_names")
-    cursor.execute("select forename, middle_names, surname, alias_name, complex_number, complex_name, "
-                   "name_type_ind, company_name, local_authority_name, local_authority_area, other_name "
-                   "from party_name pn, party_name_rel pnr where pnr.party_id=%(id)s and "
-                   "pnr.party_name_id = pn.id order by alias_name desc", {"id": party_id})
-    rows = cursor.fetchall()
+# def get_party_names(cursor, party_id):
+#     logging.warning("DEPRECATED - get_party_names")
+#     cursor.execute("select forename, middle_names, surname, alias_name, complex_number, complex_name, "
+#                    "name_type_ind, company_name, local_authority_name, local_authority_area, other_name "
+#                    "from party_name pn, party_name_rel pnr where pnr.party_id=%(id)s and "
+#                    "pnr.party_name_id = pn.id order by alias_name desc", {"id": party_id})
+#     rows = cursor.fetchall()
+#
+#     result = []
+#     for row in rows:
+#         name = {}
+#         pname = {}
+#         if row['forename'] != "":
+#             pname['forenames'] = [row['forename']]
+#
+#         if row['middle_names']:
+#             if 'forenames' not in pname:
+#                 pname['forenames'] = ['']
+#             pname['forenames'] += row['middle_names'].split(' ')
+#
+#         if row['surname'] != "":
+#             pname['surname'] = row['surname']
+#
+#         if 'forenames' in pname:
+#             name['private'] = pname
+#
+#         if row['complex_number'] is not None or row['complex_name'] != "":
+#             name['complex'] = {'number': row['complex_number'], 'name': row['complex_name']}
+#
+#         name['type'] = row['name_type_ind']
+#
+#         if row['company_name'] != "":
+#             name['company'] = row['company_name']
+#
+#         if row['local_authority_name'] != "" or row['local_authority_area'] != "":
+#             name['local'] = {
+#                 'name': row['local_authority_name'],
+#                 'area': row['local_authority_area']
+#             }
+#
+#         if row['other_name'] != "":
+#             name['other'] = row['other_name']
+#         result.append(name)
+#
+#     return result
 
-    result = []
-    for row in rows:
-        name = {}
-        pname = {}
-        if row['forename'] != "":
-            pname['forenames'] = [row['forename']]
 
-        if row['middle_names']:
-            if 'forenames' not in pname:
-                pname['forenames'] = ['']
-            pname['forenames'] += row['middle_names'].split(' ')
-
-        if row['surname'] != "":
-            pname['surname'] = row['surname']
-
-        if 'forenames' in pname:
-            name['private'] = pname
-
-        if row['complex_number'] is not None or row['complex_name'] != "":
-            name['complex'] = {'number': row['complex_number'], 'name': row['complex_name']}
-
-        name['type'] = row['name_type_ind']
-
-        if row['company_name'] != "":
-            name['company'] = row['company_name']
-
-        if row['local_authority_name'] != "" or row['local_authority_area'] != "":
-            name['local'] = {
-                'name': row['local_authority_name'],
-                'area': row['local_authority_area']
-            }
-
-        if row['other_name'] != "":
-            name['other'] = row['other_name']
-        result.append(name)
-
-    return result
-
-
-def get_parties(cursor, data, details_id):
-    logging.warning("DEPRECATED - get_parties")
-    cursor.execute("select p.party_type, p.occupation, p.date_of_birth, pt.trading_name, p.id, p.residence_withheld  "
-                   "from party p left outer join party_trading pt on p.id = pt.party_id "
-                   "where p.register_detl_id=%(id)s", {'id': details_id})
-    rows = cursor.fetchall()
-
-    party_ids = []
-    for row in rows:
-        party_id = row['id']
-        party_ids.append(party_id)
-        names = get_party_names(cursor, party_id)
-        if row['party_type'] == 'Debtor':
-            data['debtor_names'] = names
-            data['trading'] = row['trading_name']
-            data['occupation'] = row['occupation']
-            data['residence_withheld'] = row['residence_withheld']
-        elif row['party_type'] == 'Estate Owner':
-            data['occupation'] = row['occupation']
-            data['residence_withheld'] = row['residence_withheld']
-            if len(names) > 1:
-                logging.debug(names)
-                raise RuntimeError("Too many estate owner names returned")
-            elif len(names) == 0:
-                raise RuntimeError("No names returned")
-
-            name = names[0]
-            data['estate_owner_ind'] = name['type']
-            del(name['type'])
-            data['estate_owner'] = name
-        else:
-            raise RuntimeError("Unknown party type: " + row['party_type'])
-    return party_ids
+# def get_parties(cursor, data, details_id):
+#     logging.warning("DEPRECATED - get_parties")
+#     cursor.execute("select p.party_type, p.occupation, p.date_of_birth, pt.trading_name, p.id, p.residence_withheld  "
+#                    "from party p left outer join party_trading pt on p.id = pt.party_id "
+#                    "where p.register_detl_id=%(id)s", {'id': details_id})
+#     rows = cursor.fetchall()
+#
+#     party_ids = []
+#     for row in rows:
+#         party_id = row['id']
+#         party_ids.append(party_id)
+#         names = get_party_names(cursor, party_id)
+#         if row['party_type'] == 'Debtor':
+#             data['debtor_names'] = names
+#             data['trading'] = row['trading_name']
+#             data['occupation'] = row['occupation']
+#             data['residence_withheld'] = row['residence_withheld']
+#         elif row['party_type'] == 'Estate Owner':
+#             data['occupation'] = row['occupation']
+#             data['residence_withheld'] = row['residence_withheld']
+#             if len(names) > 1:
+#                 logging.debug(names)
+#                 raise RuntimeError("Too many estate owner names returned")
+#             elif len(names) == 0:
+#                 raise RuntimeError("No names returned")
+#
+#             name = names[0]
+#             data['estate_owner_ind'] = name['type']
+#             del(name['type'])
+#             data['estate_owner'] = name
+#         else:
+#             raise RuntimeError("Unknown party type: " + row['party_type'])
+#     return party_ids
 
 
 def get_registration_no_from_details_id(cursor, details_id):
@@ -831,8 +832,13 @@ def read_names(cursor, party, party_id):
         }
 
         if name_type == 'Private Individual':
+            fornames = [row['forename']]
+            middle = row['middle_names']
+            if middle is not None and middle != "":
+                fornames.append(middle.split(' '))
+
             name['private'] = {
-                'forenames': [row['forename']] + row['middle_names'].split(' '),
+                'forenames': fornames,
                 'surname': row['surname']
             }
         elif name_type == 'Rural Council' or name_type == 'Parish Council' or \
@@ -952,6 +958,20 @@ def read_parties(cursor, data, details_id, legal_ref):
         read_names(cursor, party, row['id'])
 
 
+def get_lc_counties(cursor, details_id):
+    cursor.execute("select dcr.county_id, c.name  from detl_county_rel dcr, county c " +
+                   "where dcr.details_id = %(id)s and dcr.county_id = c.id ", {'id': details_id})
+    rows = cursor.fetchall()
+
+    counties = []
+    if len(rows) != 0:
+        counties = []
+        for row in rows:
+            counties.append(row['name'])
+    return counties
+
+
+
 def get_registration_details(cursor, reg_no, date):
     cursor.execute("SELECT r.registration_no, r.date, rd.class_of_charge, rd.id, r.id as register_id, "
                    "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
@@ -964,6 +984,7 @@ def get_registration_details(cursor, reg_no, date):
     if len(rows) == 0:
         return None
 
+    details_id = rows[0]['id']
     data = {
         'registration': {
             'number': rows[0]['registration_no'],
@@ -973,7 +994,13 @@ def get_registration_details(cursor, reg_no, date):
         'status': 'current'
     }
 
-    details_id = rows[0]['id']
+    if data['class_of_charge'] not in ['PAB', 'WOB']:
+        data['particulars'] = {
+            'counties': get_lc_counties(cursor, details_id),
+            'district': rows[0]['district'],
+            'description': rows[0]['short_description']
+        }
+
     register_id = rows[0]['register_id']
     legal_ref = rows[0]['legal_body_ref']
     if rows[0]['amends'] is not None:
@@ -1001,7 +1028,6 @@ def get_registration_details(cursor, reg_no, date):
             'date': str(rows[0]['date']),
             'type': rows[0]['amendment_type']
         }
-
 
     read_parties(cursor, data, details_id, legal_ref)
 

@@ -165,7 +165,7 @@ APPLICANT_SCHEMA = {
         "address": {"type": "string"},
         "key_number": {
             "type": "string",
-            "pattern": "^\d{7}$"
+            "pattern": "^\d{3,7}$"
         },
         "reference": {
             "type": "string"
@@ -184,21 +184,17 @@ REGISTRATION_SCHEMA = {
             "type": "array",
             "items": PARTY_SCHEMA
         },
-        # "debtor_addresses": {
-        #     "type": "array",
-        #     "items": ADDRESS_SCHEMA
-        # },
         "class_of_charge": {
             "type": "string",
             "enum": ["C1", "C2", "C3", "C4", "D1", "D2", "D3", "A", "B", "E", "F", "PA", "WO", "DA",
                      "ANN", "LC", "PAB", "WOB"]
         },
         "particulars": PARTICULARS_SCHEMA,
-        #"debtor": DEBTOR_SCHEMA,
         "applicant": APPLICANT_SCHEMA,
         "additional_information": {
             "type": "string"
-        }
+        },
+        "original_request": {"type": "string"}
     },
     "required": [
         "parties", "class_of_charge", "applicant"
@@ -272,6 +268,10 @@ def validate(data, schema):
             "location": path,
             "error_message": error.message
         })
+
+    # Fail before performing in-depth checks
+    if len(errors) > 0:
+        return errors
 
     # Ensure PAB/WOB has a 'debtor' entry (already assured that class_of_charge is valid)
     # if data['class_of_charge'] in ['PAB', 'WOB'] and 'debtor' not in data:
