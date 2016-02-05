@@ -13,7 +13,7 @@ from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_amendment, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
     get_registrations_by_date, get_all_registrations
-from application.schema import SEARCH_SCHEMA, validate, REGISTRATION_SCHEMA
+from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration
 from application.search import store_search_request, perform_search, store_search_result, read_searches
 
 
@@ -134,7 +134,7 @@ def register():
         return Response(status=415)
 
     json_data = request.get_json(force=True)
-    errors = validate(json_data, REGISTRATION_SCHEMA)
+    errors = validate_registration(json_data)
 
     if len(errors) > 0:
         raise_error({
@@ -287,33 +287,6 @@ def get_searches():
     return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
-migrated_schema = {
-    "type": "object",
-    "properties": {
-        "application_type": {"type": "string"},
-        "application_ref": {"type": "string"},
-        "date": {"type": "string", "pattern": "^([0-9]{4}-[0-9]{2}-[0-9]{2})$"},
-        "debtor_name": {
-            "type": "object",
-            "properties": {
-                "forenames": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 1
-                },
-                "surname": {"type": "string"}
-            },
-            "required": ["forenames", "surname"]
-        },
-        "occupation": {"type": "string"},
-        "residence": {
-            "type": "array",
-            "items": {"type": "object"}
-        }
-    },
-    "required": ["application_type", "application_ref", "date", "debtor_name", "residence"]
-}
-
 
 @app.route('/migrated_record', methods=['POST'])
 def insert():
@@ -322,13 +295,15 @@ def insert():
         return Response(status=415)
 
     data = request.get_json(force=True)
-    # logging.info(data)
-    # TODO: is there a need to validate the migration schema???
-    """try:
-        validate(data, migrated_schema)
-    except ValidationError as error:
-        message = "{}\n{}".format(error.message, error.path)
-        return Response(message, status=400)"""
+    errors = validate_migration(data)
+    if len(errors) > 0:
+        raise_error({
+            "type": "E",
+            "message": "Input data failed validation",
+            "stack": ""
+        })
+        logging.error("Input data failed validation")
+        return Response(json.dumps(errors), status=400, mimetype='application/json')
 
     previous_id = None
     for reg in data:

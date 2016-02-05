@@ -98,6 +98,50 @@ ADDRESS_SCHEMA = {
 }
 
 
+MIGRATED_ADDRESS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": ["Residence", "Business", "Investment"]
+        },
+        "address_string": {"type": "string"}
+    },
+    "required": ["type", "address_string"],
+    "additionalProperties": False
+}
+
+
+MIGRATED_PARTY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": [
+                "Debtor",
+                "Estate Owner",
+                "Court"
+            ]
+        },
+        "names": {
+            "type": "array",
+            "items": NAME_SCHEMA
+        },
+        "addresses": {
+            "type": "array",
+            "items": MIGRATED_ADDRESS_SCHEMA,
+        },
+        "occupation": {"type": "string"},
+        "trading_name": {"type": "string"},
+        "residence_withheld": {"type": "boolean"},
+        "case_reference": {"type": "string"},
+        "date_of_birth": DATE_SCHEMA
+    },
+    "required": ["type", "names"],
+    "additionalProperties": False
+}
+
+
 PARTY_SCHEMA = {
     "type": "object",
     "properties": {
@@ -142,6 +186,20 @@ PARTICULARS_SCHEMA = {
     "additionalProperties": False
 }
 
+MIGRATED_PARTICULARS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "counties": {
+            "type": "array",
+            "items": {"type": "string"}
+        },
+        "district": {"type": "string"},
+        "description": {"type": "string"}
+    },
+    "required": ["counties", "district", "description"],
+    "additionalProperties": False
+}
+
 DEBTOR_SCHEMA = {
     "type": "object",
     "properties": {
@@ -165,7 +223,7 @@ APPLICANT_SCHEMA = {
         "address": {"type": "string"},
         "key_number": {
             "type": "string",
-            "pattern": "^\d{3,7}$"
+            "pattern": "(^\d{3,7}$)|(^$)"
         },
         "reference": {
             "type": "string"
@@ -200,6 +258,49 @@ REGISTRATION_SCHEMA = {
         "parties", "class_of_charge", "applicant"
     ],
     "additionalProperties": False
+}
+
+MIGRATED_REGISTRATION_ITEM = {
+    "type": "object",
+    "properties": {
+        "registration": {
+            "type": "object",
+            "properties": {
+                "registration_no": {"type": "string"},
+                "date": DATE_SCHEMA            
+            }
+        },
+        "parties": {
+            "type": "array",
+            "items": MIGRATED_PARTY_SCHEMA
+        },
+        "type": {
+            "type": "string",
+            "enum": ["NR", "AM", "CN", "CP", "RN", "PN"]
+        },
+        "class_of_charge": {
+            "type": "string",
+            "enum": ["C1", "C2", "C3", "C4", "D1", "D2", "D3", "A", "B", "E", "F", "PA", "WO", "DA",
+                     "ANN", "LC", "PAB", "WOB"]
+        },
+        "particulars": MIGRATED_PARTICULARS_SCHEMA,
+        "applicant": APPLICANT_SCHEMA,
+        "additional_information": {
+            "type": "string"
+        },
+        "migration_data": {
+            "type": "object"        
+        }
+    },
+    "required": [
+        "parties", "class_of_charge", "applicant"
+    ],
+    "additionalProperties": False
+}
+
+MIGRATED_REGISTRATION_SCHEMA = {
+    "type": "array",
+    "items": MIGRATED_REGISTRATION_ITEM
 }
 
 
@@ -249,9 +350,30 @@ SEARCH_SCHEMA = {
     "required": ["customer", "parameters", "expiry_date", "search_date"]
 }
 
+def validate_migration(data):
+    val = Draft4Validator(MIGRATED_REGISTRATION_SCHEMA)
+    errors = []
+    for error in val.iter_errors(data):
+        path = "$"
+        while len(error.path) > 0:
+            item = error.path.popleft()
+            if isinstance(item, int):  # This is an assumption!
+                path += "[" + str(item) + "]"
+            else:
+                path += "." + item
+        if path == '$':
+            path = '$.'
+        print(error.message + "|" + path)
+        errors.append({
+            "location": path,
+            "error_message": error.message
+        })
 
-def validate(data, schema):
-    val = Draft4Validator(schema)
+    return errors
+
+
+def validate_registration(data):
+    val = Draft4Validator(REGISTRATION_SCHEMA)
     errors = []
     for error in val.iter_errors(data):
         path = "$"
@@ -316,3 +438,27 @@ def validate(data, schema):
                 errors.append({'error_message': "Attribute 'other' required for other"})
 
     return errors
+
+    
+def validate(data, schema):
+    val = Draft4Validator(schema)
+    errors = []
+    for error in val.iter_errors(data):
+        path = "$"
+        while len(error.path) > 0:
+            item = error.path.popleft()
+            if isinstance(item, int):  # This is an assumption!
+                path += "[" + str(item) + "]"
+            else:
+                path += "." + item
+        if path == '$':
+            path = '$.'
+        print(error.message + "|" + path)
+        errors.append({
+            "location": path,
+            "error_message": error.message
+        })
+
+    # Fail before performing in-depth checks
+    if len(errors) > 0:
+        return errors
