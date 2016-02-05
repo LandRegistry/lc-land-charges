@@ -747,7 +747,7 @@ def read_names(cursor, party, party_id, lead_debtor_id):
             fornames = [row['forename']]
             middle = row['middle_names']
             if middle is not None and middle != "":
-                fornames.append(middle.split(' '))
+                fornames += middle.split(' ')
 
             name['private'] = {
                 'forenames': fornames,
