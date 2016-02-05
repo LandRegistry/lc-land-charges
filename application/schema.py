@@ -27,7 +27,7 @@ AUTHORITY_SCHEMA = {
         "name": {"type": "string"},
         "area": {"type": "string"}
     },
-    "required": ["local", "area"],
+    "required": ["name", "area"],
     "additionalProperties": False
 }
 

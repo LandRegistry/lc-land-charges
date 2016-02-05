@@ -4,21 +4,6 @@ require 'json'
 uri = URI(ENV['LAND_CHARGES_URI'] || 'http://localhost:5004')
 http = Net::HTTP.new(uri.host, uri.port)
 
-standard_data = [
-
-]
-
-
-standard_data.each do |item|
-    request = Net::HTTP::Post.new('/registrations?suppress_queue=yes')
-    request.body = item
-    request["Content-Type"] = "application/json"
-    response = http.request(request)
-    if response.code != "200"
-        puts "banks-reg/registrations: #{response.code}"
-    end
-end
-
 counties = counties = '[' +
     '{ "eng": "Bath and NE Somerset" },' +
     '{ "eng": "Bedford" },' +
@@ -139,4 +124,23 @@ request["Content-Type"] = "application/json"
 response = http.request(request)
 if response.code != "200"
     puts "banks-reg/counties: #{response.code}"
+end
+
+
+standard_data = [
+    '{"applicant": {"address": "[INS PLACEHOLDER HERE! FIXME]", "name": "[INS PLACEHOLDER HERE! FIXME]", "reference": "APP01", "key_number": "1234567"}, "parties": [{"case_reference": "[WHAT GOES HERE] FIXME!", "trading_name": "", "residence_withheld": false, "date_of_birth": "1980-01-01", "names": [{"private": {"forenames": ["Bob", "Oscar", "Francis"], "surname": "Howard"}, "type": "Private Individual"}], "occupation": "Civil Servant", "addresses": [{"address_lines": ["1 The Street", "The Town"], "county": "The County", "postcode": "AA1 1AA", "type": "Residence"}], "type": "Debtor"}], "class_of_charge": "PAB"}',
+    '{"applicant": {"address": "[INS PLACEHOLDER HERE! FIXME]", "name": "[INS PLACEHOLDER HERE! FIXME]", "reference": "APP02", "key_number": "1234567"}, "parties": [{"case_reference": "[WHAT GOES HERE] FIXME!", "trading_name": "", "residence_withheld": false, "date_of_birth": "1980-01-01", "names": [{"private": {"forenames": ["Alphonso", "Alice"], "surname": "Schmidt"}, "type": "Private Individual"}, {"private": {"forenames": ["Bert"], "surname": "Smith"}, "type": "Private Individual"}], "occupation": "Civil Servant", "addresses": [{"address_lines": ["1 The Street", "The Locality", "The Town"], "county": "The County", "postcode": "AA1 1AA", "type": "Residence"}], "type": "Debtor"}], "class_of_charge": "PAB"}',
+    '{"particulars": {"description": "1 The Lane, Some Village", "counties": ["Devon"], "district": "South Hams"}, "class_of_charge": "C1", "applicant": {"address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095", "name": "P334 Team", "reference": "reference 11"}, "parties": [{"type": "Estate Owner", "names": [{"type": "Private Individual", "private": {"surname": "Johnson", "forenames": ["Jo", "John"]}}]}]}',
+    '{"particulars": {"description": "Flat A, Floor 15, The Hideous Tower, Cityname", "counties": ["Dorset", "Lancashire"], "district": "Mixed"}, "class_of_charge": "C1", "applicant": {"address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095", "name": "P334 Team", "reference": "reference 11"}, "parties": [{"type": "Estate Owner", "names": [{"type": "County Council", "local": {"area": "Lancs", "name": "South Marsh District Council"}}]}]}'
+]
+
+
+standard_data.each do |item|
+    request = Net::HTTP::Post.new('/registrations?suppress_queue=yes')
+    request.body = item
+    request["Content-Type"] = "application/json"
+    response = http.request(request)
+    if response.code != "200"
+        puts "banks-reg/registrations: #{response.code}"
+    end
 end
