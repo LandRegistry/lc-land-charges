@@ -267,9 +267,11 @@ def insert_register_details(cursor, request_id, data, date, amends):
     if 'particulars' in data:
         district = data['particulars']['district']
         short_description = data['particulars']['description']
+        priority_notice = data['particulars']['priority_notice']
     else:
         district = None
         short_description = None
+        priority_notice = None
 
     debtor = None
     for party in data['parties']:
@@ -282,12 +284,12 @@ def insert_register_details(cursor, request_id, data, date, amends):
         legal_ref = None
 
     cursor.execute("INSERT INTO register_details (request_id, class_of_charge, legal_body_ref, "
-                   "amends, district, short_description, additional_info) "
-                   "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s) "
+                   "amends, district, short_description, additional_info, priority_notice_no  ) "
+                   "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s, %(pno)s) "
                    "RETURNING id", {
                        "rid": request_id, "coc": data['class_of_charge'],
                        "legal_ref": legal_ref, "amends": amends, "dist": district,
-                       "sdesc": short_description, "addl": additional_info
+                       "sdesc": short_description, "addl": additional_info, "pno": priority_notice
                    })
     return cursor.fetchone()[0]
 
@@ -519,6 +521,7 @@ def insert_counties(cursor, details_id, counties):
 
 
 def insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None):
+
     names, register_details_id = insert_details(cursor, request_id, data, date, amends)
 
     if data['class_of_charge'] in ['PAB', 'WOB']:

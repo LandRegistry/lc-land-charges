@@ -134,6 +134,7 @@ def register():
         return Response(status=415)
 
     json_data = request.get_json(force=True)
+
     errors = validate(json_data, REGISTRATION_SCHEMA)
 
     if len(errors) > 0:

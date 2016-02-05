@@ -136,7 +136,8 @@ PARTICULARS_SCHEMA = {
             "minItems": 1
         },
         "district": {"type": "string"},
-        "description": {"type": "string"}
+        "description": {"type": "string"},
+        "priority_notice": {"type": "string"}
     },
     "required": ["counties", "district", "description"],
     "additionalProperties": False
