@@ -15,6 +15,7 @@ from application.data import connect, get_registration_details, complete, \
     get_registrations_by_date, get_all_registrations
 from application.schema import SEARCH_SCHEMA, validate, REGISTRATION_SCHEMA
 from application.search import store_search_request, perform_search, store_search_result, read_searches
+from application.oc import get_ins_office_copy
 
 
 @app.route('/', methods=["GET"])
@@ -265,10 +266,7 @@ def create_search():
         
 @app.route('/searches', methods=['GET'])
 def get_searches():
-    # if 'filter' in request.args:
-    #    nonissued = (request.args['filter'] == 'nonissued')
     name = request.args['name']
-    print('this is name))))))', name)
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         result = read_searches(cursor, name)
@@ -285,6 +283,27 @@ def get_searches():
         complete(cursor)
 
     return Response(json.dumps(data), status=200, mimetype='application/json')
+
+
+# ============== Office Copies ===============
+
+
+@app.route('/office_copy', methods=['GET'])
+def retrieve_office_copy():
+    class_of_charge = request.args['class']
+    reg_no = request.args['reg_no']
+    date = request.args['date']
+
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        data = get_ins_office_copy(cursor, class_of_charge, reg_no, date)
+    finally:
+        complete(cursor)
+
+    if data is None:
+        return Response(data, status=404, mimetype='application/json')
+    else:
+        return Response(data, status=200, mimetype='application/json')
 
 
 migrated_schema = {
