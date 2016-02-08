@@ -236,8 +236,6 @@ def create_search():
     data = request.get_json(force=True)
     print('this is search data', json.dumps(data))
     errors = validate(data, SEARCH_SCHEMA)
-    print('errors', errors)
-    # if len(errors) > 0:
     if errors is not None:
         return Response(json.dumps(errors), status=400)
     print(data['parameters']['search_type'])
