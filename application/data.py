@@ -266,14 +266,16 @@ def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_n
 def insert_register_details(cursor, request_id, data, date, amends):
     additional_info = data['additional_information'] if 'additional_information' in data else None
 
+    priority_notice = None
     if 'particulars' in data:
         district = data['particulars']['district']
         short_description = data['particulars']['description']
-        priority_notice = data['particulars']['priority_notice']
+        if 'priority_notice' in data['particulars']:
+            priority_notice = data['particulars']['priority_notice']
     else:
         district = None
         short_description = None
-        priority_notice = None
+
 
     debtor = None
     for party in data['parties']:
