@@ -236,7 +236,9 @@ def create_search():
     data = request.get_json(force=True)
     print('this is search data', json.dumps(data))
     errors = validate(data, SEARCH_SCHEMA)
-    if len(errors) > 0:
+    print('errors', errors)
+    # if len(errors) > 0:
+    if errors is not None:
         return Response(json.dumps(errors), status=400)
     print(data['parameters']['search_type'])
     if data['parameters']['search_type'] not in ['full', 'banks']:
@@ -561,34 +563,34 @@ def get_request_ids(count):
 
 @app.route('/search_type/<request_id>', methods=["GET"])
 def get_search_type(request_id):
-   cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-   #get all rows for this request id, if none contain results then search type is 'search_nr'
-   try:
-       sql = "Select result from search_results where request_id = %(request_id)s"
-       cursor.execute(sql,{"request_id": request_id})
-       rows = cursor.fetchall()
-   finally:
-       complete(cursor)
-   search_type = {'search_type':'search nr'}
-   for row in rows:
-       if row['result']:
-           search_type = {'search_type':'search'}
-   return Response(json.dumps(search_type), status=200,mimetype='application/json')
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    # get all rows for this request id, if none contain results then search type is 'search_nr'
+    try:
+        sql = "Select result from search_results where request_id = %(request_id)s"
+        cursor.execute(sql,{"request_id": request_id})
+        rows = cursor.fetchall()
+    finally:
+        complete(cursor)
+    search_type = {'search_type':'search nr'}
+    for row in rows:
+        if row['result']:
+            search_type = {'search_type':'search'}
+    return Response(json.dumps(search_type), status=200,mimetype='application/json')
 
 
 # test route
 @app.route('/last_search', methods=["GET"])
 def last_search():
-   cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-   #get all rows for this request id, if none contain results then search type is 'search_nr'
-   try:
-       sql = "Select id as search_details_id, request_id, search_timestamp " \
-             "from search_details where id = (select max(id) from search_details) "
-       cursor.execute(sql)
-       rows = cursor.fetchall()
-   finally:
-       complete(cursor)
-   for row in rows:
-       data = {'search_details_id':row['search_details_id'],'request_id':row['request_id'],
-               'timestamp':str(row['search_timestamp'])}
-   return Response(json.dumps(data), status=200, mimetype='application/json')
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    # get all rows for this request id, if none contain results then search type is 'search_nr'
+    try:
+        sql = "Select id as search_details_id, request_id, search_timestamp " \
+              "from search_details where id = (select max(id) from search_details) "
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+    finally:
+        complete(cursor)
+    for row in rows:
+        data = {'search_details_id':row['search_details_id'], 'request_id': row['request_id'],
+                'timestamp': str(row['search_timestamp'])}
+    return Response(json.dumps(data), status=200, mimetype='application/json')

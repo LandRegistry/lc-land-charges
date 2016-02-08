@@ -308,7 +308,7 @@ def store_search_request(cursor, data):
                        })
         search_name_id = cursor.fetchone()[0]
         data['parameters']['search_items'][count]['name_id'] = search_name_id
-
+    print('****we are here******')
     return request_id, details_id, data
 
 
@@ -355,6 +355,28 @@ def perform_search(cursor, parameters, cert_date):
                 # Do full search by name
                 name_string = "{} {}".format(item['name']['forenames'], item['name']['surname'])
                 search_name = get_searchable_string(name_string, ' ', ' ', ' ', ' ')
+                print('full search name', search_name)
+                search_results.append({'name_result': search_full_by_name(cursor, search_name,
+                                                                          parameters['counties'],
+                                                                          item['year_from'],
+                                                                          item['year_to'],
+                                                                          cert_date),
+                                       'name_id': item['name_id']})
+                # Do search by initials and surname
+                initials = get_initials(item['name']['forenames'])
+                name_string = "{} {}".format(initials, item['name']['surname'])
+                search_name = get_searchable_string(name_string, ' ', ' ', ' ', ' ')
+                print('initials and surname', search_name)
+                search_results.append({'name_result': search_full_by_name(cursor, search_name,
+                                                                          parameters['counties'],
+                                                                          item['year_from'],
+                                                                          item['year_to'],
+                                                                          cert_date),
+                                       'name_id': item['name_id']})
+                # Do search by surname only
+                name_string = item['name']['surname']
+                search_name = get_searchable_string(name_string, ' ', ' ', ' ', ' ')
+                print('surname only', search_name)
                 search_results.append({'name_result': search_full_by_name(cursor, search_name,
                                                                           parameters['counties'],
                                                                           item['year_from'],
@@ -532,3 +554,14 @@ def get_abbrev_name(name):
 
     abbrev_name = "".join(abbrev_list)
     return abbrev_name
+
+
+def get_initials(names):
+    print(names)
+    initials_list = []
+    for name in names:
+        initials_list.append(name[:1])
+    print(initials_list)
+    initials = " ".join(initials_list)
+    print(initials)
+    return initials
