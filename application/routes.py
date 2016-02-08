@@ -137,6 +137,11 @@ def register():
     json_data = request.get_json(force=True)
 
     errors = validate_registration(json_data)
+    if 'dev_date' in request.args and app.config['ALLOW_DEV_ROUTES']:
+        logging.info('Overriding date')
+        json_data['dev_registration'] = {
+            'date': request.args['dev_date']
+        }
 
     if len(errors) > 0:
         raise_error({

@@ -505,7 +505,10 @@ def insert_new_registration(cursor, data):
     # request_id = insert_request(cursor, data['key_number'], data["class_of_charge"], data['application_ref'],
     #                             data['date'], document, original, data['customer_name'], data['customer_address'])
 
-    reg_nos, details_id = insert_record(cursor, data, request_id, date)
+    if 'dev_registration' in data:
+        date = data['dev_registration']['date']
+
+    reg_nos, details_id = insert_record(cursor, data, request_id, date, None, None)
     return reg_nos, details_id, request_id
 
 
