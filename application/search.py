@@ -13,7 +13,7 @@ def bankruptcy_search(cursor, full_name, cert_date):
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null"
                    "  AND r.date <= %(date)s"
-                   "  AND rd.class_of_charge in ('PA(B)', 'WO(B)', 'PA', 'WO', 'DA')",
+                   "  AND rd.class_of_charge in ('PAB', 'WOB', 'PA', 'WO', 'DA')",
                    {
                        'name': full_name.upper(), 'date': cert_date
                    })
@@ -202,7 +202,7 @@ def search_by_complex_name(cursor, complex_name, complex_number, cert_date):
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null and r.date <= %(date)s"
-                   "  AND rd.class_of_charge in ('PA(B)', 'WO(B)', 'PA', 'WO', 'DA')",
+                   "  AND rd.class_of_charge in ('PAB', 'WOB', 'PA', 'WO', 'DA')",
                    {
                        'name': complex_name.upper(), 'number': complex_number, 'date': cert_date
                    })
