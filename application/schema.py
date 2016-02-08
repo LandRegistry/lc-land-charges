@@ -277,7 +277,7 @@ MIGRATED_REGISTRATION_ITEM = {
         },
         "type": {
             "type": "string",
-            "enum": ["NR", "AM", "CN", "CP", "RN", "PN"]
+            "enum": ["NR", "AM", "CN", "CP", "RN", "PN", "RC"]
         },
         "class_of_charge": {
             "type": "string",

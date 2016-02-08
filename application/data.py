@@ -505,7 +505,10 @@ def insert_new_registration(cursor, data):
     # request_id = insert_request(cursor, data['key_number'], data["class_of_charge"], data['application_ref'],
     #                             data['date'], document, original, data['customer_name'], data['customer_address'])
 
-    reg_nos, details_id = insert_record(cursor, data, request_id, date)
+    if 'dev_registration' in data:
+        date = data['dev_registration']['date']
+
+    reg_nos, details_id = insert_record(cursor, data, request_id, date, None, None)
     return reg_nos, details_id, request_id
 
 
@@ -875,15 +878,16 @@ def get_registration_details(cursor, reg_no, date):
     if rows[0]['cancelled_by'] is not None:
         cursor.execute("select amends, amendment_type from register_details where amends=%(id)s",
                        {"id": details_id})
-        rows = cursor.fetchall()
-        if len(rows) > 0:
+        amd_rows = cursor.fetchall()
+        if len(amd_rows) > 0:
             data['status'] = 'superseded'
         else:
             data['status'] = 'cancelled'
             data['cancellation'] = {'reference': rows[0]['cancelled_by']}
-            cursor.execute('select application_date from request where id=%(id)s', {'id': data['cancellation_ref']})
-            cancel_rows = cursor.fetchall()
-            data['cancellation']['date'] = cancel_rows[0]['application_date'].isoformat()
+            # TODO: this is bugged
+            # cursor.execute('select application_date from request where id=%(id)s', {'id': data['cancellation_ref']})
+            # cancel_rows = cursor.fetchall()
+            # data['cancellation']['date'] = cancel_rows[0]['application_date'].isoformat()
 
     cursor.execute('select r.registration_no, r.date, d.amendment_type, d.amends FROM register r, register_details d ' +
                    'WHERE r.details_id=d.id AND d.amends=%(id)s', {'id': details_id})

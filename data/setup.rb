@@ -134,9 +134,18 @@ standard_data = [
     '{"particulars": {"description": "Flat A, Floor 15, The Hideous Tower, Cityname", "counties": ["Dorset", "Lancashire"], "district": "Mixed"}, "class_of_charge": "C1", "applicant": {"address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095", "name": "P334 Team", "reference": "reference 11"}, "parties": [{"type": "Estate Owner", "names": [{"type": "County Council", "local": {"area": "Lancs", "name": "South Marsh District Council"}}]}]}'
 ]
 
+regn_dates = [
+    '2014-06-03',
+    '2014-07-02',
+    '2014-08-01',
+    '2014-09-29'
+]
 
-standard_data.each do |item|
-    request = Net::HTTP::Post.new('/registrations?suppress_queue=yes')
+standard_data.length.times do |i|
+    item = standard_data[i]
+    date = regn_dates[i]
+
+    request = Net::HTTP::Post.new('/registrations?suppress_queue=yes&dev_date=' + date)
     request.body = item
     request["Content-Type"] = "application/json"
     response = http.request(request)
