@@ -789,7 +789,7 @@ def get_lc_counties(cursor, details_id, lead_county_id):
 
 
 def get_registration_details(cursor, reg_no, date):
-    cursor.execute("SELECT r.registration_no, r.date, rd.class_of_charge, rd.id, r.id as register_id, "
+    cursor.execute("SELECT r.registration_no, r.date, r.reveal, rd.class_of_charge, rd.id, r.id as register_id, "
                    "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
                    "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type "
                    "from register r, register_details rd "
@@ -809,7 +809,8 @@ def get_registration_details(cursor, reg_no, date):
             'date': rows[0]['date'].strftime('%Y-%m-%d')
         },
         'class_of_charge': rows[0]['class_of_charge'],
-        'status': 'current'
+        'status': 'current',
+        'revealed': rows[0]['reveal']
     }
 
     if data['class_of_charge'] not in ['PAB', 'WOB']:
