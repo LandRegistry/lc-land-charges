@@ -236,9 +236,25 @@ APPLICANT_SCHEMA = {
     "additionalProperties": False
 }
 
+
+UPDATE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": ['Rectification', 'Correction']
+        }
+    },
+    "required": [
+        "type"
+    ],
+    "additionalProperties": False
+}
+
 REGISTRATION_SCHEMA = {
     "type": "object",
     "properties": {
+        "update_registration": UPDATE_SCHEMA,
         "parties": {
             "type": "array",
             "items": PARTY_SCHEMA
@@ -351,6 +367,7 @@ SEARCH_SCHEMA = {
     "required": ["customer", "parameters", "expiry_date", "search_date"]
 }
 
+
 def validate_migration(data):
     val = Draft4Validator(MIGRATED_REGISTRATION_SCHEMA)
     errors = []
@@ -373,7 +390,21 @@ def validate_migration(data):
     return errors
 
 
+def validate_update(data):
+    errors = validate_generic_registration(data)
+    if 'update_registration' not in data:
+        errors.append({'error_message': "Attribute 'update_registration' is required"})
+    return errors
+
+
 def validate_registration(data):
+    errors = validate_generic_registration(data)
+    if 'update_registration' in data:
+        errors.append({'error_message': "Attribute 'update_registration' is not allowed"})
+    return errors
+
+
+def validate_generic_registration(data):
     val = Draft4Validator(REGISTRATION_SCHEMA)
     errors = []
     for error in val.iter_errors(data):
@@ -396,17 +427,50 @@ def validate_registration(data):
     if len(errors) > 0:
         return errors
 
-    # Ensure PAB/WOB has a 'debtor' entry (already assured that class_of_charge is valid)
-    # if data['class_of_charge'] in ['PAB', 'WOB'] and 'debtor' not in data:
-    #     errors.append({'error_message': "Attribute 'debtor' required for bankruptcy"})
-    # TODO ensure debtor party present on bankruptcy
-    # TODO ensure occupation, trading, res_wh & ref on debtor party
-    # TODO ensure consistency of addresses and res_wh on debtor party
-    # TODO ensure only addresses on Debtor party
-    # TODO allow aliases only on Debtor party
-    # If not a PAB/WOB, it's a land charge - make sure it has a 'particulars' entry
-    if data['class_of_charge'] not in ['PAB', 'WOB'] and 'particulars' not in data:
-        errors.append({'error_message': "Attribute 'particulars' required for land charge"})
+    debtor = None
+    estate_owner = None
+    for party in data['parties']:
+        if party['type'] == 'Debtor':
+            debtor = party
+        else:
+            if party['type'] == 'Estate Owner':
+                estate_owner = party
+
+            if 'addresses' in party:
+                errors.append({'error_message': 'Addresses not allowed on non-debtor party'})
+
+            if len(party['names']) > 1:
+                errors.append({'error_message': 'Multiple names not allowed on non-debtor party'})
+
+    # Bankruptcy specific validation
+    if data['class_of_charge'] in ['PAB', 'WOB']:
+        if estate_owner is not None:
+            errors.append({'error_message': "Party of type 'Estate Owner' not allowed for bankruptcy"})
+
+        if debtor is None:
+            errors.append({'error_message': "Party of type 'Debtor' required for bankruptcy"})
+        else:
+            for item in ['occupation', 'trading_name', 'residence_withheld', 'case_reference' ]:
+                if item not in debtor:
+                    errors.append({'error_message': "Attribute '{}' required for bankruptcy debtor".format(item)})
+
+            if 'residence_withheld' in debtor:
+                if debtor['residence_withheld'] == True and len(debtor['addresses']) > 0:
+                    errors.append({'error_message': 'Debtor residence_withheld is true and addresses are present'})
+
+                if debtor['residence_withheld'] == False and len(debtor['addresses']) == 0:
+                    errors.append({'error_message': 'Debtor residence_withheld is false but addresses are missing'})
+
+    # TODO ensure update_registration is not present - somehow - validate update uses this method
+    # Land Charge specific validation
+    if data['class_of_charge'] not in ['PAB', 'WOB']:
+        if debtor is not None:
+            errors.append({'error_message': "Party of type 'Debtor' not allowed for land charge"})
+
+        if 'particulars' not in data:
+            errors.append({'error_message': "Attribute 'particulars' required for land charge"})
+        if estate_owner is None:
+            errors.append({'error_message': "Party of type 'Estate Owner' required for land charge"})
 
     # Check that party types and name structure supplied match
     for party in data['parties']:
