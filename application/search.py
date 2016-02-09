@@ -345,8 +345,8 @@ def perform_search(cursor, parameters, cert_date):
                 # Search against the variations of the complex name
                 for name in item['name']['complex_variations']:
                     comp_results = (search_full_by_complex_name(cursor,
-                                                                name['complex_name'],
-                                                                name['complex_number'],
+                                                                name['name'],
+                                                                name['number'],
                                                                 parameters['counties'],
                                                                 item['year_from'],
                                                                 item['year_to'],
@@ -428,7 +428,7 @@ def perform_search(cursor, parameters, cert_date):
                 # Do complex name search
                 # Search against the variations of the complex name
                 for name in item['name']['complex_variations']:
-                    comp_results = (search_by_complex_name(cursor, name['complex_name'], name['complex_number'],
+                    comp_results = (search_by_complex_name(cursor, name['name'], name['number'],
                                                            cert_date))
 
                     if len(comp_results) > 0:

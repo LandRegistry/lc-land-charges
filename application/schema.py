@@ -35,7 +35,7 @@ COMPLEX_SCHEMA = {
     "type": "object",
     "properties": {
         "name": {"type": "string"},
-        "number": {"type": "string"}
+        "number": {"type": "integer"}
     },
     "required": ["name", "number"],
     "additionalProperties": False
