@@ -996,7 +996,7 @@ def get_county_id(cursor, county):
 def get_register_request_details(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        sql = "Select request_id, registration_date, registration_no "\
+        sql = "Select a.request_id, b.date as registration_date, b.registration_no "\
               " from register_details a, register b "\
               " where a.request_id = %(request_id)s and a.id = b.details_id "
         cursor.execute(sql, {"request_id": request_id})
