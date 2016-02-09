@@ -382,15 +382,7 @@ def insert_counties(cursor, details_id, counties):
         ids.append({'id': county_id, 'name': county})
     return ids
 
-    # if 'lc_register_details' in data:
-    #     # 2do: insert county here???
-    #     data['county_ids'] = []
-    #     for item in data['lc_register_details']['county']:
-    #         county_detl_id, county_id = insert_lc_county(cursor, register_details_id, item)
-    #         data['county_ids'].append({'id': county_id, 'name': item})  # for use later...
-    #
-
-
+    
 def insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None):
 
     names, register_details_id = insert_details(cursor, request_id, data, date, amends)
@@ -878,16 +870,20 @@ def insert_migrated_record(cursor, data):
             'CP': 'Part cancellation',
             'CN': 'Cancellation',
             'RN': 'Renewal',
-            'PN': 'Priority notice'
+            'PN': 'Priority notice',
+            'RC': 'Rectification'
         }
         type_str = types[data['type']]
     
         #def insert_request(cursor, applicant, application_type, date, original_data=None):
-        request_id = insert_request(cursor, data['applicant'], type_str, data['registration']['date'], None)
-                                    
-                                    
+        request_id = insert_request(cursor, data['applicant'], type_str, data['registration']['date'], None)                                   
                                     
         reg_nos, details_id = insert_record(cursor, data, request_id, data['registration']['date'], None, data['registration']['registration_no'])
+        
+        if len(data['parties']) == 0:
+            # There was no row on the original index, so by definition is cannot be revealed
+            mark_as_no_reveal(cursor, data['registration']['registration_no'], data['registration']['date'])
+            
     return details_id, request_id
         # details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
         # party_id = insert_party(cursor, details_id, "Debtor", None, None, False)

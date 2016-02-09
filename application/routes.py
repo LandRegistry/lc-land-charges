@@ -333,34 +333,6 @@ def retrieve_office_copy():
         return Response(data, status=200, mimetype='application/json')
 
 
-migrated_schema = {
-    "type": "object",
-    "properties": {
-        "application_type": {"type": "string"},
-        "application_ref": {"type": "string"},
-        "date": {"type": "string", "pattern": "^([0-9]{4}-[0-9]{2}-[0-9]{2})$"},
-        "debtor_name": {
-            "type": "object",
-            "properties": {
-                "forenames": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 1
-                },
-                "surname": {"type": "string"}
-            },
-            "required": ["forenames", "surname"]
-        },
-        "occupation": {"type": "string"},
-        "residence": {
-            "type": "array",
-            "items": {"type": "object"}
-        }
-    },
-    "required": ["application_type", "application_ref", "date", "debtor_name", "residence"]
-}
-
-
 @app.route('/migrated_record', methods=['POST'])
 def insert():
     if request.headers['Content-Type'] != "application/json":
@@ -383,7 +355,7 @@ def insert():
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         try:
             details_id, request_id = insert_migrated_record(cursor, reg)
-            if reg['type'] in ['AM', 'CN', 'CP', 'RN']:
+            if reg['type'] in ['AM', 'CN', 'CP', 'RN', 'RC']:
                 if details_id is not None:
                     cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
                                    "id = %(id)s AND cancelled_by IS NULL",
@@ -405,6 +377,13 @@ def insert():
                                    "id = %(id)s",
                                    {
                                        "amend": previous_id, "id": details_id, "type": "Renewal"
+                                   })
+                                   
+                if reg['type'] == 'RC':
+                    cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
+                                   "id = %(id)s",
+                                   {
+                                       "amend": previous_id, "id": details_id, "type": "Rectification"
                                    })
 
             previous_id = details_id
