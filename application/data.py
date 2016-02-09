@@ -202,18 +202,24 @@ def insert_register_details(cursor, request_id, data, date, amends):
     else:
         legal_ref = None
 
+    is_priority_notice = None
+    if 'priority_notice' in data and data['priority_notice'] == True:
+        is_priority_notice = True
+
     amend_type = None
     if 'update_registration' in data:
         amend_type = data['update_registration']['type']
 
     cursor.execute("INSERT INTO register_details (request_id, class_of_charge, legal_body_ref, "
-                   "amends, district, short_description, additional_info, amendment_type, priority_notice_no  ) "
-                   "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s, %(atype)s, %(pno)s) "
+                   "amends, district, short_description, additional_info, amendment_type, priority_notice_no, "
+                   "priority_notice_ind ) "
+                   "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s, %(atype)s, "
+                   "%(pno)s, %(pind)s) "
                    "RETURNING id", {
                        "rid": request_id, "coc": data['class_of_charge'],
                        "legal_ref": legal_ref, "amends": amends, "dist": district,
                        "sdesc": short_description, "addl": additional_info, "atype": amend_type,
-                       "pno": priority_notice
+                       "pno": priority_notice, 'pind': is_priority_notice
                    })
     return cursor.fetchone()[0]
 
@@ -493,33 +499,6 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data):
 
     return original_regs, reg_nos
 
-    # For now, always insert a new record
-    # original_detl_id = get_register_details_id(cursor, orig_reg_no)
-    # if original_detl_id is None:
-    #     return None, None, None
-    #
-    # document = None
-    # if 'document_id' in data:
-    #     document = data['document_id']
-    #
-    # now = datetime.datetime.now()
-    # request_id = insert_request(cursor, None, "RECTIFICATION", None, now, document, None, data['customer_name'],
-    #                             data['customer_address'])
-    #
-    # # pylint: disable=unused-variable
-    # original_regs = get_all_registration_nos(cursor, original_detl_id)
-    # amend_detl_id = get_register_details_id(cursor, orig_reg_no)
-    # reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id, orig_reg_no)
-    #
-    # # Update old registration
-    # cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
-    #                "id = %(id)s AND cancelled_by IS NULL",
-    #                {
-    #                    "canc": request_id, "id": original_detl_id
-    #                })
-    # rows = cursor.rowcount
-    # return original_regs, reg_nos, rows
-
 
 def get_register_details_id(cursor, reg_no, date):
     cursor.execute("SELECT details_id FROM register WHERE registration_no = %(regno)s AND date=%(date)s",
@@ -792,7 +771,8 @@ def get_lc_counties(cursor, details_id, lead_county_id):
 def get_registration_details(cursor, reg_no, date):
     cursor.execute("SELECT r.registration_no, r.date, r.reveal, rd.class_of_charge, rd.id, r.id as register_id, "
                    "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
-                   "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type "
+                   "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type, "
+                   "rd.priority_notice_ind "
                    "from register r, register_details rd "
                    "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id", {
                        'reg_no': reg_no, 'date': date
@@ -815,6 +795,9 @@ def get_registration_details(cursor, reg_no, date):
     }
 
     if data['class_of_charge'] not in ['PAB', 'WOB']:
+        if rows[0]['priority_notice_ind']:
+            data['priority_notice'] = True
+
         data['particulars'] = {
             'counties': get_lc_counties(cursor, details_id, lead_county),
             'district': rows[0]['district'],

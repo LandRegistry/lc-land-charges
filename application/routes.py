@@ -87,7 +87,7 @@ def registrations_by_date(date):
     else:
         return Response(json.dumps(details), status=200, mimetype='application/json')
 
-        
+
 @app.route('/registrations', methods=['GET'])
 def all_registrations():
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -164,7 +164,11 @@ def register():
     if not suppress:
         publish_new_bankruptcy(producer, new_regns)
 
-    return Response(json.dumps({'new_registrations': new_regns, 'request_id': request_id}), status=200, mimetype='application/json')
+    reg_type = 'new_registrations'
+    if 'priority_notice' in json_data and json_data['priority_notice']:
+        reg_type = 'priority_notices'
+
+    return Response(json.dumps({reg_type: new_regns, 'request_id': request_id}), status=200, mimetype='application/json')
 
 
 @app.route('/registrations/<date>/<reg_no>', methods=["PUT"])

@@ -269,6 +269,7 @@ REGISTRATION_SCHEMA = {
         "additional_information": {
             "type": "string"
         },
+        "priority_notice": {"type": "boolean"},
         "original_request": {"type": "string"}
     },
     "required": [
@@ -394,6 +395,8 @@ def validate_update(data):
     errors = validate_generic_registration(data)
     if 'update_registration' not in data:
         errors.append({'error_message': "Attribute 'update_registration' is required"})
+    if 'priority_notice' in data:
+        errors.append({'error_message': "Attribute 'priority_notice' is not allowed"})
     return errors
 
 
@@ -446,6 +449,9 @@ def validate_generic_registration(data):
     if data['class_of_charge'] in ['PAB', 'WOB']:
         if estate_owner is not None:
             errors.append({'error_message': "Party of type 'Estate Owner' not allowed for bankruptcy"})
+
+        if 'priority_notice' in data:
+            errors.append({'error_message': "priority_notice not allowed for bankruptcy"})
 
         if debtor is None:
             errors.append({'error_message': "Party of type 'Debtor' required for bankruptcy"})

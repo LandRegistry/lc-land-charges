@@ -13,6 +13,7 @@ def bankruptcy_search(cursor, full_name, cert_date):
                    "  AND r.details_id = rd.id "
                    "  AND rd.cancelled_by is null"
                    "  AND r.date <= %(date)s"
+                   "  AND r.reveal='t'"
                    "  AND rd.class_of_charge in ('PAB', 'WOB', 'PA', 'WO', 'DA')",
                    {
                        'name': full_name.upper(), 'date': cert_date
@@ -33,7 +34,7 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
                        "and rd.id=r.details_id " +
                        "and (extract(year from r.date) between %(from_date)s and %(to_date)s " +
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
-                       "and rd.cancelled_by is null and r.date <= %(date)s",
+                       "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'name': full_name.upper(), 'from_date': year_from, 'to_date': year_to,
                            'date': cert_date
@@ -54,7 +55,7 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
                        "and ((UPPER(c.name) = ANY(%(counties)s) "
                        "    and extract(year from r.date) between %(from_date)s and %(to_date)s) " +
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
-                       "and rd.cancelled_by is null and r.date <= %(date)s",
+                       "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'name': full_name.upper(), 'from_date': year_from, 'to_date': year_to,
                            'counties': uc_counties, 'date': cert_date
@@ -76,7 +77,7 @@ def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date
                        "and rd.id=r.details_id " +
                        "and (extract(year from r.date) between %(from_date)s and %(to_date)s " +
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
-                       "and rd.cancelled_by is null and r.date <= %(date)s",
+                       "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'company_name': name.upper(), 'from_date': year_from, 'to_date': year_to,
                            'date': cert_date
@@ -97,7 +98,7 @@ def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date
                        "and ((UPPER(c.name) = ANY(%(counties)s) "
                        "    and extract(year from r.date) between %(from_date)s and %(to_date)s) " +
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
-                       "and rd.cancelled_by is null and r.date <= %(date)s",
+                       "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'company_name': name.upper(), 'from_date': year_from, 'to_date': year_to,
                            'counties': uc_counties, 'date': cert_date
@@ -119,7 +120,7 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to, c
                        "and rd.id=r.details_id " +
                        "and (extract(year from r.date) between %(from_date)s and %(to_date)s " +
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
-                       "and rd.cancelled_by is null and r.date <= %(date)s",
+                       "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'loc_name': name.upper(),
                            'from_date': year_from, 'to_date': year_to, 'date': cert_date
@@ -140,7 +141,7 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to, c
                        "and ((UPPER(c.name) = ANY(%(counties)s) "
                        "    and extract(year from r.date) between %(from_date)s and %(to_date)s) " +
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
-                       "and rd.cancelled_by is null and r.date <= %(date)s",
+                       "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'loc_name': name.upper(), 'date': cert_date,
                            'from_date': year_from, 'to_date': year_to, 'counties': uc_counties
@@ -162,7 +163,7 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to, cert_d
                        "and rd.id=r.details_id " +
                        "and (extract(year from r.date) between %(from_date)s and %(to_date)s " +
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
-                       "and rd.cancelled_by is null and r.date <= %(date)s",
+                       "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'other_name': name.upper(), 'from_date': year_from, 'to_date': year_to,
                            'date': cert_date
@@ -183,7 +184,7 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to, cert_d
                        "and ((UPPER(c.name) = ANY(%(counties)s) "
                        "    and extract(year from r.date) between %(from_date)s and %(to_date)s) " +
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
-                       "and rd.cancelled_by is null and r.date <= %(date)s",
+                       "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'other_name': name.upper(), 'from_date': year_from, 'to_date': year_to,
                            'counties': uc_counties, 'date': cert_date
@@ -201,6 +202,7 @@ def search_by_complex_name(cursor, complex_name, complex_number, cert_date):
                    "  AND n.complex_number = %(number)s "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
+                   "  AND r.reveal='t'"
                    "  AND rd.cancelled_by is null and r.date <= %(date)s"
                    "  AND rd.class_of_charge in ('PAB', 'WOB', 'PA', 'WO', 'DA')",
                    {
@@ -222,7 +224,7 @@ def search_full_by_complex_name(cursor, complex_name, complex_number, counties, 
                        "and rd.id=r.details_id " +
                        "and (extract(year from r.date) between %(from_date)s and %(to_date)s " +
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
-                       "and rd.cancelled_by is null and r.date <= %(date)s",
+                       "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'complex_name': complex_name.upper(), 'number': complex_number,
                            'from_date': year_from, 'to_date': year_to, 'date': cert_date
@@ -243,7 +245,7 @@ def search_full_by_complex_name(cursor, complex_name, complex_number, counties, 
                        "and ((UPPER(c.name) = ANY(%(counties)s) "
                        "    and extract(year from r.date) between %(from_date)s and %(to_date)s) " +
                        " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
-                       "and rd.cancelled_by is null and r.date <= %(date)s",
+                       "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'complex_name': complex_name.upper(), 'number': complex_number,
                            'from_date': year_from, 'to_date': year_to,
