@@ -5,6 +5,7 @@ import datetime
 import logging
 import re
 from application.search import get_searchable_string
+from application.data_diff import get_rectification_type
 
 
 def connect(cursor_factory=None):
@@ -135,98 +136,6 @@ def insert_party_name(cursor, party_id, name):
     return return_data
 
 
-# def insert_name(cursor, name, party_id, is_alias=False):
-#     logging.warning('THIS IS DEPRECATED')
-#     if 'estate_owner_ind' in name:
-#         # name_string, forename, middle_names, surname, company = (None,) * 5
-#         # local_auth, local_auth_area, complex_name, other, searchable_string = (None,) * 5
-#         # complex_number = None
-#         if len(name['private']['forenames']) > 0 or name['private']['surname'] != '':
-#             forename = name['private']['forenames'][0]
-#             middle_names = " ".join(name['private']['forenames'][1:])
-#             surname = name['private']['surname']
-#             name_join = " ".join(name['private']['forenames']) + " " + name['private']['surname']
-#             # store the name without punctuation or spaces for searching
-#             # searchable_string = re.sub('[^A-Za-z0-9]+', '', name_string)
-#         else:
-#             forename = None
-#             middle_names = None
-#             surname = None
-#             name_join = ''
-#
-#         name_string = name_join if name_join != '' else None
-#         company = name['company'] if name['company'] != '' else None
-#         local_auth = name['local']['name'] if name['local']['name'] != '' else None
-#         local_auth_area = name['local']['area'] if name['local']['area'] != '' else None
-#         other = name['other'] if name['other'] != '' else None
-#         complex_name = name['complex']['name'] if name['complex']['name'] != '' else None
-#         complex_number = name['complex']['number'] if name['complex']['number'] != '' else None
-#
-#         if complex_name is None:
-#             searchable_string = get_searchable_string(name_string, company, local_auth, local_auth_area, other)
-#         else:
-#             searchable_string = None
-#         print(searchable_string)
-#
-#         cursor.execute("INSERT INTO party_name ( party_name, forename, " +
-#                        "middle_names, surname, alias_name, complex_number, complex_name, " +
-#                        "name_type_ind, company_name, local_authority_name, local_authority_area, other_name, " +
-#                        "searchable_string ) " +
-#                        "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s, " +
-#                        "%(comp_num)s, %(comp_name)s, %(type)s, %(company)s, " +
-#                        "%(loc_auth)s, %(loc_auth_area)s, %(other)s, %(search_name)s ) " +
-#                        "RETURNING id",
-#                        {
-#                            "name": name_string, "forename": forename, "midnames": middle_names,
-#                            "surname": surname, "alias": is_alias, "comp_num":complex_number, "comp_name": complex_name,
-#                            "type": name['estate_owner_ind'], "company": company, "loc_auth": local_auth,
-#                            "loc_auth_area": local_auth_area, "other": other, "search_name": searchable_string
-#                        })
-#         name['id'] = cursor.fetchone()[0]
-#         return_data = {'id': name['id'],
-#                        'name': name}
-#     elif 'number' in name:
-#         cursor.execute("INSERT INTO party_name (alias_name, complex_number, complex_name) " +
-#                        "VALUES ( %(alias)s, %(number)s, %(name)s ) " +
-#                        "RETURNING id",
-#                        {
-#                            "alias": is_alias, "number": name['number'], "name": name['name']
-#                        })
-#         name['id'] = cursor.fetchone()[0]
-#         return_data = {
-#             'id': name['id'],
-#             'name': name['name'],
-#             'number': name['number']
-#         }
-#     else:
-#         name_string = "{} {}".format(" ".join(name['forenames']), name['surname'])
-#         searchable_string = re.sub('[^A-Za-z0-9]+', '', name_string).upper()
-#         forename = name['forenames'][0]
-#         middle_names = " ".join(name['forenames'][1:])
-#         cursor.execute("INSERT INTO party_name ( party_name, forename, " +
-#                        "middle_names, surname, alias_name, searchable_string ) " +
-#                        "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s, %(search)s ) " +
-#                        "RETURNING id",
-#                        {
-#                            "name": name_string, "forename": forename, "midnames": middle_names,
-#                            "surname": name['surname'], "alias": is_alias, "search": searchable_string
-#                        })
-#         name['id'] = cursor.fetchone()[0]
-#         return_data = {
-#             'id': name['id'],
-#             'forenames': name['forenames'],
-#             'surname': name['surname']
-#         }
-#
-#     cursor.execute("INSERT INTO party_name_rel (party_name_id, party_id) " +
-#                    "VALUES( %(name)s, %(party)s ) RETURNING id",
-#                    {
-#                        "name": name['id'], "party": party_id
-#                    })
-#
-#     return return_data
-
-
 def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_no=None):
     logging.debug('Insert registration')
     if orig_reg_no is None:
@@ -249,23 +158,29 @@ def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_n
         reg_no = orig_reg_no
 
     # Cap it all off with the actual legal "one registration per name":
-    logging.info("INSERT {}, {}, {}, {}, {}".format(reg_no, name_id, details_id, date, county_id))
-    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, date, county_id) " +
-                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(date)s, %(county)s ) RETURNING id",
+    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, date, county_id, reveal) " +
+                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(date)s, %(county)s, %(rev)s ) RETURNING id",
                    {
                        "regno": reg_no,
                        "debtor": name_id,
                        "details": details_id,
                        'date': date,
-                       'county': county_id
+                       'county': county_id,
+                       'rev': True
                    })
     reg_id = cursor.fetchone()[0]
     return reg_no, reg_id
 
 
+def mark_as_no_reveal(cursor, reg_no, date):
+    cursor.execute("UPDATE register SET reveal=%(rev)s WHERE registration_no=%(regno)s AND date=%(date)s", {
+        "rev": False, "regno": reg_no, "date": date
+    })
+
+
 def insert_register_details(cursor, request_id, data, date, amends):
     additional_info = data['additional_information'] if 'additional_information' in data else None
-
+    logging.debug(data)
     priority_notice = None
     if 'particulars' in data:
         district = data['particulars']['district']
@@ -275,7 +190,6 @@ def insert_register_details(cursor, request_id, data, date, amends):
     else:
         district = None
         short_description = None
-
 
     debtor = None
     for party in data['parties']:
@@ -287,13 +201,18 @@ def insert_register_details(cursor, request_id, data, date, amends):
     else:
         legal_ref = None
 
+    amend_type = None
+    if 'update_registration' in data:
+        amend_type = data['update_registration']['type']
+
     cursor.execute("INSERT INTO register_details (request_id, class_of_charge, legal_body_ref, "
-                   "amends, district, short_description, additional_info, priority_notice_no  ) "
-                   "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s, %(pno)s) "
+                   "amends, district, short_description, additional_info, amendment_type, priority_notice_no  ) "
+                   "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s, %(atype)s, %(pno)s) "
                    "RETURNING id", {
                        "rid": request_id, "coc": data['class_of_charge'],
                        "legal_ref": legal_ref, "amends": amends, "dist": district,
-                       "sdesc": short_description, "addl": additional_info, "pno": priority_notice
+                       "sdesc": short_description, "addl": additional_info, "atype": amend_type,
+                       "pno": priority_notice
                    })
     return cursor.fetchone()[0]
 
@@ -319,7 +238,6 @@ def insert_request(cursor, applicant, application_type, date, original_data=None
     return cursor.fetchone()[0]
 
 
-#def insert_party(cursor, details_id, party_type, occupation, date_of_birth, residence_withheld):
 def insert_party(cursor, details_id, party):
     occupation = None
     date_of_birth = None
@@ -456,9 +374,6 @@ def insert_landcharge_regn(cursor, details_id, names, county_ids, date, orig_reg
     return reg_nos
 
 
-# def insert_registration(cursor, details_id, names, county_ids, date, orig_reg_no):
-
-
 def insert_counties(cursor, details_id, counties):
     ids = []
     for county in counties:
@@ -541,33 +456,68 @@ def insert_amendment(cursor, orig_reg_no, date, data):
     return original_regs, reg_nos, rows
 
 
-def insert_rectification(cursor, orig_reg_no, data):
-    # For now, always insert a new record
-    original_detl_id = get_register_details_id(cursor, orig_reg_no)
-    if original_detl_id is None:
-        return None, None, None
-
-    document = None
-    if 'document_id' in data:
-        document = data['document_id']
-
-    now = datetime.datetime.now()
-    request_id = insert_request(cursor, None, "RECTIFICATION", None, now, document, None, data['customer_name'],
-                                data['customer_address'])
-
-    # pylint: disable=unused-variable
-    original_regs = get_all_registration_nos(cursor, original_detl_id)
-    amend_detl_id = get_register_details_id(cursor, orig_reg_no)
-    reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id, orig_reg_no)
-
-    # Update old registration
+def update_previous_details(cursor, request_id, original_detl_id):
     cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
                    "id = %(id)s AND cancelled_by IS NULL",
                    {
                        "canc": request_id, "id": original_detl_id
                    })
-    rows = cursor.rowcount
-    return original_regs, reg_nos, rows
+
+
+def insert_rectification(cursor, rect_reg_no, rect_reg_date, data):
+    original_details = get_registration_details(cursor,
+                                                rect_reg_no,
+                                                rect_reg_date)
+    logging.debug(original_details)
+
+    original_details_id = get_register_details_id(cursor,
+                                                  rect_reg_no,
+                                                  rect_reg_date)
+    original_regs = get_all_registration_nos(cursor, original_details_id)
+
+    logging.info(original_details_id)
+    date = datetime.datetime.now().strftime('%Y-%m-%d')
+    request_id = insert_request(cursor, data['applicant'], 'Rectification', date)
+
+    # insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None):
+    reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id)
+    update_previous_details(cursor, request_id, original_details_id)
+
+    rect_type = get_rectification_type(original_details, data)
+    logging.debug('Type of rectification is: %d', rect_type)
+    if rect_type != 2:  # Legacy/business jargon - three types of rectification. Type 2 behaves differently
+        # Mark the original as not reveal
+        for reg in original_regs:
+            mark_as_no_reveal(cursor, reg['number'], reg['date'])
+
+    return original_regs, reg_nos
+
+    # For now, always insert a new record
+    # original_detl_id = get_register_details_id(cursor, orig_reg_no)
+    # if original_detl_id is None:
+    #     return None, None, None
+    #
+    # document = None
+    # if 'document_id' in data:
+    #     document = data['document_id']
+    #
+    # now = datetime.datetime.now()
+    # request_id = insert_request(cursor, None, "RECTIFICATION", None, now, document, None, data['customer_name'],
+    #                             data['customer_address'])
+    #
+    # # pylint: disable=unused-variable
+    # original_regs = get_all_registration_nos(cursor, original_detl_id)
+    # amend_detl_id = get_register_details_id(cursor, orig_reg_no)
+    # reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id, orig_reg_no)
+    #
+    # # Update old registration
+    # cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+    #                "id = %(id)s AND cancelled_by IS NULL",
+    #                {
+    #                    "canc": request_id, "id": original_detl_id
+    #                })
+    # rows = cursor.rowcount
+    # return original_regs, reg_nos, rows
 
 
 def get_register_details_id(cursor, reg_no, date):
@@ -620,7 +570,7 @@ def get_registration(cursor, reg_id, date=None):
 
 
 def get_registration_no_from_details_id(cursor, details_id):
-    cursor.execute("select r.registration_no, d.registration_date, d.amendment_type from register r, register_details d where " +
+    cursor.execute("select r.registration_no, r.date, d.amendment_type from register r, register_details d where " +
                    "  r.details_id = %(id)s AND r.details_id = d.id",
                    {'id': details_id})
     rows = cursor.fetchall()
@@ -629,8 +579,7 @@ def get_registration_no_from_details_id(cursor, details_id):
     else:
         return {
             'number': rows[0]['registration_no'],
-            'date': str(rows[0]['registration_date']),
-            'type': rows[0]['amendment_type']
+            'date': rows[0]['date'].strftime('%Y-%m-%d')
         }
 
 
@@ -842,7 +791,7 @@ def get_lc_counties(cursor, details_id, lead_county_id):
 def get_registration_details(cursor, reg_no, date):
     cursor.execute("SELECT r.registration_no, r.date, rd.class_of_charge, rd.id, r.id as register_id, "
                    "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
-                   "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id "
+                   "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type "
                    "from register r, register_details rd "
                    "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id", {
                        'reg_no': reg_no, 'date': date
@@ -874,6 +823,7 @@ def get_registration_details(cursor, reg_no, date):
     legal_ref = rows[0]['legal_body_ref']
     if rows[0]['amends'] is not None:
         data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
+        data['amends_registration']['type'] = rows[0]['amendment_type']
 
     if rows[0]['cancelled_by'] is not None:
         cursor.execute("select amends, amendment_type from register_details where amends=%(id)s",
@@ -895,7 +845,7 @@ def get_registration_details(cursor, reg_no, date):
     if len(rows) > 0:
         data['amended_by'] = {
             'number': rows[0]['registration_no'],
-            'date': str(rows[0]['date']),
+            'date': rows[0]['date'].strftime('%Y-%m-%d'),
             'type': rows[0]['amendment_type']
         }
 
