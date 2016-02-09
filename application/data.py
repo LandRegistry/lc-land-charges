@@ -98,9 +98,10 @@ def insert_party_name(cursor, party_id, name):
         other = name['other']
     elif name['type'] == 'Limited Company':
         company = name['company']
-    elif name['type'] == 'Complex':
+    elif name['type'] == 'Complex Name':
         complex_number = name['complex']['number']
         complex_name = name['complex']['name']
+        searchable_string = None
     else:
         raise RuntimeError('Unknown name type: {}'.format(name['type']))
 
@@ -550,19 +551,19 @@ def get_all_registration_nos(cursor, details_id):
 
 def get_registration(cursor, reg_id, date=None):
     if date is None:
-        cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.class_of_charge, rd.id, " +
+        cursor.execute("select r.registration_no, r.debtor_reg_name_id, r.date, rd.class_of_charge, rd.id, " +
                        "r.id as register_id from register r, register_details rd " +
                        "where r.details_id = rd.id " +
                        "and r.id=%(id)s", {'id': reg_id})
     else:
-        cursor.execute("select r.registration_no, r.debtor_reg_name_id, rd.registration_date, rd.class_of_charge, rd.id, " +
+        cursor.execute("select r.registration_no, r.debtor_reg_name_id, r.date, rd.class_of_charge, rd.id, " +
                        "r.id as register_id from register r, register_details rd " +
                        "where r.details_id = rd.id " +
                        "and r.id=%(id)s and r.date=%(date)s", {'id': reg_id, 'date': date})
     rows = cursor.fetchall()
     row = rows[0]
     result = {
-        "registration_date": str(row['registration_date']),
+        "registration_date": str(row['date']),
         "class_of_charge": row['class_of_charge'],
         "registration_no": row['registration_no'],
     }
@@ -652,7 +653,7 @@ def read_names(cursor, party, party_id, lead_debtor_id):
         name = {
             'type': name_type
         }
-
+        print('name type', name_type)
         if name_type == 'Private Individual':
             fornames = [row['forename']]
             middle = row['middle_names']
