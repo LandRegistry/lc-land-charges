@@ -11,9 +11,9 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
-    insert_amendment, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
+    insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
     get_registrations_by_date, get_all_registrations
-from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration
+from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches
 from application.oc import get_ins_office_copy
 
@@ -180,29 +180,50 @@ def amend_registration(date, reg_no):
         suppress = True
 
     json_data = request.get_json(force=True)
+    errors = validate_update(json_data)
+    if 'dev_date' in request.args and app.config['ALLOW_DEV_ROUTES']:
+        logging.info('Overriding date')
+        json_data['dev_registration'] = {
+            'date': request.args['dev_date']
+        }
+
+    if len(errors) > 0:
+        raise_error({
+            "type": "E",
+            "message": "Input data failed validation",
+            "stack": ""
+        })
+        logging.error("Input data failed validation")
+        return Response(json.dumps(errors), status=400, mimetype='application/json')
+
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
 
     # TODO: may need to revisit if business rules for rectification differs to amendment
     # if appn_type == 'amend':
-    originals, reg_nos, rows = insert_amendment(cursor, reg_no, date, json_data)
+    # originals, reg_nos, rows = insert_amendment(cursor, reg_no, date, json_data)
     # else:
-    # originals, reg_nos, rows = insert_rectification(cursor, reg_no, json_data)
+    originals, reg_nos = insert_rectification(cursor, reg_no, date, json_data)
 
-    if rows is None or rows == 0:
-        cursor.connection.rollback()
-        cursor.close()
-        cursor.connection.close()
-        return Response(status=404)
-    else:
-        complete(cursor)
-        data = {
-            "new_registrations": reg_nos,
-            "amended_registrations": originals
-        }
-        if not suppress:
-            publish_amendment(producer, data)
+    complete(cursor)
+    data = {
+        "new_registrations": reg_nos,
+        "amended_registrations": originals
+    }
+    return Response(json.dumps(data), status=200)
 
-        return Response(json.dumps(data), status=200, mimetype='application/json')
+
+
+    # if rows is None or rows == 0:
+    #     cursor.connection.rollback()
+    #     cursor.close()
+    #     cursor.connection.close()
+    #     return Response(status=404)
+    # else:
+
+    #     if not suppress:
+    #         publish_amendment(producer, data)
+    #
+    #     return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
 @app.route('/registrations/<date>/<reg_no>', methods=["DELETE"])
