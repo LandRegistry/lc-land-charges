@@ -456,7 +456,7 @@ def validate_generic_registration(data):
         if debtor is None:
             errors.append({'error_message': "Party of type 'Debtor' required for bankruptcy"})
         else:
-            for item in ['occupation', 'trading_name', 'residence_withheld', 'case_reference' ]:
+            for item in ['occupation', 'trading_name', 'residence_withheld', 'case_reference']:
                 if item not in debtor:
                     errors.append({'error_message': "Attribute '{}' required for bankruptcy debtor".format(item)})
 

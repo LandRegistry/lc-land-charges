@@ -249,8 +249,11 @@ def insert_party(cursor, details_id, party):
     occupation = None
     date_of_birth = None
     residence_withheld = False
-    if party['type'] == 'Debtor':
+
+    if 'occupation' in party:
         occupation = party['occupation']
+
+    if party['type'] == 'Debtor':
         if 'date_of_birth' in party:
             date_of_birth = party['date_of_birth']
         else:
@@ -722,8 +725,11 @@ def read_parties(cursor, data, details_id, legal_ref, lead_debtor_id):
             'type': row['party_type']
         }
 
-        if party['type'] == 'Debtor':
+        if row['occupation']:
             party['occupation'] = row['occupation']
+            
+        if party['type'] == 'Debtor':
+
             if row['date_of_birth'] is not None:
                 party['date_of_birth'] = row['date_of_birth'].strftime('%Y-%m-%d')
             else:

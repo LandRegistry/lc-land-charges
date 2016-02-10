@@ -354,4 +354,4 @@ class TestWorking:
                                       {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C4'}) == 3
 
-        
+
