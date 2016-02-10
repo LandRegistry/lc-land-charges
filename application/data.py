@@ -518,7 +518,7 @@ def get_all_registration_nos(cursor, details_id):
     for row in rows:
         results.append({
             'number': str(row['registration_no']),
-            'date': str(row['date'])
+            'date': row['date'].strftime('%Y-%m-%d')
         })
     return results
 
@@ -727,7 +727,7 @@ def read_parties(cursor, data, details_id, legal_ref, lead_debtor_id):
 
         if row['occupation']:
             party['occupation'] = row['occupation']
-            
+
         if party['type'] == 'Debtor':
 
             if row['date_of_birth'] is not None:
