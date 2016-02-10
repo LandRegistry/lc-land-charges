@@ -975,19 +975,27 @@ def get_county_id(cursor, county):
 def get_register_request_details(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        sql = "Select a.request_id, b.date as registration_date, b.registration_no "\
-              " from register_details a, register b "\
-              " where a.request_id = %(request_id)s and a.id = b.details_id "
+        sql = " Select a.request_id, b.date as registration_date, b.registration_no, c.customer_name, " \
+              " c.customer_address, c.key_number, " \
+              " c.application_type, c.application_reference, c.application_date " \
+              " from register_details a, register b, request c " \
+              " where a.request_id = %(request_id)s and a.id = b.details_id and a.request_id = c.id "
+
         cursor.execute(sql, {"request_id": request_id})
         rows = cursor.fetchall()
     finally:
         complete(cursor)
     registrations = []
     for row in rows:
-        registration = {"request_id": row["request_id"], "registration_date": row["registration_date"], "registration_no": row["registration_no"]}
+        registration = {"request_id": row["request_id"], "registration_date": str(row["registration_date"]),
+                        "registration_no": row["registration_no"],
+                        'customer_name': row['customer_name'],
+                        'customer_address': row['customer_address'], 'key_number': row['key_number'],
+                        'application_type': row['application_type'], 'application_date': str(row['application_date']),
+                        'application_reference': row['application_reference']
+                        }
         registrations.append(registration)
     return registrations
-
 
 def get_search_request_details(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
