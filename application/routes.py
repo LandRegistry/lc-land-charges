@@ -535,8 +535,9 @@ def get_request_details(request_type, request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         if request_type == 'registration':
-            reqs = get_register_request_details(request_id)
-            data = get_registration_details(cursor, reqs[0]["registration_no"], reqs[0]["registration_date"])
+            data = get_register_request_details(request_id)
+            details = get_registration_details(cursor, data[0]["registration_no"], data[0]["registration_date"])
+            data[0]['details'] = details
         elif request_type == 'search':
             print('call search request')
             data = get_search_request_details(request_id)
