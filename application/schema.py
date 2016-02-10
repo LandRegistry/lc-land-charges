@@ -269,7 +269,12 @@ REGISTRATION_SCHEMA = {
         "additional_information": {
             "type": "string"
         },
-        "priority_notice": {"type": "boolean"},
+        "priority_notice": {
+            "type": "object",
+            "properties": {
+                "expires": DATE_SCHEMA
+            }
+        },
         "original_request": {"type": "string"}
     },
     "required": [
