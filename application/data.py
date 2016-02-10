@@ -203,8 +203,10 @@ def insert_register_details(cursor, request_id, data, date, amends):
         legal_ref = None
 
     is_priority_notice = None
-    if 'priority_notice' in data and data['priority_notice'] == True:
+    prio_notc_expires = None
+    if 'priority_notice' in data:
         is_priority_notice = True
+        prio_notc_expires = data['priority_notice']['expires']
 
     amend_type = None
     if 'update_registration' in data:
@@ -212,14 +214,14 @@ def insert_register_details(cursor, request_id, data, date, amends):
 
     cursor.execute("INSERT INTO register_details (request_id, class_of_charge, legal_body_ref, "
                    "amends, district, short_description, additional_info, amendment_type, priority_notice_no, "
-                   "priority_notice_ind ) "
+                   "priority_notice_ind, prio_notice_expires ) "
                    "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s, %(atype)s, "
-                   "%(pno)s, %(pind)s) "
+                   "%(pno)s, %(pind)s, %(pnx)s) "
                    "RETURNING id", {
                        "rid": request_id, "coc": data['class_of_charge'],
                        "legal_ref": legal_ref, "amends": amends, "dist": district,
                        "sdesc": short_description, "addl": additional_info, "atype": amend_type,
-                       "pno": priority_notice, 'pind': is_priority_notice
+                       "pno": priority_notice, 'pind': is_priority_notice, "pnx": prio_notc_expires
                    })
     return cursor.fetchone()[0]
 
