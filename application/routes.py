@@ -270,7 +270,7 @@ def create_search():
         return Response(json.dumps(errors), status=400)
     print(data['parameters']['search_type'])
     if data['parameters']['search_type'] not in ['full', 'banks']:
-        message = "Invalid search type supplied"
+        message = "Invalid search type supplied: {}".format(data['parameters']['search_type'])
         logging.error(message)
         return Response(message, status=400)
 

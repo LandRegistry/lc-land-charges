@@ -342,7 +342,7 @@ PARAMETER_SCHEMA = {
         "year_from": {"type": "integer", "minimum": 1925},
         "year_to": {"type": "integer", "minimum": 1925},
     },
-    "required": ["name"]
+    "required": ["name", "name_type"]
 }
 
 
@@ -356,7 +356,7 @@ SEARCH_SCHEMA = {
         "parameters": {
             "type": "object",
             "properties": {
-                "search_type": {"type": "string"},
+                "search_type": {"type": "string", "enum": ["full", "banks"]},
                 "counties": {"type": "array", "items": {"type": "string"}},
                 "search_items": {
                     "type": "array",

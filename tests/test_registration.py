@@ -1,5 +1,6 @@
 from unittest import mock
 from application.routes import app
+from application.data_diff import get_rectification_type, is_name_change_type3
 import os
 import json
 import datetime
@@ -47,11 +48,17 @@ name_search_data = json.dumps({
         "reference": "someRef"
     },
     "document_id": 17,
+    "expiry_date": "2013-01-01",
+    "search_date": "2012-01-01",
     "parameters": {
-        "search_type": "bankruptcy",
+        "search_type": "banks",
         "counties": ["ALL"],
         "search_items": [{
-            "name": "Bob Howard"
+            "name_type": "Private Individual",
+            "name": {
+                "forenames": "Casper",
+                "surname": "Beers"
+            },
         }]
     }
 })
@@ -64,11 +71,17 @@ name_search_data_full_all = json.dumps({
         "reference": "someRef"
     },
     "document_id": 17,
+    "expiry_date": "2013-01-01",
+    "search_date": "2012-01-01",
     "parameters": {
         "search_type": "full",
         "counties": ["ALL"],
         "search_items": [{
-            "name": "Jasper Beer",
+            "name_type": "Private Individual",
+            "name": {
+                "forenames": "Jasper",
+                "surname": "Beers"
+            },
             "year_from": 1925,
             "year_to": 2015
         }]
@@ -83,11 +96,14 @@ complex_name_search_data = json.dumps({
         "reference": "someRef"
     },
     "document_id": 17,
+    "expiry_date": "2013-01-01",
+    "search_date": "2012-01-01",
     "parameters": {
-        "search_type": "bankruptcy",
+        "search_type": "banks",
         "counties": ["ALL"],
-        "search_items": [{"name": "King Stark of the North",
-                          "complex_no": "1000167"}]
+        "search_items": [{"complex_name": "King Stark of the North",
+                          "complex_number": "1000167",
+                          "name_type": "Complex Name",}]
     }
 })
 
@@ -98,16 +114,20 @@ complex_name_search_data_full_all = json.dumps({
         "address": "Lurking",
         "reference": "someRef"
     },
+    "expiry_date": "2013-01-01",
+    "search_date": "2012-01-01",
     "document_id": 17,
     "parameters": {
         "search_type": "full",
         "counties": ["ALL"],
-        "search_items": [{"name": "Jasper Beer",
+        "search_items": [{"name": {"forenames": "Bob", "surname": "Beer"},
+                          "name_type": "Private Individual",
                           "year_from": 1925,
                           "year_to": 2015
                           },
-                         {"name": "King Stark of the North",
-                          "complex_no": "1000167",
+                         {"complex_name": "King Stark of the North",
+                          "complex_number": "1000167",
+                          "name_type": "Complex Name",
                           "year_from": 1925,
                           "year_to": 2015}]
     }
@@ -121,11 +141,14 @@ name_search_data_full_counties = json.dumps({
         "reference": "someRef"
     },
     "document_id": 17,
+    "expiry_date": "2013-01-01",
+    "search_date": "2012-01-01",
     "parameters": {
         "search_type": "full",
         "counties": ["Devon"],
         "search_items": [{
-            "name": "Jasper Beer",
+            "name_type": "Private Individual",
+            "name": {"forenames": "Jasper", "surname": "Beer"},
             "year_from": 1925,
             "year_to": 2015
         }]
@@ -134,11 +157,12 @@ name_search_data_full_counties = json.dumps({
 
 search_data = [{"id": 76, "registration_date": datetime.date(2005, 12, 2), "application_type": "PAB",
                 "registration_no": "50135"}]
+
 all_queries_data = [{
     "registration_no": "50000",
-    "registration_date": "2012-08-09",
+    "registration_date": datetime.datetime(2012, 8, 9),
     "reg": 50001,
-    "date": "2012-08-09",
+    "date": datetime.datetime(2013, 8, 9),
     "class_of_charge": "PAB",
     "application_type": "PAB", "id": "56", "debtor_reg_name_id": "12",
     "forename": "Bob", "register_id": "2",
@@ -156,12 +180,17 @@ all_queries_data = [{
     "line_4": "",
     "line_5": "",
     "line_6": "",
+    "reveal": True,
+    "amendment_type": "",
     "address_type": "Debtor Residence", "address_string": "",
     "amends": None,
     "key_number": "1234567",
     "county": "Devon",
     "customer_name": "Bob", "customer_address": "Place",
     "name": "Devon",
+    "party_type": "Estate Owner",
+    "name_type_ind": "Private Individual",
+    "county_id": 22,
     "document_ref": 22,
     "postcode": "PL1 1AA",
     "cancelled_by": None,
@@ -173,8 +202,8 @@ all_queries_data = [{
 
 all_queries_complex_data = [{
     "registration_no": "50027",
-    "registration_date": "2012-08-09",
-    "date": "2012-08-09",
+    "registration_date": datetime.datetime(2012, 8, 9),
+    "date": datetime.datetime(2013, 8, 9),
     "class_of_charge": "PAB",
     "application_type": "PAB", "id": "56", "debtor_reg_name_id": "12",
     "forename": "", "register_id": "2",
@@ -193,12 +222,17 @@ all_queries_complex_data = [{
     "line_3": "",
     "line_4": "",
     "line_5": "",
+    "reveal": True,
+    "amendment_type": "",
+    "party_type": "Estate Owner",
     "line_6": "",
+    "name_type_ind": "Complex Name",
     "address_type": "Debtor Residence", "address_string": "",
     "amends": None,
     "key_number": "1234567",
     "county": "Devon",
     "document_ref": 22,
+    "county_id": 22,
     "postcode": "PL1 1AA",
     "cancelled_by": None,
     "original_regn_no": "7",
@@ -228,29 +262,9 @@ class TestWorking:
         assert response.status_code == 200
 
     @mock.patch('psycopg2.connect', **mock_search)
-    def test_item_found(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/searches', data=name_search_data, headers=headers)
-        data = json.loads(response.data.decode('utf-8'))
-        assert response.status_code == 200
-        assert 76 in data[0]['Bob Howard']
-
-    @mock.patch('psycopg2.connect', **mock_search)
     def test_full_search_all_counties(self, mock_connect):
         headers = {'Content-Type': 'application/json'}
         response = self.app.post('/searches', data=name_search_data_full_all, headers=headers)
-        assert response.status_code == 200
-
-    @mock.patch('psycopg2.connect', **mock_search)
-    def test_complex_name_simple_search(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/searches', data=complex_name_search_data, headers=headers)
-        assert response.status_code == 200
-
-    @mock.patch('psycopg2.connect', **mock_search)
-    def test_complex_name_full_search_all_counties(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/searches', data=complex_name_search_data_full_all, headers=headers)
         assert response.status_code == 200
 
     @mock.patch('psycopg2.connect', **mock_search)
@@ -258,14 +272,6 @@ class TestWorking:
         headers = {'Content-Type': 'application/json'}
         response = self.app.post('/searches', data=name_search_data_full_counties, headers=headers)
         assert response.status_code == 200
-
-    @mock.patch('psycopg2.connect', **mock_search_not_found)
-    def test_item_not_found(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/searches', data=name_search_data, headers=headers)
-        data = json.loads(response.data.decode('utf-8'))
-        assert response.status_code == 200
-        assert len(data[0]['Bob Howard']) == 0
 
     @mock.patch('psycopg2.connect', **mock_search_not_found)
     def test_search_bad_data(self, mock_connect):
@@ -286,49 +292,10 @@ class TestWorking:
         assert response.status_code == 415
 
     @mock.patch('psycopg2.connect', **mock_retrieve)
-    @mock.patch('kombu.Producer.publish')
-    def test_new_registration(self, mock_connect, mock_publish):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/registrations', data=valid_data, headers=headers)
-        assert response.status_code == 200
-        assert mock_publish.called
-
-    @mock.patch('psycopg2.connect', **mock_retrieve)
-    @mock.patch('kombu.Producer.publish')
-    def test_new_registration_complex_name(self, mock_connect, mock_publish):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/registrations', data=valid_data_complex, headers=headers)
-        assert response.status_code == 200
-        assert mock_publish.called
-
-    @mock.patch('psycopg2.connect', **mock_retrieve)
-    @mock.patch('kombu.Producer.publish')
-    def test_cancellation(self, mc, k):
-        response = self.app.delete('/registrations/2015-01-01/50001', data=valid_data, headers={'Content-Type': 'application/json'})
-        data = json.loads(response.data.decode('utf-8'))
-        assert data['cancelled'][0]['number'] == '50000'
-
-    @mock.patch('psycopg2.connect', **mock_retrieve)
-    @mock.patch('kombu.Producer.publish')
-    def test_amendment(self, mc, k):
-        response = self.app.put('/registrations/2015-01-01/50001', data=valid_data,
-                                 headers={'Content-Type': 'application/json'})
-        data = json.loads(response.data.decode('utf-8'))
-        assert data['new_registrations'][0]['number'] == 50001
-        assert data['amended_registrations'][0]['number'] == '50000'
-
-    @mock.patch('psycopg2.connect', **mock_search_not_found)
-    def test_amendment_not_found(self, mc):
-        response = self.app.put('/registrations/2015-01-01/50001', data=valid_data,
-                                headers={'Content-Type': 'application/json'})
-        assert (response.status_code == 404)
-
-    @mock.patch('psycopg2.connect', **mock_retrieve)
     def test_get_registration(self, mc):
         response = self.app.get("/registrations/2015-01-01/50000")
         data = json.loads(response.data.decode('utf-8'))
-        assert data['debtor_names'][0]['surname'] == 'Howard'
-        assert "document_id" in data
+        assert data['parties'][0]['names'][0]['private']['surname'] == 'Howard'
 
     @mock.patch('psycopg2.connect', **mock_search_not_found)
     def test_get_registration_404(self, mc):
@@ -340,5 +307,51 @@ class TestWorking:
         response = self.app.get("/registrations/2015-01-01/50027")
         print(response.data)
         data = json.loads(response.data.decode('utf-8'))
-        assert data['complex']['name'] == 'King Stark'
-        assert "document_id" in data
+        assert data['parties'][0]['names'][0]['complex']['name'] == 'King Stark'
+
+    def test_name_type_identification(self):
+        assert is_name_change_type3({"forenames": ["John", "David"], "surname": "Smyth"},
+                                    {"forenames": ["John", "David"], "surname": "Smith"}) == False
+
+        assert is_name_change_type3({"forenames": ["J"], "surname": "Smith"},
+                                    {"forenames": ["John", "David"], "surname": "Smith"}) == False
+
+        assert is_name_change_type3({"forenames": ["John", "D"], "surname": "Smith"},
+                                    {"forenames": ["John", "David"], "surname": "Smith"}) == False
+
+        assert is_name_change_type3({"forenames": ["John"], "surname": "Smith"},
+                                    {"forenames": ["John", "David"], "surname": "Smith"}) == False
+
+        assert is_name_change_type3({"forenames": ["J", "D"], "surname": "Smith"},
+                                    {"forenames": ["John", "David"], "surname": "Smith"}) == True
+
+        assert is_name_change_type3({"forenames": [], "surname": "Smith"},
+                                    {"forenames": ["John", "David"], "surname": "Smith"}) == True
+
+    def test_rectification_type(self):
+        assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
+                                      {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'}) == 1
+
+        assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["Sam", "John"], "surname": "Smith"}}]}],
+                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
+                                      {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'}) == 2
+
+        assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
+                                      {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                       'particulars': {'counties': ['Devon', 'Dorset']}, 'class_of_charge': 'C1'}) == 2
+
+        assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
+                                      {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                       'particulars': {'counties': ['Dorset']}, 'class_of_charge': 'C1'}) == 3
+
+        assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
+                                      {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C4'}) == 3
+
+        
