@@ -134,6 +134,9 @@ standard_data = [
     '{"particulars": {"description": "Flat A, Floor 15, The Hideous Tower, Cityname", "counties": ["Dorset", "Lancashire"], "district": "Mixed"}, "class_of_charge": "C1", "applicant": {"address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095", "name": "P334 Team", "reference": "reference 11"}, "parties": [{"type": "Estate Owner", "names": [{"type": "County Council", "local": {"area": "Lancs", "name": "South Marsh District Council"}}]}]}',
     '{"priority_notice": {"expires": "2014-12-12"}, "particulars": {"description": "1 The Lane, Some Village", "counties": ["Devon"], "district": "South Hams"}, "class_of_charge": "C1", "applicant": {"address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095", "name": "P334 Team", "reference": "reference 11"}, "parties": [{"type": "Estate Owner", "names": [{"type": "Private Individual", "private": {"surname": "Bobson", "forenames": ["Bob", "John"]}}]}]}',
     '{"priority_notice": {"expires": "2100-01-01"}, "particulars": {"description": "1 The Lane, Some Village", "counties": ["Devon"], "district": "South Hams"}, "class_of_charge": "C1", "applicant": {"address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095", "name": "P334 Team", "reference": "reference 11"}, "parties": [{"type": "Estate Owner", "names": [{"type": "Private Individual", "private": {"surname": "Hughson", "forenames": ["Hugh", "John"]}}]}]}',
+    '{"priority_notice": {"expires": "2016-02-01"}, "particulars": {"description": "EXPIRE 2016-02-01 1 The Lane, Some Village", "counties": ["Devon"], "district": "South Hams"}, "class_of_charge": "C1", "applicant": {"address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095", "name": "P334 Team", "reference": "reference 11"}, "parties": [{"type": "Estate Owner", "names": [{"type": "Private Individual", "private": {"surname": "Expires", "forenames": ["Test", "Notice"]}}]}]}',
+    '{"priority_notice": {"expires": "2100-01-01"}, "particulars": {"description": "EXPIRE 2100s 1 The Street, Some Town", "counties": ["Dorset"], "district": "South Hams"}, "class_of_charge": "C1", "applicant": {"address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095", "name": "P334 Team", "reference": "reference 11"}, "parties": [{"type": "Estate Owner", "names": [{"type": "Private Individual", "private": {"surname": "Expires", "forenames": ["Test", "Notice"]}}]}]}',
+    '{"priority_notice": {"expires": "2100-01-01"}, "particulars": {"description": "EXPIRE 2100s.2 1 The Street, Some Town", "counties": ["Dorset"], "district": "South Hams"}, "class_of_charge": "C1", "applicant": {"address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095", "name": "P334 Team", "reference": "reference 11"}, "parties": [{"type": "Estate Owner", "names": [{"type": "Private Individual", "private": {"surname": "Expires", "forenames": ["Test", "Notice"]}}]}]}',
 ]
 
 regn_dates = [
@@ -142,7 +145,10 @@ regn_dates = [
     '2014-08-01',
     '2014-09-29',
     '2014-11-02',
-    '2016-02-10'
+    '2016-02-10',
+    '2015-11-01',
+    '2015-11-01',
+    '2015-11-01',
 ]
 
 standard_data.length.times do |i|
