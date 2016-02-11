@@ -529,16 +529,16 @@ def get_translated_county(county_name):
 
 
 # Get details of a request for printing
-@app.route('/request_details/<request_type>/<request_id>', methods=["GET"])
-def get_request_details(request_type, request_id):
-    print('requested details of ...' + request_type)
+@app.route('/request_details/<request_id>', methods=["GET"])
+def get_request_details(request_id):
+    request_type = get_request_type(request_id)
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        if request_type == 'registration':
+        if request_type.lower() == 'new registration':
             data = get_register_request_details(request_id)
             details = get_registration_details(cursor, data[0]["registration_no"], data[0]["registration_date"])
             data[0]['details'] = details
-        elif request_type == 'search':
+        elif request_type.lower() == 'search':
             print('call search request')
             data = get_search_request_details(request_id)
         else:
@@ -602,3 +602,20 @@ def last_search():
         data = {'search_details_id':row['search_details_id'], 'request_id': row['request_id'],
                 'timestamp': str(row['search_timestamp'])}
     return Response(json.dumps(data), status=200, mimetype='application/json')
+
+
+def get_request_type(request_id):
+   cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+   # get all rows for this request id, if none contain results then search type is 'search_nr'
+   try:
+       cursor.execute("Select application_type " \
+             "from request where id = %(request_id)s ",
+                  {
+                      "request_id": request_id,
+                  })
+       rows = cursor.fetchall()
+   finally:
+       complete(cursor)
+   for row in rows:
+       data = row['application_type']
+   return data
