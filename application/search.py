@@ -316,7 +316,9 @@ def store_search_request(cursor, data):
     ins_request_id = None
     # document = data['document_id']
     search_type = data['parameters']['search_type']
-    counties = data['parameters']['counties']
+    counties = []
+    if 'counties' in data['parameters']:
+        counties = data['parameters']['counties']
 
     cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
                    "ins_request_id, customer_name, customer_address) " +

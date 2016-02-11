@@ -344,8 +344,8 @@ PARAMETER_SCHEMA = {
                      "other_name": {"type": "string"},
                  },
                  },
-        "year_from": {"type": "integer", "minimum": 1925},
-        "year_to": {"type": "integer", "minimum": 1925},
+        "year_from": {"type": "integer", "minimum": 0},
+        "year_to": {"type": "integer", "minimum": 0},
     },
     "required": ["name", "name_type"]
 }
@@ -367,7 +367,8 @@ SEARCH_SCHEMA = {
                     "type": "array",
                     "items": PARAMETER_SCHEMA
                 }
-            }
+            },
+            "required": ["search_type", "search_items"]
         }
     },
     "required": ["customer", "parameters", "expiry_date", "search_date"]

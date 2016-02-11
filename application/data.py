@@ -1005,6 +1005,7 @@ def get_register_request_details(request_id):
         registrations.append(registration)
     return registrations
 
+
 def get_search_request_details(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     print("get  search request details")
@@ -1031,8 +1032,8 @@ def get_search_request_details(request_id):
                    'search_timestamp': str(row['search_timestamp']), 'type': row['type'],
                    'counties': row['counties'], 'search_details':[]}
         print(str(request))
-        if request['search_details_id'] == None:
-            request ={'noresult':'nosearchdetlid'}
+        if request['search_details_id'] is None:
+            request = {'noresult': 'nosearchdetlid'}
         else:
             search_details = get_search_details(request["search_details_id"])
             request['search_details'] = search_details
