@@ -542,7 +542,7 @@ def get_request_details(request_id):
             print('call search request')
             data = get_search_request_details(request_id)
         else:
-            return Response("invalid request_type " + request_type, status=500)
+            return Response("invalid request_type: " + request_type, status=500)
     finally:
         complete(cursor)
     return Response(json.dumps(data), status=200, mimetype='application/json')
@@ -604,18 +604,22 @@ def last_search():
     return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
+@app.route('/request_type/<request_id>', methods=["GET"])
 def get_request_type(request_id):
-   cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-   # get all rows for this request id, if none contain results then search type is 'search_nr'
-   try:
-       cursor.execute("Select application_type " \
-             "from request where id = %(request_id)s ",
-                  {
-                      "request_id": request_id,
-                  })
-       rows = cursor.fetchall()
-   finally:
-       complete(cursor)
-   for row in rows:
-       data = row['application_type']
-   return data
+    if not request_id:
+        return "none"
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    # get all rows for this request id, if none contain results then search type is 'search_nr'
+    try:
+        cursor.execute("Select application_type " \
+                "from request where id = %(request_id)s ",{"request_id": request_id,})
+        rows = cursor.fetchall()
+    finally:
+        complete(cursor)
+    if rows:
+        for row in rows:
+            data = row['application_type']
+    else:
+        logging.error("could not find request " + request_id)
+        return "none"
+    return data
