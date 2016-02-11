@@ -784,6 +784,10 @@ def get_registration_details(cursor, reg_no, date):
     details_id = rows[0]['id']
     lead_county = rows[0]['county_id']
     lead_debtor_id = rows[0]['debtor_reg_name_id']
+    add_info = ''
+    if rows[0]['additional_info'] is not None:
+        add_info = rows[0]['additional_info']
+
     data = {
         'registration': {
             'number': rows[0]['registration_no'],
@@ -791,7 +795,8 @@ def get_registration_details(cursor, reg_no, date):
         },
         'class_of_charge': rows[0]['class_of_charge'],
         'status': 'current',
-        'revealed': rows[0]['reveal']
+        'revealed': rows[0]['reveal'],
+        'additional_information': add_info
     }
 
     if data['class_of_charge'] not in ['PAB', 'WOB']:
