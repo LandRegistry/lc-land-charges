@@ -181,7 +181,7 @@ PARTICULARS_SCHEMA = {
         },
         "district": {"type": "string"},
         "description": {"type": "string"},
-        "priority_notice": {"type": "string"}
+        "priority_notice": {"type": "string"}  # This is a reference to a priority notice
     },
     "required": ["counties", "district", "description"],
     "additionalProperties": False
@@ -269,7 +269,7 @@ REGISTRATION_SCHEMA = {
         "additional_information": {
             "type": "string"
         },
-        "priority_notice": {
+        "priority_notice": {  # This means that the registration is a priority notice
             "type": "object",
             "properties": {
                 "expires": DATE_SCHEMA
