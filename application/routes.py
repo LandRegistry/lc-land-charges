@@ -578,7 +578,6 @@ def get_request_id():
     return Response(json.dumps(request_id), status=200, mimetype='application/json')
 
 
-
 # Route exists purely for testing purposes - get some valid request ids for test data
 # count is the amount of ids to return
 @app.route('/request_ids/<count>', methods=["GET"])

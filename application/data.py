@@ -1098,7 +1098,7 @@ def get_registration_details_from_register_id(register_id):
 def get_k22_request_id(registration_no, registration_date):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     sql = "select b.request_id from register a, register_details b where a.registration_no = %(registration_no)s " \
-          " and a.date = %(registration_date)s "
+          " and a.date = %(registration_date)s and a.details_id = b.id "
     cursor.execute(sql, {"registration_no": registration_no, "registration_date": registration_date})
     rows = cursor.fetchall()
     complete(cursor)
