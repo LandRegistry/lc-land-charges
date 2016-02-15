@@ -14,7 +14,7 @@ from application.data import connect, get_registration_details, complete, \
     insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
     get_registrations_by_date, get_all_registrations
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
-from application.search import store_search_request, perform_search, store_search_result, read_searches
+from application.search import store_search_request, perform_search, store_search_result, read_searches, get_search_by_request_id
 from application.oc import get_ins_office_copy
 
 
@@ -297,10 +297,19 @@ def create_search():
         
 @app.route('/searches', methods=['GET'])
 def get_searches():
-    name = request.args['name']
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+
     try:
-        result = read_searches(cursor, name)
+        if 'name' in request.args:
+            name = request.args['name']
+            result = read_searches(cursor, name)
+
+        elif 'id' in request.args:
+            result = get_search_by_request_id(cursor, request.args['id'])
+
+        else:
+            result = []
+
         data = []
         for results in result:
             for ids in results['result']:
@@ -310,6 +319,7 @@ def get_searches():
                              'reg_date': reg_data['registration_date'],
                              'class': reg_data['class_of_charge']
                              })
+
     finally:
         complete(cursor)
 

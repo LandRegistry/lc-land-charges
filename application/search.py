@@ -38,6 +38,7 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
                        ")"
                        "and ("
                        "    rd.priority_notice_ind='f' "
+                       "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
                        "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
@@ -60,6 +61,7 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
                        "and dcr.county_id=c.id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
+                       "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
                        "and ((UPPER(c.name) = ANY(%(counties)s) "
@@ -77,9 +79,9 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
 
 
 def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date):
-    logging.info('=====')
-    logging.info(counties)
-    logging.info('~~~~~')
+    logging.debug('=====')
+    logging.debug(name)
+    logging.debug('~~~~~')
     if counties[0] == 'ALL':
         logging.info("all counties search")
         cursor.execute("SELECT DISTINCT(r.id) " +
@@ -90,6 +92,7 @@ def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date
                        "and rd.id=r.details_id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
+                       "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
                        "and (extract(year from r.date) between %(from_date)s and %(to_date)s " +
@@ -114,6 +117,7 @@ def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date
                        "and dcr.county_id=c.id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
+                       "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
                        "and ((UPPER(c.name) = ANY(%(counties)s) "
@@ -141,6 +145,7 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to, c
                        "and rd.id=r.details_id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
+                       "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
                        "and (extract(year from r.date) between %(from_date)s and %(to_date)s " +
@@ -165,6 +170,7 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to, c
                        "and dcr.county_id=c.id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
+                       "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
                        "and ((UPPER(c.name) = ANY(%(counties)s) "
@@ -192,6 +198,7 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to, cert_d
                        "and rd.id=r.details_id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
+                       "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
                        "and (extract(year from r.date) between %(from_date)s and %(to_date)s " +
@@ -216,6 +223,7 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to, cert_d
                        "and dcr.county_id=c.id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
+                       "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
                        "and ((UPPER(c.name) = ANY(%(counties)s) "
@@ -243,6 +251,7 @@ def search_by_complex_name(cursor, complex_name, complex_number, cert_date):
                    "  AND rd.cancelled_by is null and r.date <= %(date)s"
                    "  and ("
                    "      rd.priority_notice_ind='f' "
+                   "      or rd.priority_notice_ind IS NULL "
                    "      or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                    "  )"
                    "  AND rd.class_of_charge in ('PAB', 'WOB', 'PA', 'WO', 'DA')",
@@ -265,6 +274,7 @@ def search_full_by_complex_name(cursor, complex_name, complex_number, counties, 
                        "and rd.id=r.details_id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
+                       "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
                        "and (extract(year from r.date) between %(from_date)s and %(to_date)s " +
@@ -289,6 +299,7 @@ def search_full_by_complex_name(cursor, complex_name, complex_number, counties, 
                        "and dcr.county_id=c.id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
+                       "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
                        "and ((UPPER(c.name) = ANY(%(counties)s) "
@@ -537,9 +548,26 @@ def perform_search(cursor, parameters, cert_date):
                 search_results.append({'name_result': bankruptcy_search(cursor, search_name, cert_date),
                                        'name_id': item['name_id']})
 
+    logging.debug('=========== SEARCH RESULTS ==============')
+    logging.debug(search_results)
+    logging.debug('=========== /SEARCH RESULTS =============')
     return search_results
 
-    
+
+def get_search_by_request_id(cursor, id):
+    cursor.execute("SELECT sr.result " +
+                   "FROM search_results r "
+                   "where r.request_id = %(id)s", {'id': id})
+
+    rows = cursor.fetchall()
+    results = []
+    for row in rows:
+        results.append({
+            "result": row['result'],
+        })
+    return results
+
+
 def read_searches(cursor, name):
     cursor.execute("SELECT sr.result " +
                    "FROM search_name sn, search_results sr " +
