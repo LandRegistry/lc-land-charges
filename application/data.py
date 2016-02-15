@@ -1056,30 +1056,20 @@ def get_search_details(search_details_id):
     rows = cursor.fetchall()
     complete(cursor)
     sn_data = []
-    for row in rows: # for each name searched against
-        name_data = {'id':row['search_name_id'],
-                     'name':{'name_type':row['name_type'],
-                             'forenames':row['forenames'], 'surname':row['surname'], 'complex_name':row['complex_name'],
-                             'complex_number':row['complex_number'], 'company_name':row['company_name'],
-                             'local_authority_name':row['local_authority_name'],
-                             'local_authority_area':row['local_authority_area'],'other_name':row['other_name']},
-                     'year_from':row['year_from'],'year_to':row['year_to'], 'results':[]}
+    for row in rows:  # for each name searched against
+        name_data = {'id': row['search_name_id'],
+                     'name': {'name_type': row['name_type'], 'forenames': row['forenames'], 'surname': row['surname'],
+                              'complex_name': row['complex_name'], 'complex_number': row['complex_number'],
+                              'company_name': row['company_name'], 'local_authority_name': row['local_authority_name'],
+                              'local_authority_area': row['local_authority_area'], 'other_name': row['other_name']},
+                     'year_from': row['year_from'], 'year_to': row['year_to'], 'results': []}
         results = []
-        # sn_data['search_names']['results'] = results
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         print("res_id ", str(row['result']))
         for res_id in row['result']:
-            #get regsiter details from id and add to searchresults array in search name block
-            #regs= get_all_registration_nos(cursor, res_id)
-            #print("regs ", regs)
-            #for reg_no in regs: #TO what if multiple register bought back????
-            #    results_data = get_registration_details(cursor, reg['number'], reg['date'])
-            #    results.append(results_data)
-
             results.append(get_registration_details_from_register_id(res_id))
         name_data['results'] = results
         sn_data.append(name_data)
-        #sn_data = {'search_names:':name_data}
         complete(cursor)
     return sn_data
 
@@ -1101,5 +1091,22 @@ def get_registration_details_from_register_id(register_id):
     for res in results:
         res_data = get_registration_details(cursor, res['number'], res['date'])
         data.append(res_data)
+    complete(cursor)
+    return data
+
+
+def get_k22_request_id(registration_no, registration_date):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    sql = "select b.request_id from register a, register_details b where a.registration_no = %(registration_no)s " \
+          " and a.date = %(registration_date)s "
+    cursor.execute(sql, {"registration_no": registration_no, "registration_date": registration_date})
+    rows = cursor.fetchall()
+    complete(cursor)
+    req_id = 'none'
+    for row in rows:
+        req_id = row['request_id']
+        print("request id is : ", req_id)
+    data = {'request_id': req_id}
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     complete(cursor)
     return data

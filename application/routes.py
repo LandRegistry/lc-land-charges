@@ -12,7 +12,7 @@ from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
-    get_registrations_by_date, get_all_registrations
+    get_registrations_by_date, get_all_registrations, get_k22_request_id
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches, get_search_by_request_id
 from application.oc import get_ins_office_copy
@@ -168,7 +168,8 @@ def register():
     if 'priority_notice' in json_data and json_data['priority_notice']:
         reg_type = 'priority_notices'
 
-    return Response(json.dumps({reg_type: new_regns, 'request_id': request_id}), status=200, mimetype='application/json')
+    return Response(json.dumps({reg_type: new_regns, 'request_id': request_id}), status=200,
+                    mimetype='application/json')
 
 
 @app.route('/registrations/<date>/<reg_no>', methods=["PUT"])
@@ -214,16 +215,12 @@ def amend_registration(date, reg_no):
         "amended_registrations": originals
     }
     return Response(json.dumps(data), status=200)
-
-
-
     # if rows is None or rows == 0:
     #     cursor.connection.rollback()
     #     cursor.close()
     #     cursor.connection.close()
     #     return Response(status=404)
     # else:
-
     #     if not suppress:
     #         publish_amendment(producer, data)
     #
@@ -500,7 +497,6 @@ def get_counties_list():
             cursor.execute("SELECT name, welsh_name FROM COUNTY")
         else:
             cursor.execute("SELECT name FROM COUNTY")
-
         rows = cursor.fetchall()
         counties = list()
         for row in rows:
@@ -558,6 +554,22 @@ def get_request_details(request_id):
     return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
+# Get request id for
+@app.route('/request_details', methods=["GET"])
+def get_request_id():
+    if 'registration_no' in request.args:
+        reg_no = request.args['registration_no']
+    else:
+        return Response(json.dumps({'error': 'no registration_no'}), status=400)
+    if 'registration_date' in request.args:
+        reg_date = request.args['registration_date']
+    else:
+        return Response(json.dumps({'error': 'no registration_date'}), status=400)
+    request_id = get_k22_request_id(reg_no, reg_date)
+    print("route req id is ", request_id)
+    return Response(json.dumps(request_id), status=200, mimetype='application/json')
+
+
 # Route exists purely for testing purposes - get some valid request ids for test data
 # count is the amount of ids to return
 @app.route('/request_ids/<count>', methods=["GET"])
@@ -585,15 +597,15 @@ def get_search_type(request_id):
     # get all rows for this request id, if none contain results then search type is 'search_nr'
     try:
         sql = "Select result from search_results where request_id = %(request_id)s"
-        cursor.execute(sql,{"request_id": request_id})
+        cursor.execute(sql, {"request_id": request_id})
         rows = cursor.fetchall()
     finally:
         complete(cursor)
-    search_type = {'search_type':'search nr'}
+    search_type = {'search_type': 'search nr'}
     for row in rows:
         if row['result']:
-            search_type = {'search_type':'search'}
-    return Response(json.dumps(search_type), status=200,mimetype='application/json')
+            search_type = {'search_type': 'search'}
+    return Response(json.dumps(search_type), status=200, mimetype='application/json')
 
 
 # test route
@@ -601,6 +613,7 @@ def get_search_type(request_id):
 def last_search():
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # get all rows for this request id, if none contain results then search type is 'search_nr'
+    data = {}
     try:
         sql = "Select id as search_details_id, request_id, search_timestamp " \
               "from search_details where id = (select max(id) from search_details) "
@@ -609,7 +622,7 @@ def last_search():
     finally:
         complete(cursor)
     for row in rows:
-        data = {'search_details_id':row['search_details_id'], 'request_id': row['request_id'],
+        data = {'search_details_id': row['search_details_id'], 'request_id': row['request_id'],
                 'timestamp': str(row['search_timestamp'])}
     return Response(json.dumps(data), status=200, mimetype='application/json')
 
@@ -621,11 +634,12 @@ def get_request_type(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # get all rows for this request id, if none contain results then search type is 'search_nr'
     try:
-        cursor.execute("Select application_type " \
-                "from request where id = %(request_id)s ",{"request_id": request_id,})
+        cursor.execute("Select application_type "
+                       "from request where id = %(request_id)s ", {"request_id": request_id})
         rows = cursor.fetchall()
     finally:
         complete(cursor)
+    data = ""
     if rows:
         for row in rows:
             data = row['application_type']
