@@ -565,9 +565,18 @@ def get_request_id():
         reg_date = request.args['registration_date']
     else:
         return Response(json.dumps({'error': 'no registration_date'}), status=400)
-    request_id = get_k22_request_id(reg_no, reg_date)
+    if 'reprint_type' in request.args:
+        reprint_type = request.args['reprint_type']
+    else:
+        return Response("no reprint_type specified", status=400)
+    request_id = 0
+    if reprint_type == 'registration':
+        request_id = get_k22_request_id(reg_no, reg_date)
+    elif reprint_type == 'search':
+        request_id = 0  # write method to get k17/18 request ids
     print("route req id is ", request_id)
     return Response(json.dumps(request_id), status=200, mimetype='application/json')
+
 
 
 # Route exists purely for testing purposes - get some valid request ids for test data
