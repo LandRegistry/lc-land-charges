@@ -585,12 +585,12 @@ def get_search_request_ids():
     data = post_data
     print("lc data: ", str(data))
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    sql = " select a.id as request_id, c.name_type, c.forenames, c.surname, c.complex_name, c.complex_number, " \
-          " c.local_authority_name, c.local_authority_area, c.other_name, c.year_from, c.year_to " \
+    sql = " select a.id as request_id, b.search_timestamp, c.name_type, c.forenames, c.surname, c.complex_name, " \
+          " c.complex_number, c.local_authority_name, c.local_authority_area, c.other_name, c.year_from, c.year_to " \
           " from request a, search_details b, search_name c where a.key_number =  %(key_number)s" \
-          " and a.id = b.request_id and b.id = c.details_id and c.year_from = %(year_from)s " \
-          "and c.year_to = %(year_to)s "
-    params = {"key_number": data['key_number'], "year_from": data['year_from'], "year_to": data['year_to']}
+          " and a.id = b.request_id and b.search_timestamp >= %(date_from)s and b.search_timestamp <= %(date_to)s " \
+          " and b.id = c.details_id "
+    params = {"key_number": data['key_number'], "date_from": data['date_from'], "date_to": data['date_to']}
     if data['estate_owner_ind'] == "private":
         sql += " and c.forenames = %(forenames)s and c.surname = %(surname)s "
         forenames = ""
@@ -603,7 +603,8 @@ def get_search_request_ids():
     request_ids = {'results': []}
     for row in rows:
         print("row ", str(row))
-        res = {'request_id': row['request_id'],
+        res = {'request_id': row['request_id'], 'name_type': row['name_type'],
+               'search_timestamp': str(row['search_timestamp']),
                'estate_owner': {'private': {"forenames": row['forenames'], "surname": row['surname']},
                                 'local': {'name': row['local_authority_name'], "area": row['local_authority_area']},
                                 "complex": {"name": row['complex_name']}, "other": {"name": row['other_name']}}}
