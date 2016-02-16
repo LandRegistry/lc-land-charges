@@ -52,13 +52,13 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
 
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
-                       "detl_county_rel dcr, county c, register_details rd " +
+                       "register_details rd "
+                       "FULL OUTER JOIN detl_county_rel dcr on rd.id = dcr.details_id "
+                       "FULL OUTER JOIN county c on dcr.county_id = c.id "
                        "Where pn.searchable_string=%(name)s " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
-                       "and rd.id=r.details_id " +
-                       "and rd.id=dcr.details_id " +
-                       "and dcr.county_id=c.id " +
+                       "and rd.id=r.details_id "
                        "and ("
                        "    rd.priority_notice_ind='f' "
                        "    or rd.priority_notice_ind IS NULL "
@@ -71,6 +71,7 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
                        "        AND ( "
                        "            rd.class_of_charge = 'A' "
                        "            OR UPPER(c.name) = ANY(%(counties)s) "
+                       "            OR c.name IS NULL "
                        "        ) "
                        "    ) "
                        ") "
@@ -115,13 +116,13 @@ def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date
 
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
-                       "detl_county_rel dcr, county c, register_details rd " +
+                       "register_details rd "
+                       "FULL OUTER JOIN detl_county_rel dcr on rd.id = dcr.details_id "
+                       "FULL OUTER JOIN county c on dcr.county_id = c.id "
                        "Where pn.searchable_string=%(company_name)s " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=r.details_id " +
-                       "and rd.id=dcr.details_id " +
-                       "and dcr.county_id=c.id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
                        "    or rd.priority_notice_ind IS NULL "
@@ -134,6 +135,7 @@ def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date
                        "        AND ( "
                        "            rd.class_of_charge = 'A' "
                        "            OR UPPER(c.name) = ANY(%(counties)s) "
+                       "            OR c.name IS NULL "
                        "        ) "
                        "    ) "
                        ") "
@@ -175,13 +177,13 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to, c
 
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
-                       "detl_county_rel dcr, county c, register_details rd " +
+                       "register_details rd "
+                       "FULL OUTER JOIN detl_county_rel dcr on rd.id = dcr.details_id "
+                       "FULL OUTER JOIN county c on dcr.county_id = c.id "
                        "Where pn.searchable_string=%(loc_name)s " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=r.details_id " +
-                       "and rd.id=dcr.details_id " +
-                       "and dcr.county_id=c.id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
                        "    or rd.priority_notice_ind IS NULL "
@@ -194,6 +196,7 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to, c
                        "        AND ( "
                        "            rd.class_of_charge = 'A' "
                        "            OR UPPER(c.name) = ANY(%(counties)s) "
+                       "            OR c.name IS NULL "
                        "        ) "
                        "    ) "
                        ") "
@@ -235,13 +238,13 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to, cert_d
 
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
-                       "detl_county_rel dcr, county c, register_details rd " +
+                       "register_details rd "
+                       "FULL OUTER JOIN detl_county_rel dcr on rd.id = dcr.details_id "
+                       "FULL OUTER JOIN county c on dcr.county_id = c.id "
                        "Where pn.searchable_string=%(other_name)s " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=r.details_id " +
-                       "and rd.id=dcr.details_id " +
-                       "and dcr.county_id=c.id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
                        "    or rd.priority_notice_ind IS NULL "
@@ -254,6 +257,7 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to, cert_d
                        "        AND ( "
                        "            rd.class_of_charge = 'A' "
                        "            OR UPPER(c.name) = ANY(%(counties)s) "
+                       "            OR c.name IS NULL"
                        "        ) "
                        "    ) "
                        ") "
@@ -318,13 +322,13 @@ def search_full_by_complex_name(cursor, complex_name, complex_number, counties, 
 
         cursor.execute("SELECT DISTINCT(r.id) " +
                        "FROM party_name pn, register r, party_name_rel pnr, party p, " +
-                       "detl_county_rel dcr, county c, register_details rd " +
+                       "register_details rd "
+                       "FULL OUTER JOIN detl_county_rel dcr on rd.id = dcr.details_id "
+                       "FULL OUTER JOIN county c on dcr.county_id = c.id "
                        "Where pn.complex_name=%(complex_name)s and pn.complex_number=%(number)s " +
                        "and pnr.party_name_id = pn.id and pnr.party_id=p.id " +
                        "and p.register_detl_id=rd.id " +
                        "and rd.id=r.details_id " +
-                       "and rd.id=dcr.details_id " +
-                       "and dcr.county_id=c.id " +
                        "and ("
                        "    rd.priority_notice_ind='f' "
                        "    or rd.priority_notice_ind IS NULL "
@@ -337,6 +341,7 @@ def search_full_by_complex_name(cursor, complex_name, complex_number, counties, 
                        "        AND ( "
                        "            rd.class_of_charge = 'A' "
                        "            OR UPPER(c.name) = ANY(%(counties)s) "
+                       "            OR c.name IS NULL "
                        "        ) "
                        "    ) "
                        ") "

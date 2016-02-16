@@ -353,7 +353,7 @@ def insert_landcharge_regn(cursor, details_id, names, county_ids, date, orig_reg
         raise RuntimeError("Invalid number of names: {}".format(len(names)))
         
     reg_nos = []
-    if len(county_ids) == 0: # can occur on migration only        
+    if len(county_ids) == 0:  # can occur on migration or a registration against NO COUNTY
         if len(names) > 0:
             name = names[0]['id']
         else:
@@ -387,6 +387,9 @@ def insert_landcharge_regn(cursor, details_id, names, county_ids, date, orig_reg
 
 
 def insert_counties(cursor, details_id, counties):
+    if len(counties) == 1 and counties[0].upper() == 'NO COUNTY':
+        return []
+
     ids = []
     for county in counties:
         county_detl_id, county_id = insert_lc_county(cursor, details_id, county)
@@ -967,6 +970,7 @@ def insert_cancellation(registration_no, date, data):
 
 
 def insert_lc_county(cursor, register_details_id, county):
+    logging.debug('Inserting: ' + county)
     county_id = get_county_id(cursor, county)
     cursor.execute("INSERT INTO detl_county_rel (county_id, details_id) " +
                    "VALUES( %(county_id)s, %(details_id)s ) RETURNING id",
