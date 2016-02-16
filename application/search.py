@@ -64,9 +64,16 @@ def search_full_by_name(cursor, full_name, counties, year_from, year_to, cert_da
                        "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
-                       "and ((UPPER(c.name) = ANY(%(counties)s) "
-                       "    and extract(year from r.date) between %(from_date)s and %(to_date)s) " +
-                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
+                       "AND ("
+                       "    rd.class_of_charge in ('PA', 'WO', 'DA' ) "
+                       "    OR ( "
+                       "        extract(year from r.date) between %(from_date)s and %(to_date)s "
+                       "        AND ( "
+                       "            rd.class_of_charge = 'A' "
+                       "            OR UPPER(c.name) = ANY(%(counties)s) "
+                       "        ) "
+                       "    ) "
+                       ") "
                        "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'name': full_name.upper(), 'from_date': year_from, 'to_date': year_to,
@@ -120,9 +127,16 @@ def search_full_by_company(cursor, name, counties, year_from, year_to, cert_date
                        "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
-                       "and ((UPPER(c.name) = ANY(%(counties)s) "
-                       "    and extract(year from r.date) between %(from_date)s and %(to_date)s) " +
-                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
+                       "AND ("
+                       "    rd.class_of_charge in ('PA', 'WO', 'DA' ) "
+                       "    OR ( "
+                       "        extract(year from r.date) between %(from_date)s and %(to_date)s "
+                       "        AND ( "
+                       "            rd.class_of_charge = 'A' "
+                       "            OR UPPER(c.name) = ANY(%(counties)s) "
+                       "        ) "
+                       "    ) "
+                       ") "
                        "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'company_name': name.upper(), 'from_date': year_from, 'to_date': year_to,
@@ -173,9 +187,16 @@ def search_full_by_local_authority(cursor, name, counties, year_from, year_to, c
                        "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
-                       "and ((UPPER(c.name) = ANY(%(counties)s) "
-                       "    and extract(year from r.date) between %(from_date)s and %(to_date)s) " +
-                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
+                       "AND ("
+                       "    rd.class_of_charge in ('PA', 'WO', 'DA' ) "
+                       "    OR ( "
+                       "        extract(year from r.date) between %(from_date)s and %(to_date)s "
+                       "        AND ( "
+                       "            rd.class_of_charge = 'A' "
+                       "            OR UPPER(c.name) = ANY(%(counties)s) "
+                       "        ) "
+                       "    ) "
+                       ") "
                        "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'loc_name': name.upper(), 'date': cert_date,
@@ -226,9 +247,16 @@ def search_full_by_other_name(cursor, name, counties, year_from, year_to, cert_d
                        "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
-                       "and ((UPPER(c.name) = ANY(%(counties)s) "
-                       "    and extract(year from r.date) between %(from_date)s and %(to_date)s) " +
-                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
+                       "AND ("
+                       "    rd.class_of_charge in ('PA', 'WO', 'DA' ) "
+                       "    OR ( "
+                       "        extract(year from r.date) between %(from_date)s and %(to_date)s "
+                       "        AND ( "
+                       "            rd.class_of_charge = 'A' "
+                       "            OR UPPER(c.name) = ANY(%(counties)s) "
+                       "        ) "
+                       "    ) "
+                       ") "
                        "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'other_name': name.upper(), 'from_date': year_from, 'to_date': year_to,
@@ -302,9 +330,16 @@ def search_full_by_complex_name(cursor, complex_name, complex_number, counties, 
                        "    or rd.priority_notice_ind IS NULL "
                        "    or (priority_notice_ind='y' and rd.prio_notice_expires >= %(exdate)s) "
                        ")"
-                       "and ((UPPER(c.name) = ANY(%(counties)s) "
-                       "    and extract(year from r.date) between %(from_date)s and %(to_date)s) " +
-                       " or rd.class_of_charge in ('PA', 'WO', 'DA')) " +
+                       "AND ("
+                       "    rd.class_of_charge in ('PA', 'WO', 'DA' ) "
+                       "    OR ( "
+                       "        extract(year from r.date) between %(from_date)s and %(to_date)s "
+                       "        AND ( "
+                       "            rd.class_of_charge = 'A' "
+                       "            OR UPPER(c.name) = ANY(%(counties)s) "
+                       "        ) "
+                       "    ) "
+                       ") "
                        "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
                        {
                            'complex_name': complex_name.upper(), 'number': complex_number,
@@ -392,6 +427,25 @@ def store_search_result(cursor, request_id, details_id, name_id, data):
                    })
 
 
+def complex_name_full_search(cursor, names, counties, search_item, cert_date):
+    build_results = []
+    # Do complex name search
+    # Search against the variations of the complex name
+    for name in names: #item['name']['complex_variations']:
+        comp_results = (search_full_by_complex_name(cursor,
+                                                    name['name'],
+                                                    name['number'],
+                                                    counties,
+                                                    search_item['year_from'],
+                                                    search_item['year_to'],
+                                                    cert_date))
+
+        if len(comp_results) > 0:
+            for ids in comp_results:
+                build_results.append(ids)
+    return {'name_result': build_results, 'name_id': search_item['name_id']}
+
+
 def perform_search(cursor, parameters, cert_date):
     if "counties" not in parameters:
         parameters["counties"] = []
@@ -403,23 +457,31 @@ def perform_search(cursor, parameters, cert_date):
     if parameters['search_type'] == 'full':
         logging.info('Perform full search')
         for item in parameters['search_items']:
-            if item['name_type'] == "Complex":
-                build_results = []
-                # Do complex name search
-                # Search against the variations of the complex name
-                for name in item['name']['complex_variations']:
-                    comp_results = (search_full_by_complex_name(cursor,
-                                                                name['name'],
-                                                                name['number'],
-                                                                parameters['counties'],
-                                                                item['year_from'],
-                                                                item['year_to'],
-                                                                cert_date))
 
-                    if len(comp_results) > 0:
-                        for ids in comp_results:
-                            build_results.append(ids)
-                search_results.append({'name_result': build_results, 'name_id': item['name_id']})
+            if item['name_type'] == "Complex":
+                results = complex_name_full_search(cursor,
+                                                   item['name']['complex_variations'],
+                                                   parameters['counties'],
+                                                   item,
+                                                   cert_date)
+                search_results.append(results)
+
+                # build_results = []
+                # # Do complex name search
+                # # Search against the variations of the complex name
+                # for name in item['name']['complex_variations']:
+                #     comp_results = (search_full_by_complex_name(cursor,
+                #                                                 name['name'],
+                #                                                 name['number'],
+                #                                                 parameters['counties'],
+                #                                                 item['year_from'],
+                #                                                 item['year_to'],
+                #                                                 cert_date))
+                #
+                #     if len(comp_results) > 0:
+                #         for ids in comp_results:
+                #             build_results.append(ids)
+                # search_results.append({'name_result': build_results, 'name_id': item['name_id']})
             elif item['name_type'] == "Private Individual":
                 results_array = []
                 # Do full search by name
