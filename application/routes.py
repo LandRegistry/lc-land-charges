@@ -574,7 +574,7 @@ def get_request_id():
         request_id = get_k22_request_id(reg_no, reg_date)
     elif reprint_type == 'search':
         request_id = 0  # write method to get k17/18 request ids
-    print("route req id is ", request_id)
+
     return Response(json.dumps(request_id), status=200, mimetype='application/json')
 
 
