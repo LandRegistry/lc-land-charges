@@ -16,6 +16,7 @@ from application.data import connect, get_registration_details, complete, \
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches, get_search_by_request_id
 from application.oc import get_ins_office_copy
+import datetime
 
 
 @app.route('/', methods=["GET"])
@@ -583,14 +584,17 @@ def get_request_id():
 def get_search_request_ids():
     post_data = json.loads(request.data.decode('utf-8'))
     data = post_data
-    print("lc data: ", str(data))
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     sql = " select a.id as request_id, b.search_timestamp, c.name_type, c.forenames, c.surname, c.complex_name, " \
-          " c.complex_number, c.local_authority_name, c.local_authority_area, c.other_name, c.year_from, c.year_to " \
+          " c.complex_number, c.local_authority_name, c.local_authority_area, c.other_name, c.company_name," \
+          " c.year_from, c.year_to " \
           " from request a, search_details b, search_name c where a.key_number =  %(key_number)s" \
           " and a.id = b.request_id and b.search_timestamp >= %(date_from)s and b.search_timestamp <= %(date_to)s " \
           " and b.id = c.details_id "
-    params = {"key_number": data['key_number'], "date_from": data['date_from'], "date_to": data['date_to']}
+
+    date_to = datetime.datetime.strptime(data['date_to'], '%Y-%m-%d')
+    date_to = date_to + datetime.timedelta(days=1)
+    params = {"key_number": data['key_number'], "date_from": data['date_from'], "date_to": date_to}
     if data['estate_owner_ind'].lower() == "privateindividual":
         sql += " and UPPER(c.forenames) = %(forenames)s and UPPER(c.surname) = %(surname)s "
         forenames = ""
@@ -603,6 +607,21 @@ def get_search_request_ids():
                "UPPER(c.local_authority_area) = %(local_authority_area)s "
         params['local_authority_name'] = data['estate_owner']['local']['name'].upper()
         params['local_authority_area'] = data['estate_owner']['local']['area'].upper()
+    if data['estate_owner_ind'].lower() == "localauthority":
+        sql += " and UPPER(c.local_authority_name) = %(local_authority_name)s and " \
+               "UPPER(c.local_authority_area) = %(local_authority_area)s "
+        params['local_authority_name'] = data['estate_owner']['local']['name'].upper()
+        params['local_authority_area'] = data['estate_owner']['local']['area'].upper()
+    if data['estate_owner_ind'].lower() == "other":
+        sql += " and UPPER(c.other_name) = %(other_name)s "
+        params['other_name'] = data['estate_owner']['other'].upper()
+    if data['estate_owner_ind'].lower() == 'limitedcompany':
+        sql += " and UPPER(c.company_name) = %(company_name)s "
+        params['company_name'] = data['estate_owner']['company'].upper()
+    if data['estate_owner_ind'].lower() == 'complexname':
+        sql += " and UPPER(c.complex_name) = %(complex_name)s "
+        params['complex_name'] = data['estate_owner']['complex']['name'].upper()
+        params['complex_number'] = data['estate_owner']['complex']['number']
     cursor.execute(sql, params)
     rows = cursor.fetchall()
     results = {'results': []}
@@ -613,7 +632,8 @@ def get_search_request_ids():
                    'search_timestamp': str(row['search_timestamp']),
                    'estate_owner': {'private': {"forenames": row['forenames'], "surname": row['surname']},
                                     'local': {'name': row['local_authority_name'], "area": row['local_authority_area']},
-                                    'complex': {"name": row['complex_name']}, "other": {"name": row['other_name']}}}
+                                    'complex': {"name": row['complex_name'], "number": row['complex_number']},
+                                    "other": row['other_name'], "company": row['company_name']}}
             results['results'].append(res)
             request_ids.append(row['request_id'])
     return Response(json.dumps(results), status=200, mimetype='application/json')
