@@ -592,25 +592,27 @@ def get_search_request_ids():
           " and b.id = c.details_id "
     params = {"key_number": data['key_number'], "date_from": data['date_from'], "date_to": data['date_to']}
     if data['estate_owner_ind'] == "private":
-        sql += " and c.forenames = %(forenames)s and c.surname = %(surname)s "
+        sql += " and UPPER(c.forenames) = %(forenames)s and UPPER(c.surname) = %(surname)s "
         forenames = ""
         for forename in data['estate_owner']['private']['forenames']:
-            forenames += forename + " "
+            forenames += forename.upper() + " "
         params['forenames'] = forenames.strip()
-        params['surname'] = data['estate_owner']['private']['surname']
+        params['surname'] = data['estate_owner']['private']['surname'].upper()
     cursor.execute(sql, params)
     rows = cursor.fetchall()
-    request_ids = {'results': []}
+    results = {'results': []}
+    request_ids = []
     for row in rows:
-        print("row ", str(row))
-        res = {'request_id': row['request_id'], 'name_type': row['name_type'],
-               'search_timestamp': str(row['search_timestamp']),
-               'estate_owner': {'private': {"forenames": row['forenames'], "surname": row['surname']},
-                                'local': {'name': row['local_authority_name'], "area": row['local_authority_area']},
-                                "complex": {"name": row['complex_name']}, "other": {"name": row['other_name']}}}
-        request_ids['results'].append(res)
-    print("request_ids = ", str(request_ids))
-    return Response(json.dumps(request_ids), status=200, mimetype='application/json')
+        if not row['request_id'] in request_ids:
+            print("row ", str(row))
+            res = {'request_id': row['request_id'], 'name_type': row['name_type'],
+                   'search_timestamp': str(row['search_timestamp']),
+                   'estate_owner': {'private': {"forenames": row['forenames'], "surname": row['surname']},
+                                    'local': {'name': row['local_authority_name'], "area": row['local_authority_area']},
+                                    'complex': {"name": row['complex_name']}, "other": {"name": row['other_name']}}}
+            results['results'].append(res)
+            request_ids.append(row['request_id'])
+    return Response(json.dumps(results), status=200, mimetype='application/json')
 
 
 # Route exists purely for testing purposes - get some valid request ids for test data
