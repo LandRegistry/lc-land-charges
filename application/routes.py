@@ -591,20 +591,24 @@ def get_search_request_ids():
           " and a.id = b.request_id and b.search_timestamp >= %(date_from)s and b.search_timestamp <= %(date_to)s " \
           " and b.id = c.details_id "
     params = {"key_number": data['key_number'], "date_from": data['date_from'], "date_to": data['date_to']}
-    if data['estate_owner_ind'] == "private":
+    if data['estate_owner_ind'].lower() == "privateindividual":
         sql += " and UPPER(c.forenames) = %(forenames)s and UPPER(c.surname) = %(surname)s "
         forenames = ""
         for forename in data['estate_owner']['private']['forenames']:
             forenames += forename.upper() + " "
         params['forenames'] = forenames.strip()
         params['surname'] = data['estate_owner']['private']['surname'].upper()
+    if data['estate_owner_ind'].lower() == "countycouncil":
+        sql += " and UPPER(c.local_authority_name) = %(local_authority_name)s and " \
+               "UPPER(c.local_authority_area) = %(local_authority_area)s "
+        params['local_authority_name'] = data['estate_owner']['local']['name'].upper()
+        params['local_authority_area'] = data['estate_owner']['local']['area'].upper()
     cursor.execute(sql, params)
     rows = cursor.fetchall()
     results = {'results': []}
     request_ids = []
     for row in rows:
         if not row['request_id'] in request_ids:
-            print("row ", str(row))
             res = {'request_id': row['request_id'], 'name_type': row['name_type'],
                    'search_timestamp': str(row['search_timestamp']),
                    'estate_owner': {'private': {"forenames": row['forenames'], "surname": row['surname']},
