@@ -554,7 +554,7 @@ def get_request_details(request_id):
     return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
-# Get request id for
+# Get request id for a registration
 @app.route('/request_details', methods=["GET"])
 def get_request_id():
     if 'registration_no' in request.args:
@@ -576,6 +576,40 @@ def get_request_id():
         request_id = 0  # write method to get k17/18 request ids
     print("route req id is ", request_id)
     return Response(json.dumps(request_id), status=200, mimetype='application/json')
+
+
+# Get request id for a search
+@app.route('/request_search_details', methods=["POST"])
+def get_search_request_ids():
+    post_data = json.loads(request.data.decode('utf-8'))
+    data = post_data
+    print("lc data: ", str(data))
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    sql = " select a.id as request_id, c.name_type, c.forenames, c.surname, c.complex_name, c.complex_number, " \
+          " c.local_authority_name, c.local_authority_area, c.other_name, c.year_from, c.year_to " \
+          " from request a, search_details b, search_name c where a.key_number =  %(key_number)s" \
+          " and a.id = b.request_id and b.id = c.details_id and c.year_from = %(year_from)s " \
+          "and c.year_to = %(year_to)s "
+    params = {"key_number": data['key_number'], "year_from": data['year_from'], "year_to": data['year_to']}
+    if data['estate_owner_ind'] == "private":
+        sql += " and c.forenames = %(forenames)s and c.surname = %(surname)s "
+        forenames = ""
+        for forename in data['estate_owner']['private']['forenames']:
+            forenames += forename + " "
+        params['forenames'] = forenames.strip()
+        params['surname'] = data['estate_owner']['private']['surname']
+    cursor.execute(sql, params)
+    rows = cursor.fetchall()
+    request_ids = {'results': []}
+    for row in rows:
+        print("row ", str(row))
+        res = {'request_id': row['request_id'],
+               'estate_owner': {'private': {"forenames": row['forenames'], "surname": row['surname']},
+                                'local': {'name': row['local_authority_name'], "area": row['local_authority_area']},
+                                "complex": {"name": row['complex_name']}, "other": {"name": row['other_name']}}}
+        request_ids['results'].append(res)
+    print("request_ids = ", str(request_ids))
+    return Response(json.dumps(request_ids), status=200, mimetype='application/json')
 
 
 # Route exists purely for testing purposes - get some valid request ids for test data
