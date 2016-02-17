@@ -591,37 +591,48 @@ def get_search_request_ids():
           " from request a, search_details b, search_name c where a.key_number =  %(key_number)s" \
           " and a.id = b.request_id and b.search_timestamp >= %(date_from)s and b.search_timestamp <= %(date_to)s " \
           " and b.id = c.details_id "
-
+    date_from = datetime.datetime.strptime(data['date_from'], '%Y-%m-%d')
+    date_from = date_from + datetime.timedelta(days=-1)
     date_to = datetime.datetime.strptime(data['date_to'], '%Y-%m-%d')
     date_to = date_to + datetime.timedelta(days=1)
-    params = {"key_number": data['key_number'], "date_from": data['date_from'], "date_to": date_to}
+    params = {"key_number": data['key_number'], "date_from": date_from, "date_to": date_to}
     if data['estate_owner_ind'].lower() == "privateindividual":
-        sql += " and UPPER(c.forenames) = %(forenames)s and UPPER(c.surname) = %(surname)s "
         forenames = ""
         for forename in data['estate_owner']['private']['forenames']:
             forenames += forename.upper() + " "
-        params['forenames'] = forenames.strip()
-        params['surname'] = data['estate_owner']['private']['surname'].upper()
+        if not forenames.strip() == "":
+            sql += " and UPPER(c.forenames) = %(forenames)s "
+            params['forenames'] = forenames.strip()
+        if not data['estate_owner']['private']['surname'].strip() == "":
+            sql += " and UPPER(c.surname) = %(surname)s "
+            params['surname'] = data['estate_owner']['private']['surname'].upper()
     if data['estate_owner_ind'].lower() == "countycouncil":
-        sql += " and UPPER(c.local_authority_name) = %(local_authority_name)s and " \
-               "UPPER(c.local_authority_area) = %(local_authority_area)s "
-        params['local_authority_name'] = data['estate_owner']['local']['name'].upper()
-        params['local_authority_area'] = data['estate_owner']['local']['area'].upper()
+        if not data['estate_owner']['local']['name'] == "":
+            sql += " and UPPER(c.local_authority_name) = %(local_authority_name)s "
+            params['local_authority_name'] = data['estate_owner']['local']['name'].upper()
+        if not data['estate_owner']['local']['area'] == "":
+            sql += " and UPPER(c.local_authority_area) = %(local_authority_area)s "
+            params['local_authority_area'] = data['estate_owner']['local']['area'].upper()
     if data['estate_owner_ind'].lower() == "localauthority":
-        sql += " and UPPER(c.local_authority_name) = %(local_authority_name)s and " \
-               "UPPER(c.local_authority_area) = %(local_authority_area)s "
-        params['local_authority_name'] = data['estate_owner']['local']['name'].upper()
-        params['local_authority_area'] = data['estate_owner']['local']['area'].upper()
+        if not data['estate_owner']['local']['name'] == "":
+            sql += " and UPPER(c.local_authority_name) = %(local_authority_name)s "
+            params['local_authority_name'] = data['estate_owner']['local']['name'].upper()
+        if not data['estate_owner']['local']['area'] == "":
+            sql += " and UPPER(c.local_authority_area) = %(local_authority_area)s "
+            params['local_authority_area'] = data['estate_owner']['local']['area'].upper()
     if data['estate_owner_ind'].lower() == "other":
-        sql += " and UPPER(c.other_name) = %(other_name)s "
-        params['other_name'] = data['estate_owner']['other'].upper()
+        if not data['estate_owner']['other'] == "":
+            sql += " and UPPER(c.other_name) = %(other_name)s "
+            params['other_name'] = data['estate_owner']['other'].upper()
     if data['estate_owner_ind'].lower() == 'limitedcompany':
-        sql += " and UPPER(c.company_name) = %(company_name)s "
-        params['company_name'] = data['estate_owner']['company'].upper()
+        if not data['estate_owner']['company'] == "":
+            sql += " and UPPER(c.company_name) = %(company_name)s "
+            params['company_name'] = data['estate_owner']['company'].upper()
     if data['estate_owner_ind'].lower() == 'complexname':
-        sql += " and UPPER(c.complex_name) = %(complex_name)s "
-        params['complex_name'] = data['estate_owner']['complex']['name'].upper()
-        params['complex_number'] = data['estate_owner']['complex']['number']
+        if not data['estate_owner']['complex']['name'] == "":
+            sql += " and UPPER(c.complex_name) = %(complex_name)s "
+            params['complex_name'] = data['estate_owner']['complex']['name'].upper()
+    logging.debug("SQL ", sql)
     cursor.execute(sql, params)
     rows = cursor.fetchall()
     results = {'results': []}
