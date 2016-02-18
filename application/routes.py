@@ -632,21 +632,20 @@ def get_search_request_ids():
         if not data['estate_owner']['complex']['name'] == "":
             sql += " and UPPER(c.complex_name) = %(complex_name)s "
             params['complex_name'] = data['estate_owner']['complex']['name'].upper()
-    logging.debug("SQL ", sql)
     cursor.execute(sql, params)
     rows = cursor.fetchall()
     results = {'results': []}
     request_ids = []
     for row in rows:
-        if not row['request_id'] in request_ids:
-            res = {'request_id': row['request_id'], 'name_type': row['name_type'],
-                   'search_timestamp': str(row['search_timestamp']),
-                   'estate_owner': {'private': {"forenames": row['forenames'], "surname": row['surname']},
-                                    'local': {'name': row['local_authority_name'], "area": row['local_authority_area']},
-                                    'complex': {"name": row['complex_name'], "number": row['complex_number']},
-                                    "other": row['other_name'], "company": row['company_name']}}
-            results['results'].append(res)
-            request_ids.append(row['request_id'])
+        # if not row['request_id'] in request_ids:
+        res = {'request_id': row['request_id'], 'name_type': row['name_type'],
+               'search_timestamp': str(row['search_timestamp']),
+               'estate_owner': {'private': {"forenames": row['forenames'], "surname": row['surname']},
+                                'local': {'name': row['local_authority_name'], "area": row['local_authority_area']},
+                                'complex': {"name": row['complex_name'], "number": row['complex_number']},
+                                "other": row['other_name'], "company": row['company_name']}}
+        results['results'].append(res)
+        request_ids.append(row['request_id'])
     return Response(json.dumps(results), status=200, mimetype='application/json')
 
 
