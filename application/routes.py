@@ -252,6 +252,35 @@ def cancel_registration(date, reg_no):
         return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
+@app.route('/court_check/<court>/<ref>/<year>', methods=['GET'])
+def court_ref_existence_check(court, ref, year):
+    logging.debug("Court existence checking")
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        cursor.execute("SELECT registration_no, date FROM register r, register_details rd " +
+                       "WHERE UPPER(rd.legal_body)=%(court)s AND UPPER(rd.legal_body_ref_no)=%(ref)s " +
+                       "AND rd.legal_body_ref_year=%(year)s AND rd.id=r.details_id",
+                       {"court": court.upper(), "ref": ref.upper(), "year": int(year)})
+        rows = cursor.fetchall()
+        results = []
+        if len(rows) > 0:
+            status_code = 200
+            for row in rows:
+                details = get_registration_details(cursor, row['registration_no'], row['date'])
+                debtor_name = details['parties'][0]['names'][0]['private']
+                name_string = " ".join(debtor_name['forenames']) + " " + debtor_name['surname']
+                results.append({'reg_no': details['registration']['number'],
+                                'date': details['registration']['date'],
+                                'class_of_charge': details['class_of_charge'],
+                                'name': name_string})
+        else:
+            status_code = 404
+    finally:
+        complete(cursor)
+
+    return Response(json.dumps(results), status=status_code, mimetype='application/json')
+
+
 # ============== Searches ===============
 
 

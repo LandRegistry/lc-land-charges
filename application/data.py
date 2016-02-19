@@ -197,8 +197,16 @@ def insert_register_details(cursor, request_id, data, date, amends):
         if party['type'] == 'Debtor':
             debtor = party
 
+    legal_body = None
+    legal_ref_no = None
+    legal_ref_year = None
+
     if debtor is not None:
         legal_ref = debtor['case_reference']
+        if 'legal_body' in debtor:
+            legal_body = debtor['legal_body']
+            legal_ref_no = debtor['legal_ref_no']
+            legal_ref_year = debtor['legal_ref_year']
     else:
         legal_ref = None
 
@@ -214,14 +222,15 @@ def insert_register_details(cursor, request_id, data, date, amends):
 
     cursor.execute("INSERT INTO register_details (request_id, class_of_charge, legal_body_ref, "
                    "amends, district, short_description, additional_info, amendment_type, priority_notice_no, "
-                   "priority_notice_ind, prio_notice_expires ) "
+                   "priority_notice_ind, prio_notice_expires, legal_body, legal_body_ref_no, legal_body_ref_year ) "
                    "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s, %(atype)s, "
-                   "%(pno)s, %(pind)s, %(pnx)s) "
+                   "%(pno)s, %(pind)s, %(pnx)s, %(legal_body)s, %(legal_ref_no)s, %(legal_year)s) "
                    "RETURNING id", {
                        "rid": request_id, "coc": data['class_of_charge'],
                        "legal_ref": legal_ref, "amends": amends, "dist": district,
                        "sdesc": short_description, "addl": additional_info, "atype": amend_type,
-                       "pno": priority_notice, 'pind': is_priority_notice, "pnx": prio_notc_expires
+                       "pno": priority_notice, 'pind': is_priority_notice, "pnx": prio_notc_expires,
+                       "legal_body": legal_body, "legal_ref_no": legal_ref_no, "legal_year": legal_ref_year
                    })
     return cursor.fetchone()[0]
 
