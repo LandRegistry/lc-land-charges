@@ -168,7 +168,7 @@ PARTY_SCHEMA = {
         "date_of_birth": DATE_SCHEMA
     },
     "required": ["type", "names"],
-    "additionalProperties": False
+    "additionalProperties": True
 }
 
 PARTICULARS_SCHEMA = {
