@@ -229,7 +229,7 @@ def amend_registration(date, reg_no):
 
 
 @app.route('/cancellations', methods=["POST"])
-def cancel_registration(date, reg_no):
+def cancel_registration():
     if request.headers['Content-Type'] != "application/json":
         logging.error('Content-Type is not JSON')
         return Response(status=415)
@@ -238,15 +238,18 @@ def cancel_registration(date, reg_no):
     if 'suppress_queue' in request.args:
         logging.info('Queue suppressed')
         suppress = True
-    reg_no = request.form['reg_no']
-    reg_date = request.form['reg_date']
-    json_data = request.get_json(force=True)
-    rows, nos = insert_cancellation(reg_no, date, json_data)
+    json_data = json.loads(request.data.decode('utf-8'))
+    logging.info("Received: %s", json_data)
+    reg = json_data['registration']
+    logging.info("Reg: %s", reg)
+    reg_no = json_data['registration_no']
+    reg_date = json_data['registration']['date']
+    rows, nos = insert_cancellation(reg_no, reg_date, json_data)
     if rows == 0:
         return Response(status=404)
     else:
         data = {
-            "cancelled": nos
+            "cancellations": nos
         }
         if not suppress:
             publish_cancellation(producer, nos)
