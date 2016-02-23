@@ -951,10 +951,8 @@ def insert_cancellation(registration_no, date, data):
             logging.warning("Obsolete: cancellation with document-id")  # TODO: remove this and what needs it
             document = data['document_id']
 
-        request_id = insert_request(cursor, None, "CANCELLATION", None, now, document, None, data['customer_name'],
-                                    data['customer_address'])
-        logging.info(request_id)
-        # Set cancelled_on to now
+        request_id = insert_request(cursor, data['applicant'], "CANCELLATION", data['registration']['date'], None)
+
         original_detl_id = get_head_of_chain(cursor, registration_no, date)
             #get_register_details_id(cursor, registration_no, date)
         logging.debug("Retrieved details id {}".format(original_detl_id))
