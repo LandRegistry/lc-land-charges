@@ -496,7 +496,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data):
 
     logging.info(original_details_id)
     date = datetime.datetime.now().strftime('%Y-%m-%d')
-    request_id = insert_request(cursor, data['applicant'], 'Rectification', date)
+    request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], date)
 
     # insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None):
     reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id)
