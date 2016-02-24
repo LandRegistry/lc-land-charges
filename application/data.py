@@ -496,7 +496,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data):
 
     logging.info(original_details_id)
     date = datetime.datetime.now().strftime('%Y-%m-%d')
-    request_id = insert_request(cursor, data['applicant'], 'Rectification', date)
+    request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], date)
 
     # insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None):
     reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id)
@@ -951,10 +951,8 @@ def insert_cancellation(registration_no, date, data):
             logging.warning("Obsolete: cancellation with document-id")  # TODO: remove this and what needs it
             document = data['document_id']
 
-        request_id = insert_request(cursor, None, "CANCELLATION", None, now, document, None, data['customer_name'],
-                                    data['customer_address'])
-        logging.info(request_id)
-        # Set cancelled_on to now
+        request_id = insert_request(cursor, data['applicant'], "CANCELLATION", data['registration']['date'], None)
+
         original_detl_id = get_head_of_chain(cursor, registration_no, date)
             #get_register_details_id(cursor, registration_no, date)
         logging.debug("Retrieved details id {}".format(original_detl_id))

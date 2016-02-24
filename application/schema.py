@@ -242,7 +242,7 @@ UPDATE_SCHEMA = {
     "properties": {
         "type": {
             "type": "string",
-            "enum": ['Rectification', 'Correction']
+            "enum": ['Rectification', 'Correction', 'Amendment']
         }
     },
     "required": [

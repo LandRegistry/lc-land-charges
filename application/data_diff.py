@@ -45,7 +45,7 @@ def is_name_change_type3(before, after):
             if len(name) == 1 and len(after_name) == 1:  # Initial remains as initial
                 return False
 
-            if name[0].upper() != after_name[0].upper(): # Before is not the initial of after
+            if name[0].upper() != after_name[0].upper():  # Before is not the initial of after
                 return False
     else:
         if len(before['forenames']) == 0:
@@ -89,6 +89,12 @@ def get_rectification_type(original_data, new_data):
     # 'parties': [{'names': [{'private': {'forenames': ['Jo', 'John'], 'surname': 'Johnson'}, 'type':
     # 'Private Individual'}], 'type': 'Estate Owner'}], 'particulars': {'description': '1 The Lane, Some Village',
     # 'district': 'South Hams', 'counties': ['Devon']}}
+    if new_data['update_registration']['type'] == 'Amendment':
+        if ((len(original_data['parties'][0]['names']) == len(new_data['parties'][0]['names'])) and
+                (all(i in new_data['parties'][0]['names'] for i in original_data['parties'][0]['names']))):
+            return 1
+        else:
+            return 2
 
     names_are_the_same = names_match(original_data['parties'][0]['names'][0],
                                      new_data['parties'][0]['names'][0])
