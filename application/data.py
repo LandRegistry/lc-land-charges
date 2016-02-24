@@ -410,10 +410,6 @@ def insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None)
     names, register_details_id = insert_details(cursor, request_id, data, date, amends)
 
     if data['class_of_charge'] in ['PAB', 'WOB']:
-        # TODO: need to get migrator and B2B link to populate counties in parties element
-        # TODO: discuss with Ian why we have different methods for lc and banks????
-        # count_ids not used on the register for banks but insert_counties needed for searching
-        county_ids = insert_counties(cursor, register_details_id, data['parties'][0]['counties'])
         reg_nos = insert_bankruptcy_regn(cursor, register_details_id, names, date, orig_reg_no)
     else:
         county_ids = insert_counties(cursor, register_details_id, data['particulars']['counties'])

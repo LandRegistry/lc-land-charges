@@ -756,3 +756,25 @@ def get_request_type(request_id):
         logging.error("could not find request " + request_id)
         return "none"
     return data
+
+
+@app.route('/area_variants', methods=['PUT'])
+def set_area_variants():
+    data = json.loads(request.data.decode('utf-8'))
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    for item in data:
+        cursor.execute('INSERT INTO county_search_keys (name, key, variant_of, county_council) '
+                       'VALUES( %(name)s, %(key)s, %(variant)s, %(county)s )', {
+                           'name': item['name'], 'key': item['key'],
+                           'variant': item['variant_of'], 'county': item['county_council']
+                       })
+    complete(cursor)
+    return Response(status=200)
+
+
+@app.route('/area_variants', methods=['DELETE'])
+def clear_area_variants():
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute('DELETE FROM county_search_keys')
+    complete(cursor)
+    return Response(status=200)

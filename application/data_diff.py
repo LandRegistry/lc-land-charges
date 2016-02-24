@@ -45,7 +45,7 @@ def is_name_change_type3(before, after):
             if len(name) == 1 and len(after_name) == 1:  # Initial remains as initial
                 return False
 
-            if name[0].upper() != after_name[0].upper(): # Before is not the initial of after
+            if name[0].upper() != after_name[0].upper():  # Before is not the initial of after
                 return False
     else:
         if len(before['forenames']) == 0:
