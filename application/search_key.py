@@ -67,8 +67,6 @@ COMPLEX_NAME_INDICATORS = ['ARCHBISHOP', 'ARCHDEACON', 'AUTHORITY', 'BISHOP', 'B
                            'ROYAL', 'SANATORIUM', 'SCHOOL', 'SCHOOLS', 'STATE', 'TRUST', 'TRUSTS', 'TRUSTEE',
                            'TRUSTEES', 'UNIVERSITY', 'VICAR', 'WARDEN', 'WARDENS']
 
-
-
 LA_ABBREVIATIONS = {
     'SAINT': 'ST',
     'SAINTS': 'ST',
@@ -84,11 +82,14 @@ LA_ABBREVIATIONS = {
     'SUR': 'S'
 }
 
-NON_KEY_WORDS = ['BOARD', 'GOVERNOR', 'GOVENORS', 'GUARDIAN', 'GUARDIANS', 'INCUMBENT', 'INCORPORATED',
+NON_KEY_WORDS = ['BOARD', 'GOVERNOR', 'GOVERNORS', 'GUARDIAN', 'GUARDIANS', 'INCUMBENT', 'INCORPORATED',
                  'INC', 'PROPRIETOR', 'PROPRIETORS', 'REGISTERED', 'TRUSTEE', 'TRUSTEES']
 
 LA_NON_KEY_WORDS = ['AND', '&', 'AT', 'BY', 'CITY', 'CUM', 'DE', 'DU', 'EN', 'IN', 'LA', 'LE',
                     'NEXT', 'OF', 'ON', 'OVER', 'OUT', 'SEA', 'THE', 'U', 'UNDER', 'UPON', 'WITH']
+
+B_INDICATORS = ['BOARD OF']
+
 
 
 # TODO: remove this once we pass a cursor in
@@ -105,8 +106,12 @@ def complete(cursor):
     cursor.connection.close()
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
 def remove_non_alphanumeric(name_string):
     return re.sub('[^A-Za-z0-9]', '', name_string)
+
+def remove_non_alphanumeric_spaces(name_string):
+    return re.sub('[^A-Za-z0-9\s]', '', name_string)
 
 
 def create_private_name_key(private):
@@ -143,7 +148,8 @@ def remove_noise(name_array):
 
 
 def remove_non_key(name_array, words_to_remove):
-    return [word for word in name_array if word not in words_to_remove]
+    result = [word for word in name_array if word not in words_to_remove]
+    return result
 
 
 def replace_la_abbreviations(name_array):
@@ -154,6 +160,11 @@ def replace_la_abbreviations(name_array):
 
 
 def create_limited_name_key(company):
+    # Pre-parse the various PLC combinations...
+    company = re.sub("(\s|^)(public)\s(limited|ltd|ld)\s(company|co|cos|coy|coys|comp|comps|companies)(\s|$)", r"\1PLC\5", company, flags=re.IGNORECASE)
+    company = re.sub("(\s|^)(cwmni|c)\s(cyf|cyfyngedig|c)\s(cyhoeddus|c)(\s|$)", r"\1PLC\5", company, flags=re.IGNORECASE)
+    company = remove_non_alphanumeric_spaces(company)
+
     name_array = company.upper().split(' ')
     name_array = remove_common_words(name_array)
     name_array = remove_noise(name_array)
@@ -163,14 +174,13 @@ def create_limited_name_key(company):
 
 
 def fetch_name_key(cursor, name):
-    cursor.execute('SELECT key FROM county_search_keys WHERE name=%(name)s', {'name': name})
+    cursor.execute('SELECT key FROM county_search_keys WHERE name=%(name)s', {'name': name.upper()})
     rows = cursor.fetchall()
     if len(rows) == 0:
         raise RuntimeError('No variants found for name {}'.format(name))
     if len(rows) > 1:
         raise RuntimeError('Too many variants found for name {}'.format(name))
     key = rows[0]['key']
-    complete(cursor)
     return key
 
 
@@ -185,38 +195,36 @@ def create_local_authority_key(area):
     return area
 
 
-# VARNAM A where
-# Not more than 4 words
-# None of the words are plexnam words
-# Also includes surname-only
-
-# VARNAM B where
-# not more then 4 significant (non-noise) words
-# The full name (excluding non-significant words) contains one or more of:
-#    plexnam word
-#    common code word
-#    noise or non-key
-#    trailing s
-# includes surname-only where the name is a special word in the group immediately above
-
 def count_words(name_array):
     # a group of initials is one word; e.g. B O F Howard is a two word name...
+    # 'noise' words aren't counted
     count = 0
     previous_was_1_char = False
     for name in name_array:
-        if len(name) > 1:
-            count += 1
-            previous_was_1_char = False
-        else:
-            if not previous_was_1_char:
+        if name not in NOISE:
+            if len(name) > 1:
                 count += 1
-            previous_was_1_char = True
+                previous_was_1_char = False
+            else:
+                if not previous_was_1_char:
+                    count += 1
+                previous_was_1_char = True
     return count
 
 
-def contains_complex_indicators(name):
-    for indicator in COMPLEX_NAME_INDICATORS:
+def contains_b_indicators(name):
+    test = COMPLEX_NAME_INDICATORS + B_INDICATORS
+    for indicator in test:
         if re.search('(^|\s){}(\s|$)'.format(indicator), name) is not None:
+            return True
+    return False
+
+
+def contains_noise_nonkey_or_s_words(name_array):
+    # TODO: what about the three -IES words
+    test_for_words = NOISE + NON_KEY_WORDS + S_WORDS
+    for name in name_array:
+        if name in test_for_words:
             return True
     return False
 
@@ -224,30 +232,80 @@ def contains_complex_indicators(name):
 def is_class_b(name):
     # This is a bit strange. In the 'other' column (legacy speak: 'VARNAM' [Various Name Types])
     # we have two sub-types, called 'A' and 'B'; they are treated differently, so we need to distinguish them
-    # IMPORTANT: PLEXNAM NAMES CAN CONTAIN SPACES
+    name_array = name.upper().split(' ')
+    word_count = count_words(name_array)
+    contains_notable_word = contains_noise_nonkey_or_s_words(name_array) or \
+        contains_b_indicators(name)
 
-    #re.search('(^|\s){}(\s|$)'.format('tri'), S))
+    if word_count > 4 or contains_notable_word:
+        return True
+
+    return False
+
+
+def get_other_type_a_key(name):
+    # ARGH: to guarantee search results not changing, we'll have to search on the last 12 bytes of
+    # ... oh wait, stage 2 uses the remainder
+
+    return remove_non_alphanumeric(name.upper())
+    # TODO: in synchroniser we'll need the punctuation bytes too...
+
+
+def get_other_type_b_key(name):
+    for item in B_INDICATORS:
+        name = re.sub('(^|\s){}(\s|$)'.format(item), "", name)
+
+    key = create_limited_name_key(name)  # Handily, type b are mostly treated with the LTD CO rules
+    return key
+
+
+def get_other_key(name):
+    if is_class_b(name):
+        key = get_other_type_b_key(name)
+        if key == '':
+            return 'NULL KEY', 'B'
+        else:
+            return key, 'B'
+    else:
+        return get_other_type_a_key(name), 'A'
+
+#    NOISE
+#    NON_KEY_WORDS
+
+# VARNAM A where
+# Not more than 4 words
+# None of the words are plexnam words
+# Also includes surname-only
+
+# VARNAM B where
+# not more then 4 significant (non-noise) words
+# The full name (including non-significant words) contains one or more of:
+#    plexnam word
+#    common code word
+#    noise or non-key
+#    trailing s
+# includes surname-only where the name is a special word in the group immediately above
 
 
 
 
 def create_registration_key(cursor, name):
-    if name['type'] == 'Private Individual':
-        return create_private_name_key(name['private'])
+    ind = ''
+
+    if name['type'] == 'Private Individual' and len(name['private']['forenames']) > 0:
+        key = create_private_name_key(name['private'])
     elif name['type'] == 'Limited Company':
-        return create_limited_name_key(name['company'])
+        key = create_limited_name_key(name['company'])
     elif name['type'] == 'County Council':
-        return fetch_name_key(cursor, name['local']['area'])
+        key = fetch_name_key(cursor, name['local']['area'])
     elif name['type'] in ['Parish Council', 'Rural Council', 'Other Council']:
-        return create_local_authority_key(name['local']['area'])
+        key = create_local_authority_key(name['local']['area'])
     elif name['type'] == 'Development Corporation':
-        return create_local_authority_key(name['other'])
-
-
-
-
-    elif name['type'] == 'Other':  # 'varnam A' or 'varnam B'
-        #return remove_non_alphanumeric(name['other'].upper())
+        key = create_local_authority_key(name['other'])
+    elif name['type'] == 'Other':
+        key, ind = get_other_key(name['other'])
+    elif name['type'] == 'Private Individual' and len(name['private']['forenames']) == 0:
+        key, ind = get_other_key(name['private']['surname'])
 
     elif name['type'] == 'Complex Name':
         pass
@@ -255,7 +313,7 @@ def create_registration_key(cursor, name):
     elif name['type'] == 'Null Complex Name':
         pass
 
-
+    return {'key': key, 'indicator': ind}
 
 # Otherwise its a complex name.
 # If number is 9999924, treat as varnam A or B
@@ -265,13 +323,13 @@ def create_registration_key(cursor, name):
 # NB:
 
 
-name = {
-    'type': 'Limited Company',
-    'company': 'The Brown Brothers Guardians of the Light Limited Company'
-}
-
-cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-print(create_registration_key(name))
+# name = {
+#     'type': 'Limited Company',
+#     'company': 'The Brown Brothers Guardians of the Light Limited Company'
+# }
+#
+# cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+# print(create_registration_key(name))
 
 # NAME_SCHEMA = {
 #     'type': 'object',
