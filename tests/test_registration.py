@@ -334,27 +334,40 @@ class TestWorking:
         assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
                                       {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
-                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'}) == 1
+                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1', 'update_registration': {'type': 'Rectification'}}) == 1
 
         assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["Sam", "John"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
                                       {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
-                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'}) == 2
+                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1', 'update_registration': {'type': 'Rectification'}}) == 2
 
         assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
                                       {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
-                                       'particulars': {'counties': ['Devon', 'Dorset']}, 'class_of_charge': 'C1'}) == 2
+                                       'particulars': {'counties': ['Devon', 'Dorset']}, 'class_of_charge': 'C1', 'update_registration': {'type': 'Rectification'}}) == 2
 
         assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
                                       {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
-                                       'particulars': {'counties': ['Dorset']}, 'class_of_charge': 'C1'}) == 3
+                                       'particulars': {'counties': ['Dorset']}, 'class_of_charge': 'C1', 'update_registration': {'type': 'Rectification'}}) == 3
 
         assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
                                       {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
-                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C4'}) == 3
+                                       'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C4', 'update_registration': {'type': 'Rectification'}}) == 3
+
+        assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', 'private': {'forenames':['John'], 'surname': 'Smith'}}]}]},
+                                      {'parties': [{'names': [{'type': 'Private Individual', 'private': {'forenames':['John'], 'surname': 'Smith'}}]}],
+                                       'update_registration': {'type': 'Amendment'}}) != 2
+
+        assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', 'private': {'forenames':['John'], 'surname': 'Smith'}}]}]},
+                                      {'parties': [{'names': [{'type': 'Private Individual', 'private': {'forenames':['John', 'Adam'], 'surname': 'Smith'}}]}],
+                                       'update_registration': {'type': 'Amendment'}}) == 2
+
+        assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', 'private': {'forenames':['John'], 'surname': 'Smith'}}]}]},
+                                      {'parties': [{'names': [{'type': 'Private Individual', 'private': {'forenames':['John'], 'surname': 'Smith'}},
+                                                              {'type': 'Private Individual', 'private': {'forenames':['John', 'Adam'], 'surname': 'Smith'}}]}],
+                                       'update_registration': {'type': 'Amendment'}}) == 2
 
     def test_ltd_co_name_key(self):
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
