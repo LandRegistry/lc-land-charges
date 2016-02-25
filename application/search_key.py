@@ -279,6 +279,7 @@ def create_registration_key(cursor, name):
     elif name['type'] in ['Parish Council', 'Rural Council', 'Other Council']:
         key = create_local_authority_key(name['local']['area'])
     elif name['type'] == 'Development Corporation':
+        # TODO: strip '(New Town)? Development Corporation'
         key = create_local_authority_key(name['other'])
     elif name['type'] == 'Other':
         key, ind = get_other_key(name['other'])
@@ -317,22 +318,45 @@ def create_pi_search_keys(name):
     return keys
 
 
-def create_search_keys(cursor, name):
-
+def create_search_keys(cursor, name_type, name):
     keys = []
+    if name_type == 'Private Individual':
+        keys = create_pi_search_keys({'forenames': name['forenames'].split(' '), 'surname': name['surname']})
 
-    if name['type'] == 'Private Individual':
-        keys = create_pi_search_keys(name['private'])
+    elif name_type == 'Limited Company':
+        keys.append(create_limited_name_key(name['company_name']))
 
-    elif name['type'] == 'Complex Name':
+    elif name_type == 'County Council':
+        keys.append(fetch_name_key(cursor, name['local_authority_area']))
+
+    elif name_type in ['Parish Council', 'Rural Council', 'Other Council']:
+        keys.append(create_local_authority_key(name['local_authority_area']))
+
+    elif name_type == 'Development Corporation':
+        # TODO: strip '(New Town)? Development Corporation'
+        keys.append(create_local_authority_key(name['other_name']))
+
+    elif name_type == 'Other':
+        key, ind = get_other_key(name['other_name'])
+        keys.append(key)
+
+    elif name_type == 'Complex':
         key, ind = get_other_key(name['complex']['name'])
         keys.append(key)
-    elif name['type'] == 'Null Complex Name':
+    elif name_type == 'Null Complex Name':
         key, ind = get_other_key(name['complex']['name'])
         keys.append(key)
     else:
-        keys = [create_registration_key(cursor, name)]
+        raise RuntimeError('Unknown name type: {}'.format(name['type']))
 
     return keys
 
-
+                #
+                # "forenames": {"type": "string"},
+                # "surname": {"type": "string"},
+                # "complex_name": {"type": "string"},
+                # "complex_number": {"type": "integer"},
+                # "complex_variations": {"type": "array", "items": COMPLEX_SCHEMA},
+                # "local_authority_name": {"type": "string"},
+                # "local_authority_area": {"type": "string"},
+                # "other_name": {"type": "string"},

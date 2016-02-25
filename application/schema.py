@@ -56,6 +56,7 @@ NAME_SCHEMA = {
                 "Development Corporation",
                 "Limited Company",
                 "Complex Name",
+                "Coded Name",
                 "Other"
             ]
         },
@@ -331,23 +332,26 @@ PARAMETER_SCHEMA = {
     "type": "object",
     "properties": {
         "name_type": {"type": "string"},
-        "name": {"type": "object",
-                 "properties": {
-                     "forenames": {"type": "string"},
-                     "surname": {"type": "string"},
-                     "complex_name": {"type": "string"},
-                     "complex_number": {"type": "integer"},
-                     "complex_variations": {"type": "array",
-                                            "items": COMPLEX_SCHEMA},
-                     "local_authority_name": {"type": "string"},
-                     "local_authority_area": {"type": "string"},
-                     "other_name": {"type": "string"},
-                 },
-                 },
+        "name": {
+            "type": "object",
+            "properties": {
+                "forenames": {"type": "string"},
+                "surname": {"type": "string"},
+                "complex_name": {"type": "string"},
+                "complex_number": {"type": "integer"},
+                "complex_variations": {"type": "array", "items": COMPLEX_SCHEMA},
+                "local_authority_name": {"type": "string"},
+                "local_authority_area": {"type": "string"},
+                "company_name": {"type": "string"},
+                "other_name": {"type": "string"},
+            },
+            "additionalProperties": False
+        },
         "year_from": {"type": "integer", "minimum": 0},
         "year_to": {"type": "integer", "minimum": 0},
     },
-    "required": ["name", "name_type"]
+    "required": ["name", "name_type"],
+    "additionalProperties": False
 }
 
 
