@@ -244,9 +244,6 @@ def is_class_b(name):
 
 
 def get_other_type_a_key(name):
-    # ARGH: to guarantee search results not changing, we'll have to search on the last 12 bytes of
-    # ... oh wait, stage 2 uses the remainder
-
     return remove_non_alphanumeric(name.upper())
     # TODO: in synchroniser we'll need the punctuation bytes too...
 
@@ -269,25 +266,6 @@ def get_other_key(name):
     else:
         return get_other_type_a_key(name), 'A'
 
-#    NOISE
-#    NON_KEY_WORDS
-
-# VARNAM A where
-# Not more than 4 words
-# None of the words are plexnam words
-# Also includes surname-only
-
-# VARNAM B where
-# not more then 4 significant (non-noise) words
-# The full name (including non-significant words) contains one or more of:
-#    plexnam word
-#    common code word
-#    noise or non-key
-#    trailing s
-# includes surname-only where the name is a special word in the group immediately above
-
-
-
 
 def create_registration_key(cursor, name):
     ind = ''
@@ -306,61 +284,55 @@ def create_registration_key(cursor, name):
         key, ind = get_other_key(name['other'])
     elif name['type'] == 'Private Individual' and len(name['private']['forenames']) == 0:
         key, ind = get_other_key(name['private']['surname'])
+    elif name['type'] == 'Complex Name':  # Generate the key as if VARNAM as we'll need that later
+        key, ind = get_other_key(name['complex']['name'])
+    elif name['type'] == 'Null Complex Name':  # so-called 'five nine two four' names; treat as VARNAM
+        key, ind = get_other_key(name['complex']['name'])
+    else:
+        raise RuntimeError('Unknown name type: {}'.format(name['type']))
 
-    elif name['type'] == 'Complex Name':
-        pass
-
-    elif name['type'] == 'Null Complex Name':
-        pass
-
+    # TODO: remember to also match name type
     return {'key': key, 'indicator': ind}
 
-# Otherwise its a complex name.
-# If number is 9999924, treat as varnam A or B
+
+def create_pi_search_keys(name):
+    keys = []
+
+    initials = True
+    for forename in name['forenames']:
+        if len(forename) > 1:
+            initials = False
+            break
+
+    if not initials and len(name['forenames']) > 0:
+        keys.append((''.join(name['forenames']) + name['surname']).upper())
+
+    if len(name['forenames']) > 0:
+        inits = ''
+        for forename in name['forenames']:
+            inits += forename[0]
+        keys.append((inits + name['surname']).upper())
+
+    keys.append(name['surname'].upper())
+    return keys
 
 
+def create_search_keys(cursor, name):
 
-# NB:
+    keys = []
+
+    if name['type'] == 'Private Individual':
+        keys = create_pi_search_keys(name['private'])
+
+    elif name['type'] == 'Complex Name':
+        key, ind = get_other_key(name['complex']['name'])
+        keys.append(key)
+    elif name['type'] == 'Null Complex Name':
+        key, ind = get_other_key(name['complex']['name'])
+        keys.append(key)
+    else:
+        keys = [create_registration_key(cursor, name)]
+
+    return keys
 
 
-# name = {
-#     'type': 'Limited Company',
-#     'company': 'The Brown Brothers Guardians of the Light Limited Company'
-# }
-#
-# cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-# print(create_registration_key(name))
-
-# NAME_SCHEMA = {
-#     'type': 'object',
-#     'properties': {
-#         'type': {
-#             'type': 'string',
-#             'enum': [
-#                 'Private Individual',
-#                 'County Council',
-#                 'Parish Council',
-#                 'Rural Council',
-#                 'Other Council',
-#                 'Development Corporation',
-#                 'Limited Company',
-#                 'Complex Name',
-#                 'Other'
-#             ]
-#         },
-#         'private': PRIVATE_INDIVIDUAL_SCHEMA,
-#         'local': AUTHORITY_SCHEMA,
-#         'other': {'type': 'string'},
-#         'company': {'type': 'string'},
-#         'complex': COMPLEX_SCHEMA
-#     },
-#     'required': ['type'],
-#     'oneOf': [
-#         {'required': ['private']},
-#         {'required': ['local']},
-#         {'required': ['company']},
-#         {'required': ['other']},
-#         {'required': ['complex']}
-#     ],
-#     'additionalProperties': False
-# }

@@ -6,6 +6,7 @@ import logging
 import re
 from application.search import get_searchable_string
 from application.data_diff import get_rectification_type
+from application.search_key import create_registration_key
 
 
 def connect(cursor_factory=None):
@@ -101,25 +102,29 @@ def insert_party_name(cursor, party_id, name):
     elif name['type'] == 'Complex Name':
         complex_number = name['complex']['number']
         complex_name = name['complex']['name']
-        searchable_string = None
+        #searchable_string = None
     else:
         raise RuntimeError('Unknown name type: {}'.format(name['type']))
 
-    if name['type'] != 'Complex Name':
-        searchable_string = get_searchable_string(name_string, company, local_auth, local_auth_area, other)
+    # if name['type'] != 'Complex Name':
+    #     searchable_string = get_searchable_string(name_string, company, local_auth, local_auth_area, other)
 
     #get_searchable_string(name_string=None, company=None, local_auth=None, local_auth_area=None, other=None):
+    name_key = create_registration_key(cursor, name)
+
+
     cursor.execute("INSERT INTO party_name ( party_name, forename, middle_names, surname, alias_name, "
                    "complex_number, complex_name, name_type_ind, company_name, local_authority_name, "
-                   "local_authority_area, other_name, searchable_string ) "
+                   "local_authority_area, other_name, searchable_string, subtype ) "
                    "VALUES ( %(name)s, %(forename)s, %(midnames)s, %(surname)s, %(alias)s, "
                    "%(comp_num)s, %(comp_name)s, %(type)s, %(company)s, "
-                   "%(loc_auth)s, %(loc_auth_area)s, %(other)s, %(search_name)s ) "
+                   "%(loc_auth)s, %(loc_auth_area)s, %(other)s, %(search_name)s, %(subtype)s ) "
                    "RETURNING id", {
                        "name": name_string, "forename": forename, "midnames": middle_names,
                        "surname": surname, "alias": is_alias, "comp_num": complex_number, "comp_name": complex_name,
                        "type": name['type'], "company": company, "loc_auth": local_auth,
-                       "loc_auth_area": local_auth_area, "other": other, "search_name": searchable_string,
+                       "loc_auth_area": local_auth_area, "other": other, "search_name": name_key['key'],
+                       'subtype': name_key['indicator']
                    })
 
     name_id = cursor.fetchone()[0]

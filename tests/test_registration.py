@@ -1,7 +1,7 @@
 from unittest import mock
 from application.routes import app
 from application.data_diff import get_rectification_type, is_name_change_type3
-from application.search_key import create_registration_key
+from application.search_key import create_registration_key, create_search_keys
 from application.data import connect, complete
 import os
 import json
@@ -416,3 +416,18 @@ class TestWorking:
                                                'area': 'Nottinghamshire'}})
         assert key['key'] == 'NOTTINGHA'
         complete(cursor)
+
+    def test_local_authority(self):
+        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+        key = create_registration_key(cursor, {'type': 'Parish Council', 'local': {'name': 'Over Parish Council',
+                                               'area': 'Over'}})
+        assert key['key'] == 'NULL KEY'
+        complete(cursor)
+
+    def test_pi_search_keys(self):
+        keys = create_search_keys(None, {'type': 'Private Individual', 'private':
+                                            {'forenames': ['John', 'William'], 'surname': 'Smith'}})
+        assert len(keys) == 3
+        assert 'SMITH' in keys
+        assert 'JWSMITH' in keys
+        assert 'JOHNWILLIAMSMITH' in keys
