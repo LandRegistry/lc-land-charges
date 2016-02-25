@@ -1,6 +1,8 @@
 from unittest import mock
 from application.routes import app
 from application.data_diff import get_rectification_type, is_name_change_type3
+from application.search_key import create_registration_key, create_search_keys
+from application.data import connect, complete
 import os
 import json
 import datetime
@@ -354,4 +356,78 @@ class TestWorking:
                                       {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C4'}) == 3
 
+    def test_ltd_co_name_key(self):
+        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+        assert create_registration_key(cursor, {'type': 'Limited Company', 'company': 'Shakespeares Books Limited'})['key'] \
+               == 'SHAKESPEARESBOOKSLD'
 
+        assert create_registration_key(cursor, {'type': 'Limited Company', 'company': 'Brown Bros & Company (Associated) Ltd'})['key'] \
+               == 'BROWNBROCOASSLD'
+
+        assert create_registration_key(cursor, {'type': 'Limited Company', 'company': 'Jewel Builders Ltd'})['key'] \
+               == 'JEWELBUILDERLD'
+
+        assert create_registration_key(cursor, {'type': 'Limited Company', 'company': 'A Green & Co Ltd'})['key'] \
+               == 'AGREENCOLD'
+
+        assert create_registration_key(cursor, {'type': 'Limited Company', 'company': 'Messrs Jones & Green Cyf'})['key'] \
+               == 'JONESGREENLD'
+
+        assert create_registration_key(cursor, {'type': 'Limited Company', 'company': 'James and Edgar Public Ltd Cos'})['key'] \
+               == 'JAMESEDGARLD'
+
+        assert create_registration_key(cursor, {'type': 'Limited Company', 'company': 'ABC Builders PLC'})['key'] \
+               == 'ABCBUILDERLD'  # TODO: example says ARCBUILDERS, but the trailing S rule contradicts
+
+        assert create_registration_key(cursor, {'type': 'Limited Company', 'company': 'D Evans Cwmni Cyf Cyhoeddus'})['key'] \
+               == 'DEVANSLD'
+
+        complete(cursor)
+
+    def test_varnam_a(self):
+        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+        key = create_registration_key(cursor, {'type': 'Other', 'other': 'Beauty Without Cruelty'})
+        assert key['indicator'] == 'A'
+        assert key['key'] == 'BEAUTYWITHOUTCRUELTY'
+
+        key = create_registration_key(cursor, {'type': 'Other', 'other': 'Carol Fayre'})
+        assert key['indicator'] == 'A'
+        assert key['key'] == 'CAROLFAYRE'
+        complete(cursor)
+
+    def test_varnam_b(self):
+        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+        key = create_registration_key(cursor, {'type': 'Other', 'other': 'John Brown and Bros Associated'})
+        assert key['indicator'] == 'B'
+        assert key['key'] == 'JOHNBROWNBROASS'
+
+        key = create_registration_key(cursor, {'type': 'Other', 'other': 'Lollipops and Roses'})
+        assert key['indicator'] == 'B'
+        assert key['key'] == 'LOLLIPOPSROSES'
+
+        key = create_registration_key(cursor, {'type': 'Other', 'other': 'The Board of Governors Inc'})
+        assert key['indicator'] == 'B'
+        assert key['key'] == 'NULL KEY'
+        complete(cursor)
+
+    def test_county_council(self):
+        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+        key = create_registration_key(cursor, {'type': 'County Council', 'local': {'name': 'Nottinghamshire County Council',
+                                               'area': 'Nottinghamshire'}})
+        assert key['key'] == 'NOTTINGHA'
+        complete(cursor)
+
+    def test_local_authority(self):
+        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+        key = create_registration_key(cursor, {'type': 'Parish Council', 'local': {'name': 'Over Parish Council',
+                                               'area': 'Over'}})
+        assert key['key'] == 'NULL KEY'
+        complete(cursor)
+
+    def test_pi_search_keys(self):
+        keys = create_search_keys(None, {'type': 'Private Individual', 'private':
+                                            {'forenames': ['John', 'William'], 'surname': 'Smith'}})
+        assert len(keys) == 3
+        assert 'SMITH' in keys
+        assert 'JWSMITH' in keys
+        assert 'JOHNWILLIAMSMITH' in keys
