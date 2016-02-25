@@ -1032,10 +1032,10 @@ def get_search_request_details(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     print("get  search request details")
     try:
-        sql = " Select a.id as request_id, b.id as search_details_id, b.search_timestamp, b.type, b.counties, "\
-              " a.key_number, a.application_type, a.application_reference, a.application_date, a.customer_name, "\
-              " a.customer_address, b.certificate_date, b.expiry_date "\
-              " from request a, search_details b "\
+        sql = " Select a.id as request_id, b.id as search_details_id, b.search_timestamp, b.type, b.counties, " \
+              " a.key_number, a.application_type, a.application_reference, a.application_date, a.customer_name, " \
+              " a.customer_address, b.certificate_date, b.expiry_date " \
+              " from request a, search_details b " \
               " where a.id = %(request_id)s and a.id = b.request_id "
         cursor.execute(sql, {"request_id": request_id})
         rows = cursor.fetchall()
@@ -1052,7 +1052,7 @@ def get_search_request_details(request_id):
                    'application_date': str(row['application_date']),
                    'search_details_id': row['search_details_id'],
                    'search_timestamp': str(row['search_timestamp']), 'type': row['type'],
-                   'counties': row['counties'], 'search_details':[]}
+                   'counties': row['counties'], 'search_details': []}
         print(str(request))
         if request['search_details_id'] is None:
             request = {'noresult': 'nosearchdetlid'}
