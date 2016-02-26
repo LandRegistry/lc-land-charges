@@ -484,7 +484,8 @@ def update_previous_details(cursor, request_id, original_detl_id):
                    })
 
 
-def insert_rectification(cursor, rect_reg_no, rect_reg_date, data):
+def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, amendment=None):
+    # This method is also used for Amendments as they perform the same action!
     original_details = get_registration_details(cursor,
                                                 rect_reg_no,
                                                 rect_reg_date)
@@ -495,12 +496,19 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data):
                                                   rect_reg_date)
     original_regs = get_all_registration_nos(cursor, original_details_id)
 
-    logging.info(original_details_id)
-    date = datetime.datetime.now().strftime('%Y-%m-%d')
-    request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], date)
+    if amendment is None:
+        logging.info(original_details_id)
+        date = datetime.datetime.now().strftime('%Y-%m-%d')
+        request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], date)
 
-    # insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None):
-    reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id)
+        # insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None):
+        reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id)
+    else:
+        amend_reg = amendment['reg_no']
+        amend_date = amendment['date']
+        request_id = get_register_details_id(cursor, amend_reg, amend_date)
+        reg_nos = []
+
     update_previous_details(cursor, request_id, original_details_id)
 
     rect_type = get_rectification_type(original_details, data)
@@ -511,6 +519,26 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data):
             mark_as_no_reveal(cursor, reg['number'], reg['date'])
 
     return original_regs, reg_nos
+
+
+def amend_pab(cursor, pab_reg_no, pab_date, amend_reg_no, amend_date, data):
+    original_details = get_registration_details(cursor, pab_reg_no, pab_date)
+    original_details_id = get_register_details_id(cursor, pab_reg_no, pab_date)
+    logging.info(original_details_id)
+
+    original_regs = get_all_registration_nos(cursor, original_details_id)
+    logging.info(original_regs)
+
+    # get the amend details id to set the cancelled by id on register_details
+    amend_details_id = get_register_details_id(cursor, amend_reg_no, amend_date)
+
+    update_previous_details(cursor, amend_details_id, original_details_id)
+
+    amend_type = get_rectification_type(original_details, data)
+
+
+
+    return
 
 
 def get_register_details_id(cursor, reg_no, date):
@@ -730,7 +758,7 @@ def read_addresses(cursor, party, party_id):
         party['addresses'].append(address)
 
 
-def read_parties(cursor, data, details_id, legal_ref, lead_debtor_id):
+def read_parties(cursor, data, details_id, legal_ref, lead_debtor_id, legal_body, legal_ref_no, legal_ref_year):
     cursor.execute('SELECT id, party_type, occupation, date_of_birth, residence_withheld '
                    'FROM party '
                    'WHERE register_detl_id = %(id)s', {
@@ -754,6 +782,9 @@ def read_parties(cursor, data, details_id, legal_ref, lead_debtor_id):
                 party['date_of_birth'] = None
             party['residence_withheld'] = row['residence_withheld']
             party['case_reference'] = legal_ref
+            party['legal_body'] = legal_body
+            party['legal_body_ref_no'] = legal_ref_no
+            party['legal_body_ref_year'] = legal_ref_year
             read_addresses(cursor, party, row['id'])
             # TODO: case_reference
 
@@ -788,7 +819,7 @@ def get_registration_details(cursor, reg_no, date):
     cursor.execute("SELECT r.registration_no, r.date, r.reveal, rd.class_of_charge, rd.id, r.id as register_id, "
                    "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
                    "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type, "
-                   "rd.priority_notice_ind "
+                   "rd.priority_notice_ind, rd.legal_body, rd.legal_body_ref_no, rd.legal_body_ref_year "
                    "from register r, register_details rd "
                    "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id", {
                        'reg_no': reg_no, 'date': date
@@ -827,6 +858,9 @@ def get_registration_details(cursor, reg_no, date):
 
     register_id = rows[0]['register_id']
     legal_ref = rows[0]['legal_body_ref']
+    legal_body = rows[0]['legal_body']
+    legal_ref_no = rows[0]['legal_body_ref_no']
+    legal_ref_year = rows[0]['legal_body_ref_year']
     if rows[0]['amends'] is not None:
         data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
         data['amends_registration']['type'] = rows[0]['amendment_type']
@@ -855,7 +889,7 @@ def get_registration_details(cursor, reg_no, date):
             'type': rows[0]['amendment_type']
         }
 
-    read_parties(cursor, data, details_id, legal_ref, lead_debtor_id)
+    read_parties(cursor, data, details_id, legal_ref, lead_debtor_id, legal_body, legal_ref_no, legal_ref_year)
 
     return data
 
