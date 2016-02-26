@@ -186,6 +186,11 @@ def amend_registration(date, reg_no):
         suppress = True
 
     json_data = request.get_json(force=True)
+    if 'pab_amendment' in json_data:
+        pab_amendment = json_data['pab_amendment']
+        del json_data['pab_amendment']
+    else:
+        pab_amendment = None
     errors = validate_update(json_data)
     if 'dev_date' in request.args and app.config['ALLOW_DEV_ROUTES']:
         logging.info('Overriding date')
@@ -208,13 +213,26 @@ def amend_registration(date, reg_no):
     # if appn_type == 'amend':
     # originals, reg_nos, rows = insert_amendment(cursor, reg_no, date, json_data)
     # else:
-    originals, reg_nos = insert_rectification(cursor, reg_no, date, json_data)
+    try:
+        originals, reg_nos = insert_rectification(cursor, reg_no, date, json_data, None)
+        data = {
+            "new_registrations": reg_nos,
+            "amended_registrations": originals
+        }
+        if pab_amendment is not None:
+            reg_no = pab_amendment['reg_no']
+            date = pab_amendment['date']
+            today = datetime.datetime.now().strftime('%Y-%m-%d')
+            print('today ******', today)
+            amendment = {'reg_no': data['new_registrations'][0],
+                         'date': today}
+            originals, reg_nos = insert_rectification(cursor, reg_no, date, json_data, amendment)
+            data['amend_registrations'].append(originals)
+        complete(cursor)
+    except:
+        rollback(cursor)
+        raise
 
-    complete(cursor)
-    data = {
-        "new_registrations": reg_nos,
-        "amended_registrations": originals
-    }
     return Response(json.dumps(data), status=200)
     # if rows is None or rows == 0:
     #     cursor.connection.rollback()
