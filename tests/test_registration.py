@@ -263,53 +263,11 @@ class TestWorking:
         response = self.app.get("/")
         assert response.status_code == 200
 
-    @mock.patch('psycopg2.connect', **mock_search)
-    def test_full_search_all_counties(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/searches', data=name_search_data_full_all, headers=headers)
-        assert response.status_code == 200
-
-    @mock.patch('psycopg2.connect', **mock_search)
-    def test_full_search_some_counties(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/searches', data=name_search_data_full_counties, headers=headers)
-        assert response.status_code == 200
-
-    @mock.patch('psycopg2.connect', **mock_search_not_found)
-    def test_search_bad_data(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/searches', data='{"foo": "bar"}', headers=headers)
-        assert response.status_code == 400
-
-    @mock.patch('psycopg2.connect')
-    def test_search_not_json(self, mock_connect):
-        headers = {'Content-Type': 'application/xml'}
-        response = self.app.post('/searches', data=name_search_data, headers=headers)
-        assert response.status_code == 415
-
     @mock.patch('psycopg2.connect')
     def test_not_json(self, mock_connect):
         headers = {'Content-Type': 'application/xml'}
         response = self.app.post('/registrations', data=valid_data, headers=headers)
         assert response.status_code == 415
-
-    @mock.patch('psycopg2.connect', **mock_retrieve)
-    def test_get_registration(self, mc):
-        response = self.app.get("/registrations/2015-01-01/50000")
-        data = json.loads(response.data.decode('utf-8'))
-        assert data['parties'][0]['names'][0]['private']['surname'] == 'Howard'
-
-    @mock.patch('psycopg2.connect', **mock_search_not_found)
-    def test_get_registration_404(self, mc):
-        response = self.app.get("/registrations/2015-01-01/50000")
-        assert response.status_code == 404
-
-    @mock.patch('psycopg2.connect', **mock_retrieve_complex)
-    def test_get_registration_complex_name(self, mc):
-        response = self.app.get("/registrations/2015-01-01/50027")
-        print(response.data)
-        data = json.loads(response.data.decode('utf-8'))
-        assert data['parties'][0]['names'][0]['complex']['name'] == 'King Stark'
 
     def test_name_type_identification(self):
         assert is_name_change_type3({"forenames": ["John", "David"], "surname": "Smyth"},
@@ -414,6 +372,14 @@ class TestWorking:
         assert key['indicator'] == 'B'
         assert key['key'] == 'JOHNBROWNBROASS'
 
+        key = create_registration_key(cursor, {'type': 'Other', 'other': 'John Brown and Brothers Associated'})
+        assert key['indicator'] == 'B'
+        assert key['key'] == 'JOHNBROWNBROASS'
+
+        key = create_registration_key(cursor, {'type': 'Other', 'other': 'Bob Ross and Bros Associated'})
+        assert key['indicator'] == 'B'
+        assert key['key'] == 'BOBROSSBROASS'
+
         key = create_registration_key(cursor, {'type': 'Other', 'other': 'Lollipops and Roses'})
         assert key['indicator'] == 'B'
         assert key['key'] == 'LOLLIPOPSROSES'
@@ -438,8 +404,7 @@ class TestWorking:
         complete(cursor)
 
     def test_pi_search_keys(self):
-        keys = create_search_keys(None, {'type': 'Private Individual', 'private':
-                                            {'forenames': ['John', 'William'], 'surname': 'Smith'}})
+        keys = create_search_keys(None, 'Private Individual', {'forenames': 'John William', 'surname': 'Smith'})
         assert len(keys) == 3
         assert 'SMITH' in keys
         assert 'JWSMITH' in keys

@@ -95,7 +95,7 @@ def insert_party_name(cursor, party_id, name):
     elif name['type'] in ['County Council', 'Rural Council', 'Parish Council', 'Other Council']:
         local_auth = name['local']['name']
         local_auth_area = name['local']['area']
-    elif name['type'] in ['Development Corporation', 'Other']:
+    elif name['type'] in ['Development Corporation', 'Other', 'Coded Name']:
         other = name['other']
     elif name['type'] == 'Limited Company':
         company = name['company']
@@ -198,9 +198,10 @@ def insert_register_details(cursor, request_id, data, date, amends):
         short_description = None
 
     debtor = None
-    for party in data['parties']:
-        if party['type'] == 'Debtor':
-            debtor = party
+    if 'parties' in data:
+        for party in data['parties']:
+            if party['type'] == 'Debtor':
+                debtor = party
 
     legal_body = None
     legal_ref_no = None
@@ -658,7 +659,7 @@ def get_registrations_by_date(cursor, date):
 def read_names(cursor, party, party_id, lead_debtor_id):
     cursor.execute('select n.id, forename, middle_names, surname, complex_number, complex_name, '
                    'name_type_ind, company_name, local_authority_name, local_authority_area, '
-                   'other_name '
+                   'other_name, searchable_string, subtype '
                    'from party_name n, party_name_rel pn '
                    'where n.id = pn.party_name_id and pn.party_id = %(id)s', {
                        'id': party_id
@@ -690,7 +691,7 @@ def read_names(cursor, party, party_id, lead_debtor_id):
                 'name': row['local_authority_name'],
                 'area': row['local_authority_area']
             }
-        elif name_type == 'Development Corporation' or name_type == 'Other':
+        elif name_type == 'Development Corporation' or name_type == 'Other' or name_type == 'Coded Name':
             name['other'] = row['other_name']
         elif name_type == 'Limited Company':
             name['company'] = row['company_name']
@@ -701,6 +702,9 @@ def read_names(cursor, party, party_id, lead_debtor_id):
             }
         else:
             raise RuntimeError("Unknown name type: {}".format(name_type))
+
+        name['search_key'] = row['searchable_string']
+        name['subtype'] = row['subtype']
 
         if name_id == lead_debtor_id:
             names_list.insert(0, name)
@@ -974,34 +978,35 @@ def get_head_of_chain(cursor, reg_no, date):
         request_id = next_id
 
 
-def insert_cancellation(registration_no, date, data):
+def insert_cancellation(orig_registration_no, orig_date, data):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         # Insert a row with application info
-        logging.info("Cancelling {} {}".format(registration_no, date))
-
-        now = datetime.datetime.now()
+        logging.info("Cancelling {} {}".format(orig_registration_no, orig_date))
         document = None
         if 'document_id' in data:
             logging.warning("Obsolete: cancellation with document-id")  # TODO: remove this and what needs it
             document = data['document_id']
-
         request_id = insert_request(cursor, data['applicant'], "CANCELLATION", data['registration']['date'], None)
-
-        original_detl_id = get_head_of_chain(cursor, registration_no, date)
-            #get_register_details_id(cursor, registration_no, date)
+        # insert the cancellation register for synchronisation purposes
+        orig_detl = get_registration_details(cursor, orig_registration_no, orig_date)
+        orig_class = orig_detl['class_of_charge']
+        data['class_of_charge'] = orig_class
+        canc_date = datetime.datetime.now().strftime('%Y-%m-%d')
+        register_details_id = insert_register_details(cursor, request_id, data, canc_date, None)
+        canc_reg_no, canc_reg_id = insert_registration(cursor, register_details_id, None, canc_date, None, None)
+        # update the original registration
+        original_detl_id = get_head_of_chain(cursor, orig_registration_no, orig_date)
         logging.debug("Retrieved details id {}".format(original_detl_id))
         logging.info(original_detl_id)
-
         original_regs = get_all_registration_nos(cursor, original_detl_id)
         logging.info('--->')
         logging.info(original_regs)
-
-        logging.info("SELECT * FROM register_details where id='" + str(original_detl_id) + "' AND cancelled_by IS NULL")
+        #  do we need a "cancelled_ind" on register_details to show part or full cans rather than using cancelled_by
         cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
                        "id = %(id)s AND cancelled_by IS NULL",
                        {
-                           "canc": request_id, "id": original_detl_id
+                           "canc": canc_reg_id, "id": original_detl_id
                        })
 
         # TODO: archive document
@@ -1010,8 +1015,12 @@ def insert_cancellation(registration_no, date, data):
     except:
         rollback(cursor)
         raise
-
-    return rows, original_regs
+    #  return the registration number of the cancellation.
+    canc_reg_list = [{
+            'number': canc_reg_no,
+            'date': canc_date
+        }]
+    return rows, canc_reg_list
 
 
 def insert_lc_county(cursor, register_details_id, county):

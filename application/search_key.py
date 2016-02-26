@@ -279,20 +279,19 @@ def create_registration_key(cursor, name):
     elif name['type'] in ['Parish Council', 'Rural Council', 'Other Council']:
         key = create_local_authority_key(name['local']['area'])
     elif name['type'] == 'Development Corporation':
-        # TODO: strip '(New Town)? Development Corporation'
-        key = create_local_authority_key(name['other'])
+        devcorp = re.sub("\s(New Town\s)? Development Corporation", "", name['other'], flags=re.IGNORECASE)
+        key = create_local_authority_key(devcorp)
     elif name['type'] == 'Other':
         key, ind = get_other_key(name['other'])
     elif name['type'] == 'Private Individual' and len(name['private']['forenames']) == 0:
         key, ind = get_other_key(name['private']['surname'])
     elif name['type'] == 'Complex Name':  # Generate the key as if VARNAM as we'll need that later
         key, ind = get_other_key(name['complex']['name'])
-    elif name['type'] == 'Null Complex Name':  # so-called 'five nine two four' names; treat as VARNAM
-        key, ind = get_other_key(name['complex']['name'])
+    elif name['type'] == 'Coded Name':  # so-called 'five nine two four' names; treat as VARNAM
+        key, ind = get_other_key(name['other'])
     else:
         raise RuntimeError('Unknown name type: {}'.format(name['type']))
 
-    # TODO: remember to also match name type
     return {'key': key, 'indicator': ind}
 
 
@@ -333,8 +332,8 @@ def create_search_keys(cursor, name_type, name):
         keys.append(create_local_authority_key(name['local_authority_area']))
 
     elif name_type == 'Development Corporation':
-        # TODO: strip '(New Town)? Development Corporation'
-        keys.append(create_local_authority_key(name['other_name']))
+        devcorp = re.sub("\s(New Town\s)? Development Corporation", "", name['other'], flags=re.IGNORECASE)
+        keys.append(create_local_authority_key(devcorp))
 
     elif name_type == 'Other':
         key, ind = get_other_key(name['other_name'])
@@ -343,20 +342,10 @@ def create_search_keys(cursor, name_type, name):
     elif name_type == 'Complex':
         key, ind = get_other_key(name['complex']['name'])
         keys.append(key)
-    elif name_type == 'Null Complex Name':
-        key, ind = get_other_key(name['complex']['name'])
+    elif name_type == 'Coded Name':
+        key, ind = get_other_key(name['other_name'])
         keys.append(key)
     else:
         raise RuntimeError('Unknown name type: {}'.format(name['type']))
 
     return keys
-
-                #
-                # "forenames": {"type": "string"},
-                # "surname": {"type": "string"},
-                # "complex_name": {"type": "string"},
-                # "complex_number": {"type": "integer"},
-                # "complex_variations": {"type": "array", "items": COMPLEX_SCHEMA},
-                # "local_authority_name": {"type": "string"},
-                # "local_authority_area": {"type": "string"},
-                # "other_name": {"type": "string"},
