@@ -263,30 +263,6 @@ class TestWorking:
         response = self.app.get("/")
         assert response.status_code == 200
 
-    @mock.patch('psycopg2.connect', **mock_search)
-    def test_full_search_all_counties(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/searches', data=name_search_data_full_all, headers=headers)
-        assert response.status_code == 200
-
-    @mock.patch('psycopg2.connect', **mock_search)
-    def test_full_search_some_counties(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/searches', data=name_search_data_full_counties, headers=headers)
-        assert response.status_code == 200
-
-    @mock.patch('psycopg2.connect', **mock_search_not_found)
-    def test_search_bad_data(self, mock_connect):
-        headers = {'Content-Type': 'application/json'}
-        response = self.app.post('/searches', data='{"foo": "bar"}', headers=headers)
-        assert response.status_code == 400
-
-    @mock.patch('psycopg2.connect')
-    def test_search_not_json(self, mock_connect):
-        headers = {'Content-Type': 'application/xml'}
-        response = self.app.post('/searches', data=name_search_data, headers=headers)
-        assert response.status_code == 415
-
     @mock.patch('psycopg2.connect')
     def test_not_json(self, mock_connect):
         headers = {'Content-Type': 'application/xml'}
@@ -333,27 +309,27 @@ class TestWorking:
     def test_rectification_type(self):
         assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
-                                      {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                      {'update_registration': {'type': 'Rectification'}, 'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'}) == 1
 
         assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["Sam", "John"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
-                                      {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                      {'update_registration': {'type': 'Rectification'},'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'}) == 2
 
         assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
-                                      {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                      {'update_registration': {'type': 'Rectification'},'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon', 'Dorset']}, 'class_of_charge': 'C1'}) == 2
 
         assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
-                                      {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                      {'update_registration': {'type': 'Rectification'},'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Dorset']}, 'class_of_charge': 'C1'}) == 3
 
         assert get_rectification_type({'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C1'},
-                                      {'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
+                                      {'update_registration': {'type': 'Rectification'},'parties': [{'names': [{'type': 'Private Individual', "private": {"forenames": ["John", "David"], "surname": "Smith"}}]}],
                                        'particulars': {'counties': ['Devon']}, 'class_of_charge': 'C4'}) == 3
 
     def test_ltd_co_name_key(self):
@@ -401,6 +377,14 @@ class TestWorking:
         assert key['indicator'] == 'B'
         assert key['key'] == 'JOHNBROWNBROASS'
 
+        key = create_registration_key(cursor, {'type': 'Other', 'other': 'John Brown and Brothers Associated'})
+        assert key['indicator'] == 'B'
+        assert key['key'] == 'JOHNBROWNBROASS'
+
+        key = create_registration_key(cursor, {'type': 'Other', 'other': 'Bob Ross and Bros Associated'})
+        assert key['indicator'] == 'B'
+        assert key['key'] == 'BOBROSSBROASS'
+
         key = create_registration_key(cursor, {'type': 'Other', 'other': 'Lollipops and Roses'})
         assert key['indicator'] == 'B'
         assert key['key'] == 'LOLLIPOPSROSES'
@@ -425,8 +409,7 @@ class TestWorking:
         complete(cursor)
 
     def test_pi_search_keys(self):
-        keys = create_search_keys(None, {'type': 'Private Individual', 'private':
-                                            {'forenames': ['John', 'William'], 'surname': 'Smith'}})
+        keys = create_search_keys(None, 'Private Individual', {'forenames': 'John William', 'surname': 'Smith'})
         assert len(keys) == 3
         assert 'SMITH' in keys
         assert 'JWSMITH' in keys

@@ -630,7 +630,7 @@ def get_registrations_by_date(cursor, date):
 def read_names(cursor, party, party_id, lead_debtor_id):
     cursor.execute('select n.id, forename, middle_names, surname, complex_number, complex_name, '
                    'name_type_ind, company_name, local_authority_name, local_authority_area, '
-                   'other_name '
+                   'other_name, searchable_string, subtype '
                    'from party_name n, party_name_rel pn '
                    'where n.id = pn.party_name_id and pn.party_id = %(id)s', {
                        'id': party_id
@@ -673,6 +673,9 @@ def read_names(cursor, party, party_id, lead_debtor_id):
             }
         else:
             raise RuntimeError("Unknown name type: {}".format(name_type))
+
+        name['search_key'] = row['searchable_string']
+        name['subtype'] = row['subtype']
 
         if name_id == lead_debtor_id:
             names_list.insert(0, name)

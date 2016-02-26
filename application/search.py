@@ -158,6 +158,7 @@ def perform_bankruptcy_search_complex_name(cursor, name_type, keys, number, cert
 
 
 def perform_full_search_all_counties(cursor, name_type, keys, year_from, year_to, cert_date):
+    logging.debug('Full search: %s %s', name_type, keys[0])
     cursor.execute("SELECT r.id "
                    "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd "
                    "WHERE pn.searchable_string = ANY(%(keys)s) "
@@ -165,6 +166,7 @@ def perform_full_search_all_counties(cursor, name_type, keys, year_from, year_to
                    "  and p.register_detl_id=rd.id "
                    "  and rd.id=r.details_id "
                    "  and pn.name_type_ind = %(nametype)s "
+                   "  and (r.debtor_reg_name_id is null or r.debtor_reg_name_id = pn.id) "
                    "  and ("
                    "      rd.priority_notice_ind='f' "
                    "      or rd.priority_notice_ind IS NULL "
@@ -181,6 +183,7 @@ def perform_full_search_all_counties(cursor, name_type, keys, year_from, year_to
                        'date': cert_date, 'exdate': cert_date, 'nametype': name_type
                    })
     rows = cursor.fetchall()
+    logging.debug("%d rows returned", len(rows))
     return [row['id'] for row in rows]
 
 
@@ -194,6 +197,7 @@ def perform_full_search(cursor, name_type, keys, counties, year_from, year_to, c
                    "  and p.register_detl_id=rd.id "
                    "  and rd.id=r.details_id "
                    "  and pn.name_type_ind = %(nametype)s "
+                   "  and (r.debtor_reg_name_id is null or r.debtor_reg_name_id = pn.id) "
                    "  and ("
                    "      rd.priority_notice_ind='f' "
                    "      or rd.priority_notice_ind IS NULL "
@@ -229,6 +233,7 @@ def perform_full_search_complex_name_all_counties(cursor, name_type, keys, numbe
                    "  and p.register_detl_id=rd.id "
                    "  and rd.id=r.details_id "
                    "  and pn.name_type_ind = 'Complex Name' "
+                   "  and (r.debtor_reg_name_id is null or r.debtor_reg_name_id = pn.id) "
                    "  and ("
                    "      rd.priority_notice_ind='f' "
                    "      or rd.priority_notice_ind IS NULL "
@@ -260,6 +265,7 @@ def perform_full_search_complex_name(cursor, name_type, keys, number, counties, 
                    "  and p.register_detl_id=rd.id "
                    "  and rd.id=r.details_id "
                    "  and pn.name_type_ind = %(nametype)s "
+                   "  and (r.debtor_reg_name_id is null or r.debtor_reg_name_id = pn.id) "
                    "  and ("
                    "      rd.priority_notice_ind='f' "
                    "      or rd.priority_notice_ind IS NULL "
@@ -312,6 +318,8 @@ def perform_search(cursor, parameters, cert_date):
 
     for item in parameters['search_items']:
         keys = create_search_keys(cursor, item['name_type'], item['name'])
+        logging.debug('Search keys:')
+        logging.debug(keys)
 
         if item['name_type'] == 'Complex':
             cnumber = item['name']['complex']['number']
