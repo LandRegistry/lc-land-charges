@@ -625,34 +625,36 @@ def get_all_registrations(cursor):
 
         
 def get_registrations_by_date(cursor, date):
-    cursor.execute('select id from request where application_date=%(date)s', {'date': date})
+    cursor.execute('select r.registration_no, r.date, d.class_of_charge, d.amends, d.cancelled_by, d.request_id '
+                   'from register r, register_details d '
+                   'where r.details_id = d.id and r.date=%(date)s', {'date': date})
     rows = cursor.fetchall()
 
     results = []
     for row in rows:
-        results.append({
-            'application': '',
-            'id': row['id'],
-            'data': []
-        })
+        request_id = row['request_id']
+        item = None
+        for r in results:
+            if r['id'] == request_id:
+                item = r
+                break
+        if item is None:
+            item = {
+                'application': '',
+                'id': request_id,
+                'data': []
+            }
+            results.append(item)
 
-    for result in results:
-        cursor.execute('select r.registration_no, r.date, d.class_of_charge, d.amends, d.cancelled_by '
-                       'from register r, register_details d '
-                       'where r.details_id = d.id and d.request_id=%(id)s', {'id': result['id']})
-        rows = cursor.fetchall()
-        if rows[0]['amends'] is None:
-            result['application'] = 'new'
+        if row['amends'] is None:
+            item['application'] = 'new'
         else:
-            result['application'] = 'amend'
-        # TODO: cancellations
+            item['application'] = 'amend'
 
-        for row in rows:
-            result['data'].append({
-                'number': row['registration_no'],
-                'date': row['date'].strftime('%Y-%m-%d')
-            })
-
+        item['data'].append({
+            'number': row['registration_no'],
+            'date': row['date'].strftime('%Y-%m-%d')
+        })
     return results
 
 
