@@ -186,12 +186,16 @@ def amend_registration(date, reg_no):
         suppress = True
 
     json_data = request.get_json(force=True)
+    print('***1', json_data)
     if 'pab_amendment' in json_data:
+        print('***2')
         pab_amendment = json_data['pab_amendment']
         del json_data['pab_amendment']
     else:
+        print('***3')
         pab_amendment = None
     errors = validate_update(json_data)
+    print('***4', errors)
     if 'dev_date' in request.args and app.config['ALLOW_DEV_ROUTES']:
         logging.info('Overriding date')
         json_data['dev_registration'] = {
@@ -223,11 +227,10 @@ def amend_registration(date, reg_no):
             reg_no = pab_amendment['reg_no']
             date = pab_amendment['date']
             today = datetime.datetime.now().strftime('%Y-%m-%d')
-            print('today ******', today)
-            amendment = {'reg_no': data['new_registrations'][0],
+            amendment = {'reg_no': data['new_registrations'][0]['number'],
                          'date': today}
             originals, reg_nos = insert_rectification(cursor, reg_no, date, json_data, amendment)
-            data['amend_registrations'].append(originals)
+            data['amended_registrations'].append(originals)
         complete(cursor)
     except:
         rollback(cursor)

@@ -487,6 +487,7 @@ def update_previous_details(cursor, request_id, original_detl_id):
 
 def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, amendment=None):
     # This method is also used for Amendments as they perform the same action!
+    print(rect_reg_no, rect_reg_date, amendment)
     original_details = get_registration_details(cursor,
                                                 rect_reg_no,
                                                 rect_reg_date)
@@ -511,7 +512,8 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, amendment=Non
         reg_nos = []
 
     update_previous_details(cursor, request_id, original_details_id)
-
+    print('orig details******', original_details)
+    print('data *************', data)
     rect_type = get_rectification_type(original_details, data)
     logging.debug('Type of rectification is: %d', rect_type)
     if rect_type != 2:  # Legacy/business jargon - three types of rectification. Type 2 behaves differently
