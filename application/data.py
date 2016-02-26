@@ -95,7 +95,7 @@ def insert_party_name(cursor, party_id, name):
     elif name['type'] in ['County Council', 'Rural Council', 'Parish Council', 'Other Council']:
         local_auth = name['local']['name']
         local_auth_area = name['local']['area']
-    elif name['type'] in ['Development Corporation', 'Other']:
+    elif name['type'] in ['Development Corporation', 'Other', 'Coded Name']:
         other = name['other']
     elif name['type'] == 'Limited Company':
         company = name['company']
@@ -663,7 +663,7 @@ def read_names(cursor, party, party_id, lead_debtor_id):
                 'name': row['local_authority_name'],
                 'area': row['local_authority_area']
             }
-        elif name_type == 'Development Corporation' or name_type == 'Other':
+        elif name_type == 'Development Corporation' or name_type == 'Other' or name_type == 'Coded Name':
             name['other'] = row['other_name']
         elif name_type == 'Limited Company':
             name['company'] = row['company_name']

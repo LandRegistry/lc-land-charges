@@ -287,8 +287,8 @@ def create_registration_key(cursor, name):
         key, ind = get_other_key(name['private']['surname'])
     elif name['type'] == 'Complex Name':  # Generate the key as if VARNAM as we'll need that later
         key, ind = get_other_key(name['complex']['name'])
-    elif name['type'] == 'Null Complex Name':  # so-called 'five nine two four' names; treat as VARNAM
-        key, ind = get_other_key(name['complex']['name'])
+    elif name['type'] == 'Coded Name':  # so-called 'five nine two four' names; treat as VARNAM
+        key, ind = get_other_key(name['other'])
     else:
         raise RuntimeError('Unknown name type: {}'.format(name['type']))
 
@@ -343,8 +343,8 @@ def create_search_keys(cursor, name_type, name):
     elif name_type == 'Complex':
         key, ind = get_other_key(name['complex']['name'])
         keys.append(key)
-    elif name_type == 'Null Complex Name':
-        key, ind = get_other_key(name['complex']['name'])
+    elif name_type == 'Coded Name':
+        key, ind = get_other_key(name['other_name'])
         keys.append(key)
     else:
         raise RuntimeError('Unknown name type: {}'.format(name['type']))
