@@ -40,16 +40,17 @@ def insert_address(cursor, address, party_id):
 
         county = address['county']
         postcode = address['postcode']       # Postcode in the last
-        cursor.execute("INSERT INTO address_detail ( line_1, line_2, line_3, line_4, line_5, line_6 ,county, postcode) " +
-                       "VALUES( %(line1)s, %(line2)s, %(line3)s, %(line4)s, %(line5)s, %(line6)s, %(county)s, %(postcode)s ) " +
-                       "RETURNING id",
+        cursor.execute("INSERT INTO address_detail ( line_1, line_2, line_3, line_4, line_5, line_6 ,county, postcode) "
+                       "VALUES( %(line1)s, %(line2)s, %(line3)s, %(line4)s, %(line5)s, %(line6)s, %(county)s, "
+                       "%(postcode)s ) RETURNING id",
                        {
                            "line1": lines[0], "line2": lines[1], "line3": lines[2],
                            "line4": lines[3], "line5": lines[4], "line6": lines[5],
                            "county": county, "postcode": postcode,
                        })
         detail_id = cursor.fetchone()[0]
-        address_string = "{}, {}, {}".format(", ".join(address['address_lines']), address["county"], address["postcode"])
+        address_string = "{}, {}, {}".format(", ".join(address['address_lines']), address["county"],
+                                             address["postcode"])
     elif 'address_string' in address:
         address_string = address['address_string']
         detail_id = None
@@ -109,10 +110,8 @@ def insert_party_name(cursor, party_id, name):
     # if name['type'] != 'Complex Name':
     #     searchable_string = get_searchable_string(name_string, company, local_auth, local_auth_area, other)
 
-    #get_searchable_string(name_string=None, company=None, local_auth=None, local_auth_area=None, other=None):
+    # get_searchable_string(name_string=None, company=None, local_auth=None, local_auth_area=None, other=None):
     name_key = create_registration_key(cursor, name)
-
-
     cursor.execute("INSERT INTO party_name ( party_name, forename, middle_names, surname, alias_name, "
                    "complex_number, complex_name, name_type_ind, company_name, local_authority_name, "
                    "local_authority_area, other_name, searchable_string, subtype ) "
@@ -220,7 +219,10 @@ def insert_register_details(cursor, request_id, data, date, amends):
     prio_notc_expires = None
     if 'priority_notice' in data:
         is_priority_notice = True
-        prio_notc_expires = data['priority_notice']['expires']
+        if 'expires' in 'priority_notice':
+            prio_notc_expires = data['priority_notice']['expires']
+        else:
+            prio_notc_expires = data['prio_notice_expires']
 
     amend_type = None
     if 'update_registration' in data:
@@ -286,7 +288,8 @@ def insert_party(cursor, details_id, party):
     return cursor.fetchone()[0]
 
 
-def insert_migration_status(cursor, register_id, registration_number, registration_date, class_of_charge, additional_data):
+def insert_migration_status(cursor, register_id, registration_number, registration_date, class_of_charge,
+                            additional_data):
     cursor.execute("INSERT INTO migration_status (register_id, original_regn_no, date, class_of_charge, "
                    "migration_complete, extra_data ) "
                    "VALUES( %(register_id)s, %(reg_no)s, %(date)s, %(class)s, True, %(extra)s ) RETURNING id",
@@ -324,10 +327,11 @@ def insert_details(cursor, request_id, data, date, amends_id):
 
     # party_trading
     if debtor_id is not None:
-        trading_name = debtor['trading_name']
-        cursor.execute("INSERT INTO party_trading (party_id, trading_name) " +
-                       "VALUES ( %(party)s, %(trading)s ) RETURNING id",
-                       {"party": debtor_id, "trading": trading_name})
+        if 'trading_name' in debtor:
+            trading_name = debtor['trading_name']
+            cursor.execute("INSERT INTO party_trading (party_id, trading_name) " +
+                           "VALUES ( %(party)s, %(trading)s ) RETURNING id",
+                           {"party": debtor_id, "trading": trading_name})
     return names, register_details_id
 
 
@@ -538,9 +542,6 @@ def amend_pab(cursor, pab_reg_no, pab_date, amend_reg_no, amend_date, data):
     update_previous_details(cursor, amend_details_id, original_details_id)
 
     amend_type = get_rectification_type(original_details, data)
-
-
-
     return
 
 
@@ -689,8 +690,8 @@ def read_names(cursor, party, party_id, lead_debtor_id):
                 'forenames': fornames,
                 'surname': row['surname']
             }
-        elif name_type == 'Rural Council' or name_type == 'Parish Council' or \
-                        name_type == 'County Council' or name_type == 'Other Council':
+        elif name_type == 'Rural Council' or name_type == 'Parish Council' \
+                or name_type == 'County Council' or name_type == 'Other Council':
             name['local'] = {
                 'name': row['local_authority_name'],
                 'area': row['local_authority_area']
@@ -827,7 +828,8 @@ def get_registration_details(cursor, reg_no, date):
     cursor.execute("SELECT r.registration_no, r.date, r.reveal, rd.class_of_charge, rd.id, r.id as register_id, "
                    "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
                    "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type, "
-                   "rd.priority_notice_ind, rd.legal_body, rd.legal_body_ref_no, rd.legal_body_ref_year "
+                   "rd.priority_notice_ind, rd.prio_notice_expires, rd.legal_body, rd.legal_body_ref_no, "
+                   "rd.legal_body_ref_year "
                    "from register r, register_details rd "
                    "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id", {
                        'reg_no': reg_no, 'date': date
@@ -857,6 +859,7 @@ def get_registration_details(cursor, reg_no, date):
     if data['class_of_charge'] not in ['PAB', 'WOB']:
         if rows[0]['priority_notice_ind']:
             data['priority_notice'] = True
+            data['prio_notice_expires'] = rows[0]['prio_notice_expires'].strftime('%Y-%m-%d')
 
         data['particulars'] = {
             'counties': get_lc_counties(cursor, details_id, lead_county),
@@ -929,10 +932,11 @@ def insert_migrated_record(cursor, data):
         }
         type_str = types[data['type']]
     
-        #def insert_request(cursor, applicant, application_type, date, original_data=None):
+        # def insert_request(cursor, applicant, application_type, date, original_data=None):
         request_id = insert_request(cursor, data['applicant'], type_str, data['registration']['date'], None)                                   
                                     
-        reg_nos, details_id = insert_record(cursor, data, request_id, data['registration']['date'], None, data['registration']['registration_no'])
+        reg_nos, details_id = insert_record(cursor, data, request_id, data['registration']['date'], None,
+                                            data['registration']['registration_no'])
         
         if len(data['parties']) == 0:
             # There was no row on the original index, so by definition is cannot be revealed
@@ -985,46 +989,29 @@ def get_head_of_chain(cursor, reg_no, date):
 def insert_cancellation(orig_registration_no, orig_date, data):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        # Insert a row with application info
-        logging.info("Cancelling {} {}".format(orig_registration_no, orig_date))
-        document = None
-        if 'document_id' in data:
-            logging.warning("Obsolete: cancellation with document-id")  # TODO: remove this and what needs it
-            document = data['document_id']
-        request_id = insert_request(cursor, data['applicant'], "CANCELLATION", data['registration']['date'], None)
-        # insert the cancellation register for synchronisation purposes
-        orig_detl = get_registration_details(cursor, orig_registration_no, orig_date)
-        orig_class = orig_detl['class_of_charge']
-        data['class_of_charge'] = orig_class
+        original_details_id = get_register_details_id(cursor, orig_registration_no, orig_date)
+        original_regs = get_all_registration_nos(cursor, original_details_id)
         canc_date = datetime.datetime.now().strftime('%Y-%m-%d')
-        register_details_id = insert_register_details(cursor, request_id, data, canc_date, None)
-        canc_reg_no, canc_reg_id = insert_registration(cursor, register_details_id, None, canc_date, None, None)
-        # update the original registration
-        original_detl_id = get_head_of_chain(cursor, orig_registration_no, orig_date)
-        logging.debug("Retrieved details id {}".format(original_detl_id))
-        logging.info(original_detl_id)
-        original_regs = get_all_registration_nos(cursor, original_detl_id)
-        logging.info('--->')
-        logging.info(original_regs)
-        #  do we need a "cancelled_ind" on register_details to show part or full cans rather than using cancelled_by
-        cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
-                       "id = %(id)s AND cancelled_by IS NULL",
-                       {
-                           "canc": canc_reg_id, "id": original_detl_id
-                       })
-
-        # TODO: archive document
-        rows = cursor.rowcount
+        canc_request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], canc_date)
+        detl_data = get_registration_details(cursor, orig_registration_no, orig_date)
+        detl_data['update_registration'] = data['update_registration']
+        print("detl_data", str(data))
+        if data['update_registration']['type'] == "Part Cancellation":
+            detl_data["additional_information"] = data["additional_information"]
+        reg_nos, canc_details_id = insert_record(cursor, detl_data, canc_request_id, canc_date, original_details_id)
+        update_previous_details(cursor, canc_details_id, original_details_id)
+        # if full cancellation mark all rows as no reveal
+        if data['update_registration']['type'] == "Cancellation":
+            for reg in original_regs:
+                mark_as_no_reveal(cursor, reg['number'], reg['date'])
+        elif data['update_registration']['type'] == "Part Cancellation":
+            mark_as_no_reveal(cursor, orig_registration_no, orig_date)
         complete(cursor)
     except:
         rollback(cursor)
         raise
-    #  return the registration number of the cancellation.
-    canc_reg_list = [{
-            'number': canc_reg_no,
-            'date': canc_date
-        }]
-    return rows, canc_reg_list
+    print("regnos", (reg_nos))
+    return len(reg_nos), reg_nos, canc_request_id
 
 
 def insert_lc_county(cursor, register_details_id, county):

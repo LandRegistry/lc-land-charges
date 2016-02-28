@@ -265,12 +265,12 @@ def cancel_registration():
     logging.info("Reg: %s", reg)
     reg_no = json_data['registration_no']
     reg_date = json_data['registration']['date']
-    rows, nos = insert_cancellation(reg_no, reg_date, json_data)
+    rows, nos, canc_request_id = insert_cancellation(reg_no, reg_date, json_data)
     if rows == 0:
         return Response(status=404)
     else:
         data = {
-            "cancellations": nos
+            "cancellations": nos, "request_id": canc_request_id
         }
         if not suppress:
             publish_cancellation(producer, nos)
@@ -595,7 +595,7 @@ def get_request_details(request_id):
     request_type = get_request_type(request_id)
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        if request_type.lower() == 'new registration':
+        if request_type.lower() in ('new registration', 'cancellation', 'part cancellation'):
             data = get_register_request_details(request_id)
             details = get_registration_details(cursor, data[0]["registration_no"], data[0]["registration_date"])
             data[0]['details'] = details
