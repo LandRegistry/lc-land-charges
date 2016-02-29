@@ -1172,14 +1172,17 @@ def get_entry_summary(cursor, details_id):
                        'did': details_id
                    })
     rows = cursor.fetchall()
-    if len(rows) != 1:
-        raise RuntimeError("Unexpected return row count in get_entry_summary")
+    # if len(rows) != 1:
+    #     raise RuntimeError("Unexpected return row count in get_entry_summary")
+    registrations = []
+    for row in rows:
+        registrations.append({
+            'number': row['registration_no'],
+            'date': row['date'].strftime('%Y-%m-%d')
+        })
 
     return {
-        'registration': {
-            'number': rows[0]['registration_no'],
-            'date': rows[0]['date'].strftime('%Y-%m-%d')
-        },
+        'registrations': registrations,
         'class_of_charge': rows[0]['class_of_charge'],
         'reveal': rows[0]['reveal'],
         'application': "New Registration" if rows[0]['amendment_type'] is None else rows[0]['amendment_type'],
@@ -1189,9 +1192,12 @@ def get_entry_summary(cursor, details_id):
 
 def get_registration_history(cursor, reg_no, date):
     results = []
-    cursor.execute('SELECT r.reveal, d.amendment_type, d.amends, d.class_of_charge '
-                   'FROM register r, register_details d '
-                   'WHERE r.details_id = d.id AND r.registration_no=%(reg_no)s AND r.date = %(date)s', {
+
+    # TODO: Bollocks, we need to get every reg num/date for each item in the history
+
+    cursor.execute('SELECT details_id '
+                   'FROM register '
+                   'WHERE registration_no=%(reg_no)s AND date = %(date)s', {
                        'date': date, 'reg_no': reg_no
                    })
     rows = cursor.fetchall()
@@ -1201,18 +1207,8 @@ def get_registration_history(cursor, reg_no, date):
     if len(rows) == 0:
         return []
 
-    entry = {
-        'registration': {
-            'number': reg_no,
-            'date': date
-        },
-        'class_of_charge': rows[0]['class_of_charge'],
-        'reveal': rows[0]['reveal'],
-        'application': rows[0]['amendment_type'],
-        'amends': rows[0]['amends']
-    }
+    entry = get_entry_summary(cursor, rows[0]['details_id'])
     results.append(entry)
-
     while entry['amends'] is not None:
         entry = get_entry_summary(cursor, entry['amends'])
         results.append(entry)
