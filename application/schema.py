@@ -274,7 +274,9 @@ REGISTRATION_SCHEMA = {
             "type": "object",
             "properties": {
                 "expires": DATE_SCHEMA
-            }
+            },
+            "required": ["expires"],
+            "additionalProperties": False
         },
         "original_request": {"type": "string"}
     },

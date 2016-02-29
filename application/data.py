@@ -217,12 +217,14 @@ def insert_register_details(cursor, request_id, data, date, amends):
 
     is_priority_notice = None
     prio_notc_expires = None
+
+    logging.debug(data)
     if 'priority_notice' in data:
         is_priority_notice = True
-        if 'expires' in 'priority_notice':
-            prio_notc_expires = data['priority_notice']['expires']
-        else:
-            prio_notc_expires = data['prio_notice_expires']
+        # if 'expires' in 'priority_notice':
+        prio_notc_expires = data['priority_notice']['expires']
+        # else:
+        #     prio_notc_expires = data['prio_notice_expires']
 
     amend_type = None
     if 'update_registration' in data:
@@ -858,8 +860,9 @@ def get_registration_details(cursor, reg_no, date):
 
     if data['class_of_charge'] not in ['PAB', 'WOB']:
         if rows[0]['priority_notice_ind']:
-            data['priority_notice'] = True
-            data['prio_notice_expires'] = rows[0]['prio_notice_expires'].strftime('%Y-%m-%d')
+            data['priority_notice'] = {
+                "expires": rows[0]['prio_notice_expires'].strftime('%Y-%m-%d')
+            }
 
         data['particulars'] = {
             'counties': get_lc_counties(cursor, details_id, lead_county),
