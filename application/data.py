@@ -630,7 +630,8 @@ def get_all_registrations(cursor):
 
         
 def get_registrations_by_date(cursor, date):
-    cursor.execute('select r.registration_no, r.date, d.class_of_charge, d.amends, d.cancelled_by, d.request_id '
+    cursor.execute('select r.registration_no, r.date, d.class_of_charge, d.amends, d.cancelled_by, d.request_id, '
+                   'd.amendment_type '
                    'from register r, register_details d '
                    'where r.details_id = d.id and r.date=%(date)s', {'date': date})
     rows = cursor.fetchall()
@@ -654,7 +655,7 @@ def get_registrations_by_date(cursor, date):
         if row['amends'] is None:
             item['application'] = 'new'
         else:
-            item['application'] = 'amend'
+            item['application'] = row['amendment_type']  # 'amend'
 
         item['data'].append({
             'number': row['registration_no'],
@@ -1162,3 +1163,62 @@ def get_k22_request_id(registration_no, registration_date):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     complete(cursor)
     return data
+
+
+def get_entry_summary(cursor, details_id):
+    cursor.execute('SELECT r.registration_no, r.date, r.reveal, d.amendment_type, d.amends, d.class_of_charge '
+                   'FROM register r, register_details d '
+                   'WHERE r.details_id = d.id AND d.id = %(did)s', {
+                       'did': details_id
+                   })
+    rows = cursor.fetchall()
+    if len(rows) != 1:
+        raise RuntimeError("Unexpected return row count in get_entry_summary")
+
+    return {
+        'registration': {
+            'number': rows[0]['registration_no'],
+            'date': rows[0]['date'].strftime('%Y-%m-%d')
+        },
+        'class_of_charge': rows[0]['class_of_charge'],
+        'reveal': rows[0]['reveal'],
+        'application': "New Registration" if rows[0]['amendment_type'] is None else rows[0]['amendment_type'],
+        'amends': rows[0]['amends']
+    }
+
+
+def get_registration_history(cursor, reg_no, date):
+    results = []
+    cursor.execute('SELECT r.reveal, d.amendment_type, d.amends, d.class_of_charge '
+                   'FROM register r, register_details d '
+                   'WHERE r.details_id = d.id AND r.registration_no=%(reg_no)s AND r.date = %(date)s', {
+                       'date': date, 'reg_no': reg_no
+                   })
+    rows = cursor.fetchall()
+    if len(rows) > 1:
+        raise RuntimeError("Unexpected multiple return rows in get_registration_history")
+
+    if len(rows) == 0:
+        return []
+
+    entry = {
+        'registration': {
+            'number': reg_no,
+            'date': date
+        },
+        'class_of_charge': rows[0]['class_of_charge'],
+        'reveal': rows[0]['reveal'],
+        'application': rows[0]['amendment_type'],
+        'amends': rows[0]['amends']
+    }
+    results.append(entry)
+
+    while entry['amends'] is not None:
+        entry = get_entry_summary(cursor, entry['amends'])
+        results.append(entry)
+
+    return results
+
+
+
+
