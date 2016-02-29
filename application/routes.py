@@ -159,6 +159,7 @@ def register():
     try:
         new_regns, details_id, request_id = insert_new_registration(cursor, json_data)
         complete(cursor)
+        logging.info(format_message("Registration committed"))
     except:
         rollback(cursor)
         raise
@@ -233,21 +234,12 @@ def amend_registration(date, reg_no):
             originals, reg_nos = insert_rectification(cursor, reg_no, date, json_data, amendment)
             data['amended_registrations'].append(originals)
         complete(cursor)
+        logging.info(format_message("Alteration committed"))
     except:
         rollback(cursor)
         raise
 
     return Response(json.dumps(data), status=200)
-    # if rows is None or rows == 0:
-    #     cursor.connection.rollback()
-    #     cursor.close()
-    #     cursor.connection.close()
-    #     return Response(status=404)
-    # else:
-    #     if not suppress:
-    #         publish_amendment(producer, data)
-    #
-    #     return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
 @app.route('/cancellations', methods=["POST"])
@@ -317,11 +309,11 @@ def create_search():
         return Response(status=415)
 
     data = request.get_json(force=True)
-    print('this is search data', json.dumps(data))
+    logging.debug('this is search data', json.dumps(data))
     errors = validate(data, SEARCH_SCHEMA)
     if errors is not None:
         return Response(json.dumps(errors), status=400)
-    print(data['parameters']['search_type'])
+    logging.debug(data['parameters']['search_type'])
     if data['parameters']['search_type'] not in ['full', 'banks']:
         message = "Invalid search type supplied: {}".format(data['parameters']['search_type'])
         logging.error(format_message(message))
@@ -338,6 +330,7 @@ def create_search():
             store_search_result(cursor, search_request_id, search_details_id, item['name_id'], item['name_result'])
 
         complete(cursor)
+        logging.info(format_message("Search request and result comitted"))
     except:
         rollback(cursor)
         raise

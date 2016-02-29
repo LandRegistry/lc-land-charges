@@ -6,6 +6,7 @@ import logging
 import re
 from application.data_diff import get_rectification_type
 from application.search_key import create_registration_key
+from application.logformat import format_message
 
 
 def connect(cursor_factory=None):
@@ -989,6 +990,7 @@ def insert_cancellation(orig_registration_no, orig_date, data):
         elif data['update_registration']['type'] == "Part Cancellation":
             mark_as_no_reveal(cursor, orig_registration_no, orig_date)
         complete(cursor)
+        logging.info(format_message("Cancellation committed"))
     except:
         rollback(cursor)
         raise
