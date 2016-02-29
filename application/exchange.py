@@ -2,6 +2,7 @@ import kombu
 from kombu.common import maybe_declare
 import sys
 import logging
+from application.logformat import format_message
 
 
 def setup_messaging(config):
@@ -29,10 +30,10 @@ def publish_new_bankruptcy(producer, data):
             "application": "new",
             "data": data
         }
-        logging.info("Sending: %s", publish)
+        logging.info(format_message("Sending: %s", publish))
         producer.publish(publish)
     else:
-        logging.info("Suppressing publication")
+        logging.info(format_message("Suppressing publication"))
 
 def publish_amendment(producer, data):
     if producer is not None:
@@ -40,7 +41,7 @@ def publish_amendment(producer, data):
             "application": "amend",
             "data": data
         }
-        logging.info("Sending: %s", publish)
+        logging.info(format_message("Sending: %s", publish))
         producer.publish(publish)
 
 
@@ -50,5 +51,5 @@ def publish_cancellation(producer, data):
             "application": "cancel",
             "data": data
         }
-        logging.info("Sending: %s", publish)
+        logging.info(format_message("Sending: %s", publish))
         producer.publish(publish)

@@ -1,5 +1,6 @@
 from application import app, producer
 from application.exchange import publish_new_bankruptcy, publish_amendment, publish_cancellation
+from application.logformat import format_message
 from flask import Response, request
 import psycopg2
 import psycopg2.extras
@@ -43,12 +44,12 @@ def raise_error(error):
 
 @app.errorhandler(Exception)
 def error_handler(err):
-    logging.error('Unhandled exception: ' + str(err))
+    logging.error(format_message('Unhandled exception: ' + str(err)))
     call_stack = traceback.format_exc()
 
     lines = call_stack.split("\n")
     for line in lines:
-        logging.error(line)
+        logging.error(format_message(line))
 
     error = {
         "type": "F",
@@ -61,15 +62,15 @@ def error_handler(err):
 
 @app.before_request
 def before_request():
-    logging.info("BEGIN %s %s [%s] (%s)",
+    logging.info(format_message("BEGIN %s %s [%s] (%s)"),
                  request.method, request.url, request.remote_addr, request.__hash__())
 
 
 @app.after_request
 def after_request(response):
-    logging.info('END %s %s [%s] (%s) -- %s',
-                 request.method, request.url, request.remote_addr, request.__hash__(),
-                 response.status)
+    # logging.info('END %s %s [%s] (%s) -- %s',
+    #              request.method, request.url, request.remote_addr, request.__hash__(),
+    #              response.status)
     return response
 
 # ============== /registrations ===============
@@ -83,7 +84,7 @@ def registrations_by_date(date):
     finally:
         complete(cursor)
     if details is None:
-        logging.warning("Returning 404")
+        logging.warning(format_message("Returning 404 for date {}".format(date)))
         return Response(status=404)
     else:
         return Response(json.dumps(details), status=200, mimetype='application/json')
@@ -97,7 +98,7 @@ def all_registrations():
     finally:
         complete(cursor)
     if details is None:
-        logging.warning("Returning 404")
+        logging.warning(format_message("Returning 404 for /registrations"))
         return Response(status=404)
     else:
         return Response(json.dumps(details), status=200, mimetype='application/json')
@@ -111,7 +112,7 @@ def registration(date, reg_no):
     finally:
         complete(cursor)
     if details is None:
-        logging.warning("Returning 404")
+        logging.warning(format_message("Returning 404 for /registrations/{}/{}".format(date, reg_no)))
         return Response(status=404)
     else:
         return Response(json.dumps(details), status=200, mimetype='application/json')
@@ -120,10 +121,10 @@ def registration(date, reg_no):
 @app.route('/registrations', methods=['POST'])
 def register():
 
-    logging.info("Received: %s", request.data.decode('utf-8'))
+    logging.info(format_message("Received registration data: %s"), request.data.decode('utf-8'))
     suppress = False
     if 'suppress_queue' in request.args:
-        logging.info('Queue suppressed')
+        logging.info(format_message('Queue suppressed'))
         suppress = True
 
     if request.headers['Content-Type'] != "application/json":
@@ -132,14 +133,14 @@ def register():
             "message": "Received invalid input data (non-JSON)",
             "stack": ""
         })
-        logging.error('Content-Type is not JSON')
+        logging.error(format_message('Content-Type is not JSON'))
         return Response(status=415)
 
     json_data = request.get_json(force=True)
 
     errors = validate_registration(json_data)
     if 'dev_date' in request.args and app.config['ALLOW_DEV_ROUTES']:
-        logging.info('Overriding date')
+        logging.warning(format_message('Overriding date'))
         json_data['dev_registration'] = {
             'date': request.args['dev_date']
         }
@@ -150,7 +151,7 @@ def register():
             "message": "Input data failed validation",
             "stack": ""
         })
-        logging.error("Input data failed validation")
+        logging.error(format_message("Input data failed validation"))
         return Response(json.dumps(errors), status=400, mimetype='application/json')
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -177,12 +178,12 @@ def register():
 def amend_registration(date, reg_no):
     # Amendment... we're being given the replacement data
     if request.headers['Content-Type'] != "application/json":
-        logging.error('Content-Type is not JSON')
+        logging.error(format_message('Content-Type is not JSON'))
         return Response(status=415)
 
     suppress = False
     if 'suppress_queue' in request.args:
-        logging.info('Queue suppressed')
+        logging.info(format_message('Queue suppressed'))
         suppress = True
 
     json_data = request.get_json(force=True)
@@ -197,7 +198,7 @@ def amend_registration(date, reg_no):
     errors = validate_update(json_data)
     print('***4', errors)
     if 'dev_date' in request.args and app.config['ALLOW_DEV_ROUTES']:
-        logging.info('Overriding date')
+        logging.warning(format_message('Overriding date'))
         json_data['dev_registration'] = {
             'date': request.args['dev_date']
         }
@@ -208,7 +209,7 @@ def amend_registration(date, reg_no):
             "message": "Input data failed validation",
             "stack": ""
         })
-        logging.error("Input data failed validation")
+        logging.error(format_message("Input data failed validation"))
         return Response(json.dumps(errors), status=400, mimetype='application/json')
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -257,12 +258,12 @@ def cancel_registration():
 
     suppress = False
     if 'suppress_queue' in request.args:
-        logging.info('Queue suppressed')
+        logging.info(format_message('Queue suppressed'))
         suppress = True
     json_data = json.loads(request.data.decode('utf-8'))
-    logging.info("Received: %s", json_data)
+    logging.debug("Received: %s", json_data)
     reg = json_data['registration']
-    logging.info("Reg: %s", reg)
+    logging.debug("Reg: %s", reg)
     reg_no = json_data['registration_no']
     reg_date = json_data['registration']['date']
     rows, nos, canc_request_id = insert_cancellation(reg_no, reg_date, json_data)
@@ -312,7 +313,7 @@ def court_ref_existence_check(court, ref, year):
 @app.route('/searches', methods=['POST'])
 def create_search():
     if request.headers['Content-Type'] != "application/json":
-        logging.error('Content-Type is not JSON')
+        logging.error(format_message('Content-Type is not JSON'))
         return Response(status=415)
 
     data = request.get_json(force=True)
@@ -323,7 +324,7 @@ def create_search():
     print(data['parameters']['search_type'])
     if data['parameters']['search_type'] not in ['full', 'banks']:
         message = "Invalid search type supplied: {}".format(data['parameters']['search_type'])
-        logging.error(message)
+        logging.error(format_message(message))
         return Response(message, status=400)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -402,7 +403,7 @@ def retrieve_office_copy():
 @app.route('/migrated_record', methods=['POST'])
 def insert():
     if request.headers['Content-Type'] != "application/json":
-        logging.error('Content-Type is not JSON')
+        logging.error(format_message('Content-Type is not JSON'))
         return Response(status=415)
 
     data = request.get_json(force=True)
@@ -413,7 +414,7 @@ def insert():
             "message": "Input data failed validation",
             "stack": ""
         })
-        logging.error("Input data failed validation")
+        logging.error(format_message("Input data failed validation"))
         return Response(json.dumps(errors), status=400, mimetype='application/json')
 
     previous_id = None
@@ -504,7 +505,7 @@ def synchronise():  # pragma: no cover
         return Response(status=403)
 
     if request.headers['Content-Type'] != "application/json":
-        logging.error('Content-Type is not JSON')
+        logging.error(format_message('Content-Type is not JSON'))
         return Response(status=415)
 
     json_data = request.get_json(force=True)
@@ -518,7 +519,7 @@ def load_counties():  # pragma: no cover
         return Response(status=403)
 
     if request.headers['Content-Type'] != "application/json":
-        logging.error('Content-Type is not JSON')
+        logging.error(format_message('Content-Type is not JSON'))
         return Response(status=415)
 
     json_data = request.get_json(force=True)
