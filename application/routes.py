@@ -39,7 +39,7 @@ def raise_error(error):
                                            app.config['MQ_HOSTNAME'], app.config['MQ_PORT'])
     connection = kombu.Connection(hostname=hostname)
     connection.SimpleQueue('errors').put(error)
-    logging.warning('Error successfully raised.')
+    logging.warning(format_message('Error successfully raised.'))
 
 
 @app.errorhandler(Exception)
@@ -62,8 +62,8 @@ def error_handler(err):
 
 @app.before_request
 def before_request():
-    logging.info(format_message("BEGIN %s %s [%s] (%s)"),
-                 request.method, request.url, request.remote_addr, request.__hash__())
+    logging.info(format_message("BEGIN %s %s [%s]"),
+                 request.method, request.url, request.remote_addr)
 
 
 @app.after_request

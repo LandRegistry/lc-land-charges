@@ -4,7 +4,6 @@ import json
 import datetime
 import logging
 import re
-from application.search import get_searchable_string
 from application.data_diff import get_rectification_type
 from application.search_key import create_registration_key
 

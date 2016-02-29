@@ -90,23 +90,23 @@ def store_search_result(cursor, request_id, details_id, name_id, data):
                    })
 
 
-def complex_name_full_search(cursor, names, counties, search_item, cert_date):
-    build_results = []
-    # Do complex name search
-    # Search against the variations of the complex name
-    for name in names: #item['name']['complex_variations']:
-        comp_results = (search_full_by_complex_name(cursor,
-                                                    name['name'],
-                                                    name['number'],
-                                                    counties,
-                                                    search_item['year_from'],
-                                                    search_item['year_to'],
-                                                    cert_date))
-
-        if len(comp_results) > 0:
-            for ids in comp_results:
-                build_results.append(ids)
-    return {'name_result': build_results, 'name_id': search_item['name_id']}
+# def complex_name_full_search(cursor, names, counties, search_item, cert_date):
+#     build_results = []
+#     # Do complex name search
+#     # Search against the variations of the complex name
+#     for name in names: #item['name']['complex_variations']:
+#         comp_results = (search_full_by_complex_name(cursor,
+#                                                     name['name'],
+#                                                     name['number'],
+#                                                     counties,
+#                                                     search_item['year_from'],
+#                                                     search_item['year_to'],
+#                                                     cert_date))
+#
+#         if len(comp_results) > 0:
+#             for ids in comp_results:
+#                 build_results.append(ids)
+#     return {'name_result': build_results, 'name_id': search_item['name_id']}
 
 
 # search banks
@@ -296,7 +296,6 @@ def perform_full_search_complex_name(cursor, name_type, keys, number, counties, 
 def perform_search(cursor, parameters, cert_date):
     welsh = load_county_dictionary(cursor)
 
-
     if "counties" not in parameters:
         parameters["counties"] = []
 
@@ -381,83 +380,83 @@ def read_searches(cursor, name):
     return results
 
 
-def get_searchable_string(name_string=None, company=None, local_auth=None, local_auth_area=None, other=None):
-    name = ''
-    if name_string is not None and name_string != ' ':
-        name = get_abbrev_name(name_string)
-    elif company is not None and company != ' ':
-        name = get_abbrev_name(company)
-    elif local_auth is not None and local_auth != ' ':
-        loc_name = get_abbrev_name(local_auth)
-        loc_area = get_abbrev_name(local_auth_area)
-        name = get_abbrev_name(loc_name + " " + loc_area)
-    elif other is not None and other != ' ':
-        name = get_abbrev_name(other)
-
-    searchable_string = re.sub('[^A-Za-z0-9]+', '', name)
-    return searchable_string.upper()
-
-
-def get_abbrev_name(name):
-    abbrev_list = []
-    common_names = [
-        'ASS', 'ASSOC', 'ASSOCS', 'ASSOCIATE', 'ASSOCIATED', 'ASSOCIATES', 'ASSOCIATION', 'ASSOCIATIONS',
-        'LD', 'PUBLIC LIMITED COMPANY', 'CWMNI CYFYNGEDIG CYHOEDDUS', 'CWMNI CYF CYHOEDDUS', 'LTD', 'LIMITED',
-        'CYFYNGEDIG', 'CYF', 'CCC', 'C C C', 'PLC', 'P L C',
-        'SOC', 'SOCS', 'SOCY', 'SOCYS', 'SOCIETY', 'SOCIETYS', 'SOCIETIES',
-        'ST', 'STREET', 'SAINT',
-        'CO', 'COS', 'COY', 'COMP', 'COYS', 'COMPS', 'COMPANY', 'COMPANIES',
-        'DR', 'DOC', 'DOCTOR',
-        'BRO', 'BROS', 'BROTHER', 'BROTHERS',
-        '&', 'AND',
-        'BROKERS', 'BUILDERS', 'COLLEGES', 'COMMISSIONERS', 'CONSTRUCTIONS', 'CONTRACTORS', 'DECORATORS',
-        'DEVELOPERS', 'DEVELOPMENTS',
-        'ENTERPRISES', 'ESTATES', 'GARAGES', 'HOLDINGS', 'HOTELS', 'INVESTMENTS', 'MOTORS', 'PRODUCTIONS',
-        'SCHOOLS', 'SONS', 'STORES', 'TRUSTS', 'WARDENS', 'CHARITIES', 'PROPERTIES', 'INDUSTRIES',
-        'ST', 'STREET', 'SAINT'
-    ]
-
-    replace_names = [
-        'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS',
-        'LD', 'LD', 'LD', 'LD', 'LD', 'LD',
-        'LD', 'LD', 'LD', 'LD', 'LD', 'LD',
-        'SOC', 'SOC', 'SOC', 'SOC', 'SOC', 'SOC', 'SOC',
-        'ST', 'ST', 'ST',
-        'CO', 'CO', 'CO', 'CO', 'CO', 'CO', 'CO', 'CO',
-        'DR', 'DR', 'DR',
-        'BRO', 'BRO', 'BRO', 'BRO',
-        'AND', 'AND',
-        'BROKER', 'BUILDER', 'COLLEGE', 'COMMISSIONER', 'CONSTRUCTION', 'CONTRACTOR', 'DECORATOR',
-        'DEVELOPER', 'DEVELOPMENT',
-        'ENTERPRISE', 'ESTATE', 'GARAGE', 'HOLDING', 'HOTEL', 'INVESTMENT', 'MOTOR', 'PRODUCTION',
-        'SCHOOL', 'SON', 'STORE', 'TRUST', 'WARDEN', 'CHARITY', 'PROPERTY', 'INDUSTRY',
-        'ST', 'ST', 'ST'
-    ]
-
-    problem_names = [
-        'PUBLIC LIMITED COMPANY', 'CWMNI CYFYNGEDIG CYHOEDDUS', 'CWMNI CYF CYHOEDDUS', 'C C C', 'P L C'
-    ]
-
-    name = name.upper()
-    for names in problem_names:
-        if names in name:
-            name = name.replace(names, 'LD')
-
-    for word in name.split():
-        if word in common_names:
-            x = common_names.index(word)
-            curr_name = replace_names[x]
-            abbrev_list.append(curr_name)
-        else:
-            abbrev_list.append(word)
-
-    abbrev_name = "".join(abbrev_list)
-    return abbrev_name
-
-
-def get_initials(names):
-    initials_list = []
-    for name in names.split(" "):
-        initials_list.append(name[:1])
-    initials = " ".join(initials_list)
-    return initials
+# def get_searchable_string(name_string=None, company=None, local_auth=None, local_auth_area=None, other=None):
+#     name = ''
+#     if name_string is not None and name_string != ' ':
+#         name = get_abbrev_name(name_string)
+#     elif company is not None and company != ' ':
+#         name = get_abbrev_name(company)
+#     elif local_auth is not None and local_auth != ' ':
+#         loc_name = get_abbrev_name(local_auth)
+#         loc_area = get_abbrev_name(local_auth_area)
+#         name = get_abbrev_name(loc_name + " " + loc_area)
+#     elif other is not None and other != ' ':
+#         name = get_abbrev_name(other)
+#
+#     searchable_string = re.sub('[^A-Za-z0-9]+', '', name)
+#     return searchable_string.upper()
+#
+#
+# def get_abbrev_name(name):
+#     abbrev_list = []
+#     common_names = [
+#         'ASS', 'ASSOC', 'ASSOCS', 'ASSOCIATE', 'ASSOCIATED', 'ASSOCIATES', 'ASSOCIATION', 'ASSOCIATIONS',
+#         'LD', 'PUBLIC LIMITED COMPANY', 'CWMNI CYFYNGEDIG CYHOEDDUS', 'CWMNI CYF CYHOEDDUS', 'LTD', 'LIMITED',
+#         'CYFYNGEDIG', 'CYF', 'CCC', 'C C C', 'PLC', 'P L C',
+#         'SOC', 'SOCS', 'SOCY', 'SOCYS', 'SOCIETY', 'SOCIETYS', 'SOCIETIES',
+#         'ST', 'STREET', 'SAINT',
+#         'CO', 'COS', 'COY', 'COMP', 'COYS', 'COMPS', 'COMPANY', 'COMPANIES',
+#         'DR', 'DOC', 'DOCTOR',
+#         'BRO', 'BROS', 'BROTHER', 'BROTHERS',
+#         '&', 'AND',
+#         'BROKERS', 'BUILDERS', 'COLLEGES', 'COMMISSIONERS', 'CONSTRUCTIONS', 'CONTRACTORS', 'DECORATORS',
+#         'DEVELOPERS', 'DEVELOPMENTS',
+#         'ENTERPRISES', 'ESTATES', 'GARAGES', 'HOLDINGS', 'HOTELS', 'INVESTMENTS', 'MOTORS', 'PRODUCTIONS',
+#         'SCHOOLS', 'SONS', 'STORES', 'TRUSTS', 'WARDENS', 'CHARITIES', 'PROPERTIES', 'INDUSTRIES',
+#         'ST', 'STREET', 'SAINT'
+#     ]
+#
+#     replace_names = [
+#         'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS',
+#         'LD', 'LD', 'LD', 'LD', 'LD', 'LD',
+#         'LD', 'LD', 'LD', 'LD', 'LD', 'LD',
+#         'SOC', 'SOC', 'SOC', 'SOC', 'SOC', 'SOC', 'SOC',
+#         'ST', 'ST', 'ST',
+#         'CO', 'CO', 'CO', 'CO', 'CO', 'CO', 'CO', 'CO',
+#         'DR', 'DR', 'DR',
+#         'BRO', 'BRO', 'BRO', 'BRO',
+#         'AND', 'AND',
+#         'BROKER', 'BUILDER', 'COLLEGE', 'COMMISSIONER', 'CONSTRUCTION', 'CONTRACTOR', 'DECORATOR',
+#         'DEVELOPER', 'DEVELOPMENT',
+#         'ENTERPRISE', 'ESTATE', 'GARAGE', 'HOLDING', 'HOTEL', 'INVESTMENT', 'MOTOR', 'PRODUCTION',
+#         'SCHOOL', 'SON', 'STORE', 'TRUST', 'WARDEN', 'CHARITY', 'PROPERTY', 'INDUSTRY',
+#         'ST', 'ST', 'ST'
+#     ]
+#
+#     problem_names = [
+#         'PUBLIC LIMITED COMPANY', 'CWMNI CYFYNGEDIG CYHOEDDUS', 'CWMNI CYF CYHOEDDUS', 'C C C', 'P L C'
+#     ]
+#
+#     name = name.upper()
+#     for names in problem_names:
+#         if names in name:
+#             name = name.replace(names, 'LD')
+#
+#     for word in name.split():
+#         if word in common_names:
+#             x = common_names.index(word)
+#             curr_name = replace_names[x]
+#             abbrev_list.append(curr_name)
+#         else:
+#             abbrev_list.append(word)
+#
+#     abbrev_name = "".join(abbrev_list)
+#     return abbrev_name
+#
+#
+# def get_initials(names):
+#     initials_list = []
+#     for name in names.split(" "):
+#         initials_list.append(name[:1])
+#     initials = " ".join(initials_list)
+#     return initials

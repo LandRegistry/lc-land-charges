@@ -1,7 +1,7 @@
-from flask import session
+from flask import request
 
 
 def format_message(message):
-    if 'transaction_id' in session:
-        return "T:{} {}".format(session['transaction_id'], message)
+    if 'X-Transaction-ID' in request.headers:
+        return "T:{} {}".format(request.headers['X-Transaction-ID'], message)
     return message
