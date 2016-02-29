@@ -34,11 +34,12 @@ def health():
 
 
 def raise_error(error):
-    hostname = "amqp://{}:{}@{}:{}".format(app.config['MQ_USERNAME'], app.config['MQ_PASSWORD'],
-                                           app.config['MQ_HOSTNAME'], app.config['MQ_PORT'])
-    connection = kombu.Connection(hostname=hostname)
-    connection.SimpleQueue('errors').put(error)
-    logging.warning('Error successfully raised.')
+    # hostname = "amqp://{}:{}@{}:{}".format(app.config['MQ_USERNAME'], app.config['MQ_PASSWORD'],
+    #                                        app.config['MQ_HOSTNAME'], app.config['MQ_PORT'])
+    # connection = kombu.Connection(hostname=hostname)
+    # connection.SimpleQueue('errors').put(error)
+    # logging.warning('Error successfully raised.')
+    logging.error(error)
 
 
 @app.errorhandler(Exception)
