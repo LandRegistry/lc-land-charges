@@ -230,10 +230,11 @@ def amend_registration(date, reg_no):
     # originals, reg_nos, rows = insert_amendment(cursor, reg_no, date, json_data)
     # else:
     try:
-        originals, reg_nos = insert_rectification(cursor, reg_no, date, json_data, None)
+        originals, reg_nos, request_id = insert_rectification(cursor, reg_no, date, json_data, None)
         data = {
             "new_registrations": reg_nos,
-            "amended_registrations": originals
+            "amended_registrations": originals,
+            "request_id": request_id
         }
         if pab_amendment is not None:
             reg_no = pab_amendment['reg_no']
@@ -241,7 +242,7 @@ def amend_registration(date, reg_no):
             today = datetime.datetime.now().strftime('%Y-%m-%d')
             amendment = {'reg_no': data['new_registrations'][0]['number'],
                          'date': today}
-            originals, reg_nos = insert_rectification(cursor, reg_no, date, json_data, amendment)
+            originals, reg_nos, request_id = insert_rectification(cursor, reg_no, date, json_data, amendment)
             data['amended_registrations'].append(originals)
         complete(cursor)
     except:

@@ -514,6 +514,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, amendment=Non
         amend_reg = amendment['reg_no']
         amend_date = amendment['date']
         details_id = get_register_details_id(cursor, amend_reg, amend_date)
+        request_id = None
         reg_nos = []
 
     update_previous_details(cursor, details_id, original_details_id)
@@ -524,7 +525,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, amendment=Non
         for reg in original_regs:
             mark_as_no_reveal(cursor, reg['number'], reg['date'])
 
-    return original_regs, reg_nos
+    return original_regs, reg_nos, request_id
 
 
 def amend_pab(cursor, pab_reg_no, pab_date, amend_reg_no, amend_date, data):
