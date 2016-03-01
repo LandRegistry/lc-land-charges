@@ -12,7 +12,7 @@ from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
-    get_registrations_by_date, get_all_registrations, get_k22_request_id
+    get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches, get_search_by_request_id
 from application.oc import get_ins_office_copy
@@ -34,11 +34,12 @@ def health():
 
 
 def raise_error(error):
-    hostname = "amqp://{}:{}@{}:{}".format(app.config['MQ_USERNAME'], app.config['MQ_PASSWORD'],
-                                           app.config['MQ_HOSTNAME'], app.config['MQ_PORT'])
-    connection = kombu.Connection(hostname=hostname)
-    connection.SimpleQueue('errors').put(error)
-    logging.warning('Error successfully raised.')
+    # hostname = "amqp://{}:{}@{}:{}".format(app.config['MQ_USERNAME'], app.config['MQ_PASSWORD'],
+    #                                        app.config['MQ_HOSTNAME'], app.config['MQ_PORT'])
+    # connection = kombu.Connection(hostname=hostname)
+    # connection.SimpleQueue('errors').put(error)
+    # logging.warning('Error successfully raised.')
+    logging.error(error)
 
 
 @app.errorhandler(Exception)
@@ -115,6 +116,21 @@ def registration(date, reg_no):
         return Response(status=404)
     else:
         return Response(json.dumps(details), status=200, mimetype='application/json')
+
+
+@app.route('/history/<date>/<int:reg_no>', methods=['GET'])
+def registration_history(date, reg_no):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        details = get_registration_history(cursor, reg_no, date)
+    finally:
+        complete(cursor)
+    if details is None:
+        logging.warning("Returning 404")
+        return Response(status=404)
+    else:
+        return Response(json.dumps(details), status=200, mimetype='application/json')
+
 
 
 @app.route('/registrations', methods=['POST'])
