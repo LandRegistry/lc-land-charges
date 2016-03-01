@@ -1,5 +1,5 @@
 from jsonschema import Draft4Validator
-
+import logging
 
 DATE_SCHEMA = {
     "type": "string",
@@ -394,7 +394,7 @@ def validate_migration(data):
                 path += "." + item
         if path == '$':
             path = '$.'
-        print(error.message + "|" + path)
+        logging.debug(error.message + "|" + path)
         errors.append({
             "location": path,
             "error_message": error.message
@@ -432,7 +432,7 @@ def validate_generic_registration(data):
                 path += "." + item
         if path == '$':
             path = '$.'
-        print(error.message + "|" + path)
+        logging.debug(error.message + "|" + path)
         errors.append({
             "location": path,
             "error_message": error.message
@@ -536,7 +536,7 @@ def validate(data, schema):
                 path += "." + item
         if path == '$':
             path = '$.'
-        print(error.message + "|" + path)
+        logging.debug(error.message + "|" + path)
         errors.append({
             "location": path,
             "error_message": error.message

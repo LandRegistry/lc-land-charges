@@ -4,9 +4,9 @@ import json
 import datetime
 import logging
 import re
-from application.search import get_searchable_string
 from application.data_diff import get_rectification_type
 from application.search_key import create_registration_key
+from application.logformat import format_message
 
 
 def connect(cursor_factory=None):
@@ -504,7 +504,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, amendment=Non
     original_regs = get_all_registration_nos(cursor, original_details_id)
 
     if amendment is None:
-        logging.info(original_details_id)
+        logging.debug(original_details_id)
         date = datetime.datetime.now().strftime('%Y-%m-%d')
         request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], date)
 
@@ -530,10 +530,10 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, amendment=Non
 def amend_pab(cursor, pab_reg_no, pab_date, amend_reg_no, amend_date, data):
     original_details = get_registration_details(cursor, pab_reg_no, pab_date)
     original_details_id = get_register_details_id(cursor, pab_reg_no, pab_date)
-    logging.info(original_details_id)
+    logging.debug(original_details_id)
 
     original_regs = get_all_registration_nos(cursor, original_details_id)
-    logging.info(original_regs)
+    logging.debug(original_regs)
 
     # get the amend details id to set the cancelled by id on register_details
     amend_details_id = get_register_details_id(cursor, amend_reg_no, amend_date)
@@ -809,7 +809,7 @@ def get_lc_counties(cursor, details_id, lead_county_id):
         counties = []
     else:
         counties = [row['name']]
-        logging.info(counties)
+        logging.debug(counties)
 
         cursor.execute("select dcr.county_id, c.name  from detl_county_rel dcr, county c " +
                        "where dcr.details_id = %(id)s and dcr.county_id = c.id ", {'id': details_id})
@@ -820,7 +820,7 @@ def get_lc_counties(cursor, details_id, lead_county_id):
                 cty = row['name']
                 if cty not in counties:
                     counties.append(cty)
-        logging.info(counties)
+        logging.debug(counties)
     return counties
 
 
@@ -944,26 +944,6 @@ def insert_migrated_record(cursor, data):
             mark_as_no_reveal(cursor, data['registration']['registration_no'], data['registration']['date'])
             
     return details_id, request_id
-        # details_id = insert_register_details(cursor, request_id, data, None)  # TODO get court
-        # party_id = insert_party(cursor, details_id, "Debtor", None, None, False)
-
-        # name_id = None
-        # if 'eo_name' in data:
-            # name_id = insert_name(cursor, data['eo_name'], party_id)
-            # name_id = name_id['id']
-
-
-        # insert_address(cursor, data['residence'], "Debtor Residence", party_id)
-
-        # logging.debug(data['date'])
-        # county_id = None
-        
-        # registration_no, registration_id = insert_registration(cursor, details_id, name_id, data['date'], county_id, data['reg_no'])
-
-    
-    # insert_migration_status(cursor, registration_id, data['registration']['registration_no'], data['registration']['date'],
-                            # data['class_of_charge'], data['migration_data'])
-    # return details_id, request_id
 
 
 def get_head_of_chain(cursor, reg_no, date):
@@ -1008,10 +988,10 @@ def insert_cancellation(orig_registration_no, orig_date, data):
         elif data['update_registration']['type'] == "Part Cancellation":
             mark_as_no_reveal(cursor, orig_registration_no, orig_date)
         complete(cursor)
+        logging.info(format_message("Cancellation committed"))
     except:
         rollback(cursor)
         raise
-    print("regnos", (reg_nos))
     return len(reg_nos), reg_nos, canc_request_id
 
 

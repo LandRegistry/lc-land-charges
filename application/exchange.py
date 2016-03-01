@@ -2,6 +2,7 @@ import kombu
 from kombu.common import maybe_declare
 import sys
 import logging
+from application.logformat import format_message
 
 
 def setup_messaging(config):
