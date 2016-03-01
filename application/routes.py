@@ -186,16 +186,12 @@ def amend_registration(date, reg_no):
         suppress = True
 
     json_data = request.get_json(force=True)
-    print('***1', json_data)
     if 'pab_amendment' in json_data:
-        print('***2')
         pab_amendment = json_data['pab_amendment']
         del json_data['pab_amendment']
     else:
-        print('***3')
         pab_amendment = None
     errors = validate_update(json_data)
-    print('***4', errors)
     if 'dev_date' in request.args and app.config['ALLOW_DEV_ROUTES']:
         logging.info('Overriding date')
         json_data['dev_registration'] = {

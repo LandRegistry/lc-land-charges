@@ -90,11 +90,28 @@ def get_rectification_type(original_data, new_data):
     # 'Private Individual'}], 'type': 'Estate Owner'}], 'particulars': {'description': '1 The Lane, Some Village',
     # 'district': 'South Hams', 'counties': ['Devon']}}
     if new_data['update_registration']['type'] == 'Amendment':
-        if ((len(original_data['parties'][0]['names']) == len(new_data['parties'][0]['names'])) and
-                (all(i in new_data['parties'][0]['names'] for i in original_data['parties'][0]['names']))):
-            return 1
-        else:
-            return 2
+        # loop through the names in original and new and then compare
+        new_names = []
+        for names in new_data['parties'][0]['names']:
+            forenames = names['private']['forenames']
+            surname = names['private']['surname']
+            new_names.append({'forenames': forenames, 'surname': surname})
+
+        # orig_names = []
+        for names in original_data['parties'][0]['names']:
+            forenames = names['private']['forenames']
+            surname = names['private']['surname']
+            orig_names = {'forenames': forenames, 'surname': surname}
+            if orig_names not in new_names:
+                return 2
+
+        # if ((len(orig_names) == len(new_names)) and
+        #        (all(i in new_names for i in orig_names))):
+        #    return 1
+        # else:
+        #    return 2
+
+        return 1
 
     names_are_the_same = names_match(original_data['parties'][0]['names'][0],
                                      new_data['parties'][0]['names'][0])
