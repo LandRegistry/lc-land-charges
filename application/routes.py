@@ -602,15 +602,12 @@ def get_request_details(request_id):
     request_type = get_request_type(request_id)
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        if request_type.lower() in ('new registration', 'cancellation', 'part cancellation'):
+        if request_type.lower() in ('search'):
+            data = get_search_request_details(request_id)
+        else:  # not a search - reg register details
             data = get_register_request_details(request_id)
             details = get_registration_details(cursor, data[0]["registration_no"], data[0]["registration_date"])
             data[0]['details'] = details
-        elif request_type.lower() == 'search':
-            print('call search request')
-            data = get_search_request_details(request_id)
-        else:
-            return Response("invalid request_type: " + request_type, status=500)
     finally:
         complete(cursor)
     return Response(json.dumps(data), status=200, mimetype='application/json')
