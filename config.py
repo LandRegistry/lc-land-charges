@@ -7,7 +7,6 @@ class Config(object):
     MQ_PASSWORD = os.getenv("MQ_PASSWORD", "mqpassword")
     MQ_HOSTNAME = os.getenv("MQ_HOST", "localhost")
     MQ_PORT = os.getenv("MQ_PORT", "5672")
-    LEGACY_ADAPTER_URI = os.getenv('LEGACY_ADAPTER_URL', 'http://localhost:5007')
     APPLICATION_NAME = "lc-land-charges"
     DATABASE_NAME = os.getenv('DATABASE_NAME', 'landcharges')
     DATABASE_USER = os.getenv('DATABASE_USER', 'landcharges')
