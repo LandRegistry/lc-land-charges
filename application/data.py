@@ -407,7 +407,7 @@ def insert_landcharge_regn(cursor, details_id, names, county_ids, date, orig_reg
 
 
 def insert_counties(cursor, details_id, counties):
-    if len(counties) == 1 and counties[0].upper() == 'NO COUNTY':
+    if len(counties) == 1 and (counties[0].upper() == 'NO COUNTY' or counties[0] == ""):
         return []
 
     ids = []
