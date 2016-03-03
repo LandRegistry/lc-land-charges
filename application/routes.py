@@ -13,7 +13,7 @@ from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
-    get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history
+    get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history, insert_migrated_cancellation
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches, get_search_by_request_id
 from application.oc import get_ins_office_copy
@@ -424,40 +424,52 @@ def insert():
         return Response(json.dumps(errors), status=400, mimetype='application/json')
 
     previous_id = None
+    first_record = data[0]
     for reg in data:
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         try:
-            details_id, request_id = insert_migrated_record(cursor, reg)
-            if reg['type'] in ['AM', 'CN', 'CP', 'RN', 'RC']:
-                if details_id is not None:
-                    cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
-                                   "id = %(id)s AND cancelled_by IS NULL",
-                                   {
-                                       "canc": request_id, "id": previous_id
-                                   })
-                else:
-                    pass
+            if reg['type'] == 'CN':
+                details_id, request_id = insert_migrated_cancellation(cursor, data)
+            else:
+                details_id, request_id = insert_migrated_record(cursor, reg)
+                if reg['type'] in ['AM', 'CN', 'CP', 'RN', 'RC']:
+                    if details_id is not None:
+                        cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+                                       "id = %(id)s AND cancelled_by IS NULL",
+                                       {
+                                           "canc": request_id, "id": previous_id
+                                       })
+                    else:
+                        pass
 
-                if reg['type'] == 'AM':
-                    cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
-                                   "id = %(id)s",
-                                   {
-                                       "amend": previous_id, "id": details_id, "type": "Amendment"
-                                   })
+                    # TODO repeating code is bad.
+                    if reg['type'] == 'AM':
+                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
+                                       "id = %(id)s",
+                                       {
+                                           "amend": previous_id, "id": details_id, "type": "Amendment"
+                                       })
 
-                if reg['type'] == 'RN':
-                    cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
-                                   "id = %(id)s",
-                                   {
-                                       "amend": previous_id, "id": details_id, "type": "Renewal"
-                                   })
-                                   
-                if reg['type'] == 'RC':
-                    cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
-                                   "id = %(id)s",
-                                   {
-                                       "amend": previous_id, "id": details_id, "type": "Rectification"
-                                   })
+                    if reg['type'] == 'RN':
+                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
+                                       "id = %(id)s",
+                                       {
+                                           "amend": previous_id, "id": details_id, "type": "Renewal"
+                                       })
+
+                    if reg['type'] == 'RC':
+                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
+                                       "id = %(id)s",
+                                       {
+                                           "amend": previous_id, "id": details_id, "type": "Rectification"
+                                       })
+
+                    if reg['type'] == 'CP':
+                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
+                                       "id = %(id)s",
+                                       {
+                                           "amend": previous_id, "id": details_id, "type": "Part Cancellation"
+                                       })
 
             previous_id = details_id
             complete(cursor)

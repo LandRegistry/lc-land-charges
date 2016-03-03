@@ -913,38 +913,84 @@ def insert_migrated_record(cursor, data):
     # TODO: using registration date as request date. Valid? Always?
 
     logging.debug(data)
-    if data['type'] in ['CN']:
+    # if data['type'] in ['CN']:  # TODO: remove this leg
+    #
+    #     data['customer_name'] = ''
+    #     data['customer_address'] = ''
+    #     insert_cancellation(data['migration_data']['original']['registration_no'],
+    #                         data['migration_data']['original']['date'], data)
+    #     registration_id = None
+    #     details_id = None
+    #     request_id = None
+    # else:
+    types = {
+        'NR': 'New registration',
+        'AM': 'Amendment',
+        'CP': 'Part cancellation',
+        'CN': 'Cancellation',
+        'RN': 'Renewal',
+        'PN': 'Priority notice',
+        'RC': 'Rectification'
+    }
+    type_str = types[data['type']]
 
-        data['customer_name'] = ''
-        data['customer_address'] = ''
-        insert_cancellation(data['migration_data']['original']['registration_no'],
-                            data['migration_data']['original']['date'], data)
-        registration_id = None
-        details_id = None
-        request_id = None
-    else:
-        types = {
-            'NR': 'New registration',
-            'AM': 'Amendment',
-            'CP': 'Part cancellation',
-            'CN': 'Cancellation',
-            'RN': 'Renewal',
-            'PN': 'Priority notice',
-            'RC': 'Rectification'
-        }
-        type_str = types[data['type']]
-    
-        # def insert_request(cursor, applicant, application_type, date, original_data=None):
-        request_id = insert_request(cursor, data['applicant'], type_str, data['registration']['date'], None)                                   
-                                    
-        reg_nos, details_id = insert_record(cursor, data, request_id, data['registration']['date'], None,
-                                            data['registration']['registration_no'])
-        
-        if len(data['parties']) == 0:
-            # There was no row on the original index, so by definition is cannot be revealed
-            mark_as_no_reveal(cursor, data['registration']['registration_no'], data['registration']['date'])
+    # def insert_request(cursor, applicant, application_type, date, original_data=None):
+    request_id = insert_request(cursor, data['applicant'], type_str, data['registration']['date'], None)
+
+    reg_nos, details_id = insert_record(cursor, data, request_id, data['registration']['date'], None,
+                                        data['registration']['registration_no'])
+
+    if len(data['parties']) == 0:
+        # There was no row on the original index, so by definition is cannot be revealed
+        mark_as_no_reveal(cursor, data['registration']['registration_no'], data['registration']['date'])
             
     return details_id, request_id
+
+
+def insert_migrated_cancellation(cursor, data):
+    # We've already inserted the predecessor records... this is a 'full' cancellation,
+    # So we need to insert the head record, and mark the chain as no-reveal
+    cancellation = data[-1]
+    if len(data) == 1:
+        pass # Do what now...
+
+    else:
+        logging.debug('Cancellation:')
+        logging.debug(cancellation)
+
+        predecessor = data[-2]
+        logging.debug('Predecessor')
+        logging.debug(predecessor)
+
+        canc_request_id = insert_request(cursor, cancellation['applicant'], 'Cancellation', cancellation['registration']['date'], None)
+
+        original_details_id = get_register_details_id(cursor, predecessor['registration']['registration_no'], predecessor['registration']['date'])
+        canc_date = cancellation['registration']['date']
+        reg_nos, canc_details_id = insert_record(cursor, cancellation, canc_request_id, canc_date, original_details_id, cancellation['registration']['registration_no'])
+                                    # (cursor, data, request_id, date, amends=None, orig_reg_no=None)
+        logging.debug('RECORD INSERTED')
+
+        update_previous_details(cursor, canc_details_id, original_details_id)
+
+        logging.debug('PREVDETL UPDATED')
+        logging.debug(data)
+
+        # [{'registration': {'date': '2016-02-01', 'registration_no': '6000'}, 'class_of_charge': 'PAB',
+        # 'additional_information': '', 'migration_data': {'unconverted_reg_no': '6000', 'flags':
+        # ['Last item lacks name information']}, 'applicant': {'address': '', 'reference': '', 'name': '', 'key_number': ''},
+        # 'type': 'NR', 'parties': []}, {'registration': {'date': '2016-02-10', 'registration_no': '6010'}, 'class_of_charge':
+        # 'PAB', 'additional_information': '', 'migration_data': {'unconverted_reg_no': '6010', 'flags':
+        # ['Last item lacks name information']}, 'applicant': {'address': '', 'reference': '', 'name': '', 'key_number': ''},
+        # 'type': 'CN', 'parties': []}]
+
+        for reg in data:
+            logging.debug(reg)
+            mark_as_no_reveal(cursor, reg['registration']['registration_no'], reg['registration']['date'])
+            logging.debug('------------------')
+
+        logging.debug('MARKED NOREVEAL')
+
+    return canc_details_id, canc_request_id
 
 
 def get_head_of_chain(cursor, reg_no, date):
@@ -973,13 +1019,16 @@ def insert_cancellation(orig_registration_no, orig_date, data):
     try:
         original_details_id = get_register_details_id(cursor, orig_registration_no, orig_date)
         original_regs = get_all_registration_nos(cursor, original_details_id)
+
         canc_date = datetime.datetime.now().strftime('%Y-%m-%d')
         canc_request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], canc_date)
         detl_data = get_registration_details(cursor, orig_registration_no, orig_date)
         detl_data['update_registration'] = data['update_registration']
-        print("detl_data", str(data))
+
+        logging.debug("detl_data", str(data))
         if data['update_registration']['type'] == "Part Cancellation":
             detl_data["additional_information"] = data["additional_information"]
+
         reg_nos, canc_details_id = insert_record(cursor, detl_data, canc_request_id, canc_date, original_details_id)
         update_previous_details(cursor, canc_details_id, original_details_id)
         # if full cancellation mark all rows as no reveal
