@@ -657,7 +657,8 @@ def get_registrations_by_date(cursor, date):
 
         item['data'].append({
             'number': row['registration_no'],
-            'date': row['date'].strftime('%Y-%m-%d')
+            'date': row['date'].strftime('%Y-%m-%d'),
+            'class_of_charge': row['class_of_charge']
         })
     return results
 
@@ -830,7 +831,7 @@ def get_registration_details(cursor, reg_no, date):
                    "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
                    "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type, "
                    "rd.priority_notice_ind, rd.prio_notice_expires, rd.legal_body, rd.legal_body_ref_no, "
-                   "rd.legal_body_ref_year "
+                   "rd.legal_body_ref_year, rd.request_id "
                    "from register r, register_details rd "
                    "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id", {
                        'reg_no': reg_no, 'date': date
@@ -842,6 +843,7 @@ def get_registration_details(cursor, reg_no, date):
     details_id = rows[0]['id']
     lead_county = rows[0]['county_id']
     lead_debtor_id = rows[0]['debtor_reg_name_id']
+    request_id = rows[0]['request_id']
     add_info = ''
     if rows[0]['additional_info'] is not None:
         add_info = rows[0]['additional_info']
@@ -904,6 +906,18 @@ def get_registration_details(cursor, reg_no, date):
 
     read_parties(cursor, data, details_id, legal_ref, lead_debtor_id, legal_body, legal_ref_no, legal_ref_year)
 
+    cursor.execute("select key_number, application_reference, customer_name, customer_address FROM "
+                   "request WHERE id=%(rid)s", {'rid': request_id})
+    rows = cursor.fetchall()
+    if len(rows) > 0:
+        data['applicant'] = {
+            'name': rows[0]['customer_name'],
+            'address': rows[0]['customer_address'],
+            'key_number': rows[0]['key_number'],
+            'reference': rows[0]['application_reference']
+        }
+
+    # name, address, keyn, ref
     return data
 
 
