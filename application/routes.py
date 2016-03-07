@@ -290,7 +290,7 @@ def court_ref_existence_check(court, ref):
     try:
         cursor.execute("SELECT registration_no, date FROM register r, register_details rd " +
                        "WHERE UPPER(rd.legal_body)=%(court)s AND UPPER(rd.legal_body_ref_no)=%(ref)s " +
-                       "AND rd.id=r.details_id",
+                       "AND rd.id=r.details_id AND r.reveal='t'",
                        {"court": court.upper(), "ref": ref.upper()})
         rows = cursor.fetchall()
         results = []

@@ -162,16 +162,32 @@ def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_n
     else:
         reg_no = orig_reg_no
 
+    # Check if registration_no and date already exist, if they do then increase sequence number
+    cursor.execute('select MAX(reg_sequence_no) + 1 AS seq_no '
+                   'from register  '
+                   'where registration_no=%(reg_no)s AND date=%(date)s',
+                   {
+                       'reg_no': reg_no,
+                       'date': date
+                   })
+    rows = cursor.fetchall()
+    if rows[0]['seq_no'] is None:
+        reg_sequence_no = 1
+    else:
+        reg_sequence_no = int(rows[0]['seq_no'])
+
     # Cap it all off with the actual legal "one registration per name":
-    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, date, county_id, reveal) " +
-                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(date)s, %(county)s, %(rev)s ) RETURNING id",
+    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, date, county_id, reveal, " +
+                   "reg_sequence_no) " +
+                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(date)s, %(county)s, %(rev)s, %(seq)s ) RETURNING id",
                    {
                        "regno": reg_no,
                        "debtor": name_id,
                        "details": details_id,
                        'date': date,
                        'county': county_id,
-                       'rev': True
+                       'rev': True,
+                       'seq': reg_sequence_no
                    })
     reg_id = cursor.fetchone()[0]
     return reg_no, reg_id
@@ -580,7 +596,9 @@ def amend_pab(cursor, pab_reg_no, pab_date, amend_reg_no, amend_date, data):
 
 
 def get_register_details_id(cursor, reg_no, date):
-    cursor.execute("SELECT details_id FROM register WHERE registration_no = %(regno)s AND date=%(date)s",
+    cursor.execute("SELECT details_id FROM register WHERE registration_no = %(regno)s AND date=%(date)s " +
+                   "ORDER BY reg_sequence_no DESC " +
+                   "FETCH FIRST 1 ROW ONLY",
                    {
                        "regno": reg_no,
                        'date': date
@@ -866,7 +884,9 @@ def get_registration_details(cursor, reg_no, date):
                    "rd.priority_notice_ind, rd.prio_notice_expires, rd.legal_body, rd.legal_body_ref_no, "
                    "rd.request_id "
                    "from register r, register_details rd "
-                   "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id", {
+                   "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id " +
+                   "ORDER BY r.reg_sequence_no DESC " +
+                   "FETCH FIRST 1 ROW ONLY", {
                        'reg_no': reg_no, 'date': date
                    })
     rows = cursor.fetchall()
@@ -1044,7 +1064,9 @@ def get_head_of_chain(cursor, reg_no, date):
     # as cancelled_by is a request_id, navigate by request_ids until we find the uncancelled
     # head entry
     cursor.execute('SELECT d.request_id, d.id FROM register r, register_details d '
-                   'WHERE registration_no=%(reg)s AND date=%(date)s AND r.details_id = d.id ',
+                   'WHERE registration_no=%(reg)s AND date=%(date)s AND r.details_id = d.id ' +
+                   'ORDER BY r.reg_sequence_no DESC ' +
+                   'FETCH FIRST 1 ROW ONLY',
                    {"reg": reg_no, "date": date})
     row = cursor.fetchone()
     request_id = row['request_id']
@@ -1229,7 +1251,8 @@ def get_registration_details_from_register_id(register_id):
 def get_k22_request_id(registration_no, registration_date):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     sql = "select b.request_id from register a, register_details b where a.registration_no = %(registration_no)s " \
-          " and a.date = %(registration_date)s and a.details_id = b.id "
+          " and a.date = %(registration_date)s and a.details_id = b.id ORDER BY a.reg_sequence_no DESC " \
+          " FETCH FIRST 1 ROW ONLY"
     cursor.execute(sql, {"registration_no": registration_no, "registration_date": registration_date})
     rows = cursor.fetchall()
     complete(cursor)
@@ -1272,7 +1295,9 @@ def get_registration_history(cursor, reg_no, date):
     results = []
     cursor.execute('SELECT details_id '
                    'FROM register '
-                   'WHERE registration_no=%(reg_no)s AND date = %(date)s', {
+                   'WHERE registration_no=%(reg_no)s AND date = %(date)s' +
+                   'ORDER BY reg_sequence_no DESC ' +
+                   'FETCH FIRST 1 ROW ONLY', {
                        'date': date, 'reg_no': reg_no
                    })
     rows = cursor.fetchall()
