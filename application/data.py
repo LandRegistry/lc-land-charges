@@ -240,7 +240,7 @@ def insert_register_details(cursor, request_id, data, date, amends):
                 amend_info_details = update['part_cancelled']
             elif 'plan_attached' in update and update['plan_attached'] != '':
                 amend_info_type = 'plan_attached'
-                amend_info_details = 't' if update['plan_attached'] == 'true' else 'f'
+                amend_info_details = update['plan_attached']
         elif amend_type == 'Rectification':
             if 'instrument' in update and update['instrument'] != '':
                 amend_info_type = 'Instrument'

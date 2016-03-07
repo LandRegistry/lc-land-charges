@@ -245,7 +245,7 @@ UPDATE_SCHEMA = {
             "type": "string",
             "enum": ['Rectification', 'Correction', 'Amendment', 'Cancellation', 'Part Cancellation']
         },
-        "plan_attached": "boolean",
+        "plan_attached": "string",
         "part_cancelled": "string",
         "instrument": "string",
         "chargee": "string"
