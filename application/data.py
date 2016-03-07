@@ -493,6 +493,7 @@ def update_previous_details(cursor, request_id, original_detl_id):
 
 def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, amendment=None):
     # This method is also used for Amendments as they perform the same action!
+    logging.debug("Insert rectification called with: " + json.dumps(data))
     original_details = get_registration_details(cursor,
                                                 rect_reg_no,
                                                 rect_reg_date)
@@ -509,7 +510,12 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, amendment=Non
         request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], date)
 
         # insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None):
-        reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id)
+        if data['update_registration']['type'] == 'Correction':
+            reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id, rect_reg_no)
+            # TODO: if multiple name each new registration will get reg no of the one rectified on screen
+            # TODO: do we need some tidy up here????
+        else:
+            reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id)
     else:
         amend_reg = amendment['reg_no']
         amend_date = amendment['date']
@@ -518,16 +524,22 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, amendment=Non
         reg_nos = []
 
     update_previous_details(cursor, details_id, original_details_id)
-    rect_type = get_rectification_type(original_details, data)
-    logging.debug('Type of rectification is: %d', rect_type)
-    if rect_type != 2:  # Legacy/business jargon - three types of rectification. Type 2 behaves differently
+    if data['update_registration']['type'] == 'Correction':
         # Mark the original as not reveal
         for reg in original_regs:
             mark_as_no_reveal(cursor, reg['number'], reg['date'])
+    else:
+        rect_type = get_rectification_type(original_details, data)
+        logging.debug('Type of rectification is: %d', rect_type)
+        if rect_type != 2:  # Legacy/business jargon - three types of rectification. Type 2 behaves differently
+            # Mark the original as not reveal
+            for reg in original_regs:
+                mark_as_no_reveal(cursor, reg['number'], reg['date'])
 
     return original_regs, reg_nos, request_id
 
 
+# TODO: amend_pab to be removed - not called.
 def amend_pab(cursor, pab_reg_no, pab_date, amend_reg_no, amend_date, data):
     original_details = get_registration_details(cursor, pab_reg_no, pab_date)
     original_details_id = get_register_details_id(cursor, pab_reg_no, pab_date)
