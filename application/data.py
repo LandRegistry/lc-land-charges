@@ -7,7 +7,7 @@ import re
 from application.data_diff import get_rectification_type
 from application.search_key import create_registration_key
 from application.logformat import format_message
-
+#from application.additional_info import get_additional_info
 
 def connect(cursor_factory=None):
     connection = psycopg2.connect("dbname='{}' user='{}' host='{}' password='{}'".format(
@@ -226,21 +226,43 @@ def insert_register_details(cursor, request_id, data, date, amends):
         # else:
         #     prio_notc_expires = data['prio_notice_expires']
 
+    amend_info_type = None
+    amend_info_details = None
+
     amend_type = None
     if 'update_registration' in data:
-        amend_type = data['update_registration']['type']
+        update = data['update_registration']
+        amend_type = update['type']
+
+        if amend_type == 'Part Cancellation':
+            if 'part_cancelled' in update and update['part_cancelled'] != '':
+                amend_info_type = 'Part Cancelled'
+                amend_info_details = update['part_cancelled']
+            elif 'plan_attached' in update and update['plan_attached'] != '':
+                amend_info_type = 'plan_attached'
+                amend_info_details = 't' if update['plan_attached'] == 'true' else 'f'
+        elif amend_type == 'Rectification':
+            if 'instrument' in update and update['instrument'] != '':
+                amend_info_type = 'Instrument'
+                amend_info_details = update['instrument']
+            elif 'chargee' in update and update['chargee'] != '':
+                amend_info_type = 'Chargee'
+                amend_info_details = update['chargee']
 
     cursor.execute("INSERT INTO register_details (request_id, class_of_charge, legal_body_ref, "
                    "amends, district, short_description, additional_info, amendment_type, priority_notice_no, "
-                   "priority_notice_ind, prio_notice_expires, legal_body, legal_body_ref_no, legal_body_ref_year ) "
+                   "priority_notice_ind, prio_notice_expires, legal_body, legal_body_ref_no, legal_body_ref_year, "
+                   "amend_info_type, amend_info_details ) "
                    "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s, %(atype)s, "
-                   "%(pno)s, %(pind)s, %(pnx)s, %(legal_body)s, %(legal_ref_no)s, %(legal_year)s) "
+                   "%(pno)s, %(pind)s, %(pnx)s, %(legal_body)s, %(legal_ref_no)s, %(legal_year)s, %(amd_type)s, "
+                   "%(amd_detl)s ) "
                    "RETURNING id", {
                        "rid": request_id, "coc": data['class_of_charge'],
                        "legal_ref": legal_ref, "amends": amends, "dist": district,
                        "sdesc": short_description, "addl": additional_info, "atype": amend_type,
                        "pno": priority_notice, 'pind': is_priority_notice, "pnx": prio_notc_expires,
-                       "legal_body": legal_body, "legal_ref_no": legal_ref_no, "legal_year": legal_ref_year
+                       "legal_body": legal_body, "legal_ref_no": legal_ref_no, "legal_year": legal_ref_year,
+                       "amd_type": amend_info_type, "amd_detl": amend_info_details
                    })
     return cursor.fetchone()[0]
 
@@ -455,6 +477,8 @@ def insert_new_registration(cursor, data):
 
 
 def insert_amendment(cursor, orig_reg_no, date, data):
+    raise RuntimeError("This method should not be used")
+
     # For now, always insert a new record
     original_detl_id = get_register_details_id(cursor, orig_reg_no, date)
     if original_detl_id is None:
@@ -1049,8 +1073,13 @@ def insert_cancellation(orig_registration_no, orig_date, data):
         if data['update_registration']['type'] == "Cancellation":
             for reg in original_regs:
                 mark_as_no_reveal(cursor, reg['number'], reg['date'])
+
         elif data['update_registration']['type'] == "Part Cancellation":
-            mark_as_no_reveal(cursor, orig_registration_no, orig_date)
+            # In the part cancellation world, the PC itself is not revealed, but the original is.
+            # Addtional information will indicate the part-cancellation
+            for reg in reg_nos:  # TODO: this is a normal PC, not a C4/D2 style one
+                mark_as_no_reveal(cursor, reg['number'], reg['date'])
+
         complete(cursor)
         logging.info(format_message("Cancellation committed"))
     except:
@@ -1233,9 +1262,6 @@ def get_entry_summary(cursor, details_id):
 
 def get_registration_history(cursor, reg_no, date):
     results = []
-
-    # TODO: Bollocks, we need to get every reg num/date for each item in the history
-
     cursor.execute('SELECT details_id '
                    'FROM register '
                    'WHERE registration_no=%(reg_no)s AND date = %(date)s', {
@@ -1258,4 +1284,57 @@ def get_registration_history(cursor, reg_no, date):
 
 
 
+# There's a convention on how the additional information is to be recorded on the various
+# types of registration, rectification, part cancellation etc.
+# These follow a fixed format, so there is no real need for people to actually type it in.
+# With just a few parameters, we should be able to figure out the additional information
+# for any record.
 
+# Assumptions
+# Where record A is 'updated' to become record B, the addlinfo is only on record B
+# Except: where the update is a renewal, when we need the +1 record
+
+
+def get_additional_info(cursor, details):
+    # details is being passed in...
+    history = get_registration_history(cursor, details['registration']['number'], details['registration']['date'])
+    register = []
+    for record in history:
+        # TODO: test assumption that item 0 is always valid
+        register.append(get_registration_details(cursor, record['registrations'][0]['number'], record['registrations'][0]['date']))
+
+    future_renewal = None
+    if 'amended_by' in details and details['amended_by']['type'] == 'Renewal':  # TODO: confirm type is 'Renewal'
+        future_renewal = get_registration_details(cursor, details['amended_by']['number'], details['amended_by']['date'])
+
+    # History is: current record at 0, previous at 1, etc...
+    # Go back in, for each n -> n + 1 work out the additional information line
+    # Squish the lines together and return
+    for x in range(0, len(register) - 2):
+        current = register[x]
+        previous = register[x + 1]
+
+        amend_type = current['amends_registration']['type']
+
+
+        # 'Rectification', 'Correction', 'Amendment', 'Cancellation', 'Part Cancellation'
+
+
+    # PART CAN [1ST REG] REGD [1ST DATE]
+
+    # if rows[0]['amends'] is not None:
+    #     data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
+    #     data['amends_registration']['type'] = rows[0]['amendment_type']
+
+    # 0, 1, 2, 3
+
+    # data['amended_by'] = {
+    #     'number': rows[0]['registration_no'],
+    #     'date': rows[0]['date'].strftime('%Y-%m-%d'),
+    #     'type': rows[0]['amendment_type']
+    # }
+
+    # get_registration_history(cursor, reg_no, date) -> gets array of object containing
+    #       'registrations', an array of object {date, number}
+
+    # def get_registration_details(cursor, reg_no, date):

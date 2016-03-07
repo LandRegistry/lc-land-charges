@@ -243,8 +243,12 @@ UPDATE_SCHEMA = {
     "properties": {
         "type": {
             "type": "string",
-            "enum": ['Rectification', 'Correction', 'Amendment']
-        }
+            "enum": ['Rectification', 'Correction', 'Amendment', 'Cancellation', 'Part Cancellation']
+        },
+        "plan_attached": "boolean",
+        "part_cancelled": "string",
+        "instrument": "string",
+        "chargee": "string"
     },
     "required": [
         "type"
@@ -407,8 +411,22 @@ def validate_update(data):
     errors = validate_generic_registration(data)
     if 'update_registration' not in data:
         errors.append({'error_message': "Attribute 'update_registration' is required"})
+
     if 'priority_notice' in data:
         errors.append({'error_message': "Attribute 'priority_notice' is not allowed"})
+
+    update = data['update_registration']
+    if update['type'] == 'Part Cancellation':
+
+        if 'plan_attached' not in update and 'part_cancelled' not in update:
+            errors.append({'error_message': "Part cancellation requires plan_attached or part_cancelled"})
+
+    elif update['type'] == 'Rectification':
+        pass  # both the intrument and chargee fields are optional for rectifications
+    else:
+        if 'plan_attached' in update or 'part_cancelled' in update or 'instrument' in update or 'chargee' in update:
+            errors.append({'error_message': 'update_registration contains 1 or more invalid fields'})
+
     return errors
 
 
