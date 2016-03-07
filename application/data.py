@@ -868,9 +868,9 @@ def get_registration_details(cursor, reg_no, date):
     lead_county = rows[0]['county_id']
     lead_debtor_id = rows[0]['debtor_reg_name_id']
     request_id = rows[0]['request_id']
-    add_info = ''
-    if rows[0]['additional_info'] is not None:
-        add_info = rows[0]['additional_info']
+    # add_info = ''
+    # if rows[0]['additional_info'] is not None:
+    #     add_info = rows[0]['additional_info']
 
     data = {
         'registration': {
@@ -880,7 +880,7 @@ def get_registration_details(cursor, reg_no, date):
         'class_of_charge': rows[0]['class_of_charge'],
         'status': 'current',
         'revealed': rows[0]['reveal'],
-        'additional_information': add_info
+        #'additional_information': add_info
     }
 
     if data['class_of_charge'] not in ['PAB', 'WOB']:
@@ -1294,6 +1294,37 @@ def get_registration_history(cursor, reg_no, date):
 # Where record A is 'updated' to become record B, the addlinfo is only on record B
 # Except: where the update is a renewal, when we need the +1 record
 
+def get_update_information(cursor, reg_no, reg_date):
+    return {
+        'part_cancelled': 'that bit, there'
+    }
+
+
+def get_part_cancellation_additional_info(cursor, details):
+    update_info = get_update_information(cursor, details['registration']['number'], details['registration']['date'])
+
+    if 'part_cancelled' in update_info:
+        additional_info = 'PART CAN {} REGD {} SO FAR ONLY AS IT RELATES TO {} BEING PART OF LAND REGD'.format(
+            details['amended_by']['number'],
+            details['amended_by']['date'],
+            update_info['part_cancelled'].upper()
+        )
+    elif 'plan_attached' in update_info:
+        additional_info = 'PART CAN {} REGD {} SO FAR ONLY AS IT RELEATES TO {} AS DESC ON APPN TO CANCEL'.format(
+            details['amended_by']['number'],
+            details['amended_by']['date'],
+            update_info['plan_attached'].upper()
+        )
+    else:
+        raise RuntimeError('Invalid amendment information')
+
+    next_details = get_registration_details(cursor, details['amended_by']['number'], details['amended_by']['date'])
+    next_addtion = ''
+    if 'amended_by' in next_details and next_details['amended_by']['type'] == 'Part Cancellation':
+        next_addtion = get_part_cancellation_additional_info(cursor, next_details)
+
+    return additional_info + next_addtion
+
 
 def get_additional_info(cursor, details):
     # details is being passed in...
@@ -1303,18 +1334,33 @@ def get_additional_info(cursor, details):
         # TODO: test assumption that item 0 is always valid
         register.append(get_registration_details(cursor, record['registrations'][0]['number'], record['registrations'][0]['date']))
 
-    future_renewal = None
-    if 'amended_by' in details and details['amended_by']['type'] == 'Renewal':  # TODO: confirm type is 'Renewal'
-        future_renewal = get_registration_details(cursor, details['amended_by']['number'], details['amended_by']['date'])
+    # next_record = None
+    # if 'amended_by' in details:  # and details['amended_by']['type'] == 'Renewal':  # TODO: confirm type is 'Renewal' (hint: nope)
+    #     next_record = get_registration_details(cursor, details['amended_by']['number'], details['amended_by']['date'])
 
-    # History is: current record at 0, previous at 1, etc...
-    # Go back in, for each n -> n + 1 work out the additional information line
-    # Squish the lines together and return
-    for x in range(0, len(register) - 2):
-        current = register[x]
-        previous = register[x + 1]
+    logging.debug(json.dumps(details))
 
-        amend_type = current['amends_registration']['type']
+    if not details['revealed']:
+        raise RuntimeError('Get additional info for non-reveal entry is unsupported')  # TODO: ???
+
+    additional_info_forward = None
+    if 'amended_by' in details and details['amended_by']['type'] == 'Part Cancellation':
+        additional_info_forward = get_part_cancellation_additional_info(cursor, details)
+
+    if 'amended'
+
+
+    return additional_info_forward
+
+    #
+    # # History is: current record at 0, previous at 1, etc...
+    # # Go back in, for each n -> n + 1 work out the additional information line
+    # # Squish the lines together and return
+    # for x in range(0, len(register) - 2):
+    #     current = register[x]
+    #     previous = register[x + 1]
+    #
+    #     amend_type = current['amends_registration']['type']
 
 
         # 'Rectification', 'Correction', 'Amendment', 'Cancellation', 'Part Cancellation'

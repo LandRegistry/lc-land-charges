@@ -13,7 +13,8 @@ from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
-    get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history, insert_migrated_cancellation
+    get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history, insert_migrated_cancellation, \
+    get_additional_info
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches, get_search_by_request_id
 from application.oc import get_ins_office_copy
@@ -110,6 +111,10 @@ def registration(date, reg_no):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         details = get_registration_details(cursor, reg_no, date)
+        addl_info = get_additional_info(cursor, details)
+
+        if addl_info is not None:
+            details['additional_information'] = addl_info
     finally:
         complete(cursor)
     if details is None:
