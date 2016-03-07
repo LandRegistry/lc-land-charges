@@ -1559,7 +1559,7 @@ def get_additional_info(cursor, details):
             additional_info_forward = get_part_cancellation_additional_info(cursor, details)
 
         if details['amended_by']['type'] == 'Rectification':
-
+            pass
 
     #if 'amended'
 
