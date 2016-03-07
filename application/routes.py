@@ -214,6 +214,7 @@ def amend_registration(date, reg_no):
         del json_data['pab_amendment']
     else:
         pab_amendment = None
+
     errors = validate_update(json_data)
     if 'dev_date' in request.args and app.config['ALLOW_DEV_ROUTES']:
         logging.warning(format_message('Overriding date'))
@@ -243,6 +244,7 @@ def amend_registration(date, reg_no):
             "amended_registrations": originals,
             "request_id": request_id
         }
+
         if pab_amendment is not None:
             reg_no = pab_amendment['reg_no']
             date = pab_amendment['date']

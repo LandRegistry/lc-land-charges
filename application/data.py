@@ -141,7 +141,7 @@ def insert_party_name(cursor, party_id, name):
     return return_data
 
 
-def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_no=None):
+def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_no=None, version=1):
     logging.debug('Insert registration')
     if orig_reg_no is None:
         # Get the next registration number
@@ -163,15 +163,17 @@ def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_n
         reg_no = orig_reg_no
 
     # Cap it all off with the actual legal "one registration per name":
-    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, date, county_id, reveal) " +
-                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(date)s, %(county)s, %(rev)s ) RETURNING id",
+    cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, date, county_id, reveal, "
+                   " reg_sequence_no ) " +
+                   "VALUES( %(regno)s, %(debtor)s, %(details)s, %(date)s, %(county)s, %(rev)s, %(seq)s ) RETURNING id",
                    {
                        "regno": reg_no,
                        "debtor": name_id,
                        "details": details_id,
                        'date': date,
                        'county': county_id,
-                       'rev': True
+                       'rev': True,
+                       'seq': version
                    })
     reg_id = cursor.fetchone()[0]
     return reg_no, reg_id
@@ -474,35 +476,35 @@ def insert_new_registration(cursor, data):
     return reg_nos, details_id, request_id
 
 
-def insert_amendment(cursor, orig_reg_no, date, data):
-    raise RuntimeError("This method should not be used")
-
-    # For now, always insert a new record
-    original_detl_id = get_register_details_id(cursor, orig_reg_no, date)
-    if original_detl_id is None:
-        return None, None, None
-
-    document = None
-    if 'document_id' in data:
-        document = data['document_id']
-
-    now = datetime.datetime.now()
-    request_id = insert_request(cursor, None, "AMENDMENT", None, now, document, None, data['customer_name'],
-                                data['customer_address'])
-
-    original_regs = get_all_registration_nos(cursor, original_detl_id)
-    amend_detl_id = get_register_details_id(cursor, orig_reg_no, date)
-    # pylint: disable=unused-variable
-    reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id)
-
-    # Update old registration
-    cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
-                   "id = %(id)s AND cancelled_by IS NULL",
-                   {
-                       "canc": request_id, "id": original_detl_id
-                   })
-    rows = cursor.rowcount
-    return original_regs, reg_nos, rows
+# def insert_amendment(cursor, orig_reg_no, date, data):
+#     raise RuntimeError("This method should not be used")
+#
+#     # For now, always insert a new record
+#     original_detl_id = get_register_details_id(cursor, orig_reg_no, date)
+#     if original_detl_id is None:
+#         return None, None, None
+#
+#     document = None
+#     if 'document_id' in data:
+#         document = data['document_id']
+#
+#     now = datetime.datetime.now()
+#     request_id = insert_request(cursor, None, "AMENDMENT", None, now, document, None, data['customer_name'],
+#                                 data['customer_address'])
+#
+#     original_regs = get_all_registration_nos(cursor, original_detl_id)
+#     amend_detl_id = get_register_details_id(cursor, orig_reg_no, date)
+#     # pylint: disable=unused-variable
+#     reg_nos, details = insert_record(cursor, data, request_id, amend_detl_id)
+#
+#     # Update old registration
+#     cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+#                    "id = %(id)s AND cancelled_by IS NULL",
+#                    {
+#                        "canc": request_id, "id": original_detl_id
+#                    })
+#     rows = cursor.rowcount
+#     return original_regs, reg_nos, rows
 
 
 def update_previous_details(cursor, request_id, original_detl_id):
@@ -513,52 +515,171 @@ def update_previous_details(cursor, request_id, original_detl_id):
                    })
 
 
-def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, amendment=None):
+def get_alteration_type(original_details, data):
+    # The first three types of alteration correspond to the legacy 'rectification types'. Types 4 and 5
+    # are added for this system. Apologies for just giving these numbers. They are:
+    # 1: Alters an existing registration entry; implemented by creating a second version, plus chaining a
+    #       pseudo-entry to hold the details of the rectification. Only the 'second version' is revealed [Rectifications only]
+    # 2: Adds a new registration and keeps the original around [Rectifications only]
+    # 3: Adds a new registration and 'removes' (as in set no-reveal) the original [Rectifications and Amendments]
+    # 4: Alters an existing registration entry; implemented by creating a second version. Only the 'second
+    #       version' is revealed [Corrections]
+    # 5: Makes no change to the original, but creates a pseudo-entry (not revealed) that effects the additional
+    #       information generated. [Part Cancellations of the non-C4/D2 variety]
+    if data['update_registration']['type'] == 'Rectification':
+        return get_rectification_type(original_details, data)  # will be 1, 2 or 3
+    elif data['update_registration']['type'] == 'Amendment':
+        return 3
+    elif data['update_registration']['type'] == 'Correction':
+        return 4
+    elif data['update_registration']['type'] == 'Part Cancellation':
+        return 5
+    else:
+        raise RuntimeError("Unknown alteration type")
+
+
+def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment=None):
     # This method is also used for Amendments as they perform the same action!
     logging.debug("Insert rectification called with: " + json.dumps(data))
-    original_details = get_registration_details(cursor,
-                                                rect_reg_no,
-                                                rect_reg_date)
-    logging.debug(original_details)
 
-    original_details_id = get_register_details_id(cursor,
-                                                  rect_reg_no,
-                                                  rect_reg_date)
+    # Handle the details records first
+    original_details = get_registration_details(cursor, rect_reg_no, rect_reg_date)
+    original_details_id = get_register_details_id(cursor, rect_reg_no, rect_reg_date)
     original_regs = get_all_registration_nos(cursor, original_details_id)
+    alter_type = get_alteration_type(original_details, data)
 
-    if amendment is None:
-        logging.debug(original_details_id)
-        date = datetime.datetime.now().strftime('%Y-%m-%d')
-        request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], date)
+    date_today = datetime.datetime.now().strftime('%Y-%m-%d')
+    request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], rect_reg_date)
 
-        # insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None):
-        if data['update_registration']['type'] == 'Correction':
-            reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id, rect_reg_no)
-            # TODO: if multiple name each new registration will get reg no of the one rectified on screen
-            # TODO: do we need some tidy up here????
+    new_details_id = None
+    pseudo_details_id = None
+    updated_details_id = None
+
+    if alter_type == 1:
+        mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
+        updated_names, updated_details_id = insert_details(cursor, request_id, data, rect_reg_date, original_details_id)
+        names, pseudo_details_id = insert_details(cursor, request_id, data, date_today, updated_details_id)
+
+    elif alter_type == 2:
+        new_names, new_details_id = insert_details(cursor, request_id, data, date_today, original_details_id)
+
+    elif alter_type == 3:
+        mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
+        new_names, new_details_id = insert_details(cursor, request_id, data, date_today, original_details_id)
+
+    elif alter_type == 4:
+        mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
+        updated_names, updated_details_id = insert_details(cursor, request_id, data, rect_reg_date, original_details_id)
+
+    elif alter_type == 5:
+        pseudo_names, pseudo_details_id = insert_details(cursor, request_id, data, date_today, original_details_id)
+
+    # Now apply registrations to everything; updated_ & new_ are always reveal: true; pseudo_ always reveal: false
+    reg_nos = []
+    if updated_details_id is not None:
+        version = original_regs[0]['sequence'] + 1  # Assumed: the sequence numbers always match
+        upd_reg_nos = []
+        if data['class_of_charge'] not in ['PAB', 'WOB']:
+            upd_counties = insert_counties(cursor, updated_details_id, data['particulars']['counties'])
+            for index, reg in original_regs:  # TODO: account for county added
+                county = upd_counties[index]
+                name = names[0]['id'] if len(names) > 0 else None
+                reg_no, reg_id = insert_registration(cursor, updated_details_id, name, rect_reg_date, county['id'], reg['number'])
+                upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'county': county[name]})
+
         else:
-            reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id)
-    else:
-        amend_reg = amendment['reg_no']
-        amend_date = amendment['date']
-        details_id = get_register_details_id(cursor, amend_reg, amend_date)
-        request_id = None
-        reg_nos = []
+            for index, reg in original_regs:  # TODO: account for name added? or is that in sync?
+                name = updated_names[index]
+                reg_no, reg_id = insert_registration(cursor, updated_details_id, name['id'], rect_reg_date, None, reg['number'])
+                if 'forenames' in name:
+                    upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'forenames': name['forenames'], 'surname': name['surname']})
+                else:
+                    upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'name': name['name']})
 
-    update_previous_details(cursor, details_id, original_details_id)
-    if data['update_registration']['type'] == 'Correction':
-        # Mark the original as not reveal
-        for reg in original_regs:
+    if new_details_id is not None:
+        if data['class_of_charge'] not in ['PAB', 'WOB']:
+            new_counties = insert_counties(cursor, new_details_id, data['particulars']['counties'])
+            new_reg_nos = insert_landcharge_regn(cursor, new_details_id, new_names, new_counties, date_today)
+        else:
+            new_reg_nos = insert_bankruptcy_regn(cursor, new_details_id, new_names, date_today)
+        reg_nos = new_reg_nos
+
+    if pseudo_details_id is not None:
+        if data['class_of_charge'] not in ['PAB', 'WOB']:
+            pseudo_counties = insert_counties(cursor, pseudo_details_id, data['particulars']['counties'])
+            pseudo_reg_nos = insert_landcharge_regn(cursor, pseudo_details_id, pseudo_names, pseudo_counties, date_today)
+        else:
+            pseudo_reg_nos = insert_bankruptcy_regn(cursor, pseudo_details_id, pseudo_names, date_today)
+
+        for reg in pseudo_reg_nos:
             mark_as_no_reveal(cursor, reg['number'], reg['date'])
-    else:
-        rect_type = get_rectification_type(original_details, data)
-        logging.debug('Type of rectification is: %d', rect_type)
-        if rect_type != 2:  # Legacy/business jargon - three types of rectification. Type 2 behaves differently
-            # Mark the original as not reveal
-            for reg in original_regs:
-                mark_as_no_reveal(cursor, reg['number'], reg['date'])
+        reg_nos = pseudo_reg_nos
 
     return original_regs, reg_nos, request_id
+
+    # original_details = get_registration_details(cursor,
+    #                                             rect_reg_no,
+    #                                             rect_reg_date)
+    # logging.debug(original_details)
+    #
+    # original_details_id = get_register_details_id(cursor,
+    #                                               rect_reg_no,
+    #                                               rect_reg_date)
+    # original_regs = get_all_registration_nos(cursor, original_details_id)
+    #
+    # rect_type = 0
+    # if data['update_registration']['type'] == 'Rectification':
+    #     rect_type = get_rectification_type(original_details, data)
+    #
+    #
+    # if pab_amendment is None:  # amendment is used to handle PAB amends?
+    #     logging.debug(original_details_id)
+    #     date = datetime.datetime.now().strftime('%Y-%m-%d')
+    #     request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], date)
+    #
+    #     # insert_record(cursor, data, request_id, date, amends=None, orig_reg_no=None):
+    #     if data['update_registration']['type'] == 'Correction':
+    #         reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id, rect_reg_no)
+    #         # TODO: if multiple name each new registration will get reg no of the one rectified on screen
+    #         # TODO: do we need some tidy up here????
+    #     elif rect_type == 1:
+    #         # horrible special case
+    #         pass
+    #     else:
+    #         reg_nos, details_id = insert_record(cursor, data, request_id, date, original_details_id)
+    # else:
+    #     amend_reg = pab_amendment['reg_no']
+    #     amend_date = pab_amendment['date']
+    #     details_id = get_register_details_id(cursor, amend_reg, amend_date)
+    #     request_id = None
+    #     reg_nos = []
+    #
+    #
+    # update_previous_details(cursor, details_id, original_details_id)
+    # if data['update_registration']['type'] == 'Correction':
+    #     # Mark the original as not reveal
+    #     for reg in original_regs:
+    #         mark_as_no_reveal(cursor, reg['number'], reg['date'])
+    # else:
+    #     #rect_type = get_rectification_type(original_details, data)
+    #     logging.debug('Type of rectification is: %d', rect_type)
+    #     #
+    #     # if rect_type in [0, 3]:  # Not a rectification, or a new registration succeeds original
+    #     #     pass
+    #     #
+    #     # elif rect_type == '2':  # Get a new registration, but leave the original revealable
+    #     #     pass
+    #     #
+    #     # elif rect_type == 1:  # The rectification gets a registration number but is not revealable
+    #     #                       # The original record is also not revealable
+    #     #                       # A new record with the same reference as the original is create and is revealable
+    #
+    #     if rect_type != 2:  # Legacy/business jargon - three types of rectification. Type 2 behaves differently
+    #         # Mark the original as not reveal
+    #         for reg in original_regs:
+    #             mark_as_no_reveal(cursor, reg['number'], reg['date'])
+    #
+    # return original_regs, reg_nos, request_id
 
 
 # TODO: amend_pab to be removed - not called.
@@ -595,14 +716,15 @@ def get_register_details_id(cursor, reg_no, date):
 
 
 def get_all_registration_nos(cursor, details_id):
-    cursor.execute("SELECT registration_no, date FROM register WHERE details_id = %(details)s",
+    cursor.execute("SELECT registration_no, date, reg_sequence_no FROM register WHERE details_id = %(details)s",
                    {"details": details_id})
     rows = cursor.fetchall()
     results = []
     for row in rows:
         results.append({
             'number': str(row['registration_no']),
-            'date': row['date'].strftime('%Y-%m-%d')
+            'date': row['date'].strftime('%Y-%m-%d'),
+            'sequence': row['reg_sequence_no']
         })
     return results
 
@@ -1261,6 +1383,7 @@ def get_entry_summary(cursor, details_id):
 
     return {
         'registrations': registrations,
+        'id': details_id,
         'class_of_charge': rows[0]['class_of_charge'],
         'reveal': rows[0]['reveal'],
         'application': "New Registration" if rows[0]['amendment_type'] is None else rows[0]['amendment_type'],
@@ -1301,6 +1424,7 @@ def get_registration_history(cursor, reg_no, date):
 # Assumptions
 # Where record A is 'updated' to become record B, the addlinfo is only on record B
 # Except: where the update is a renewal, when we need the +1 record
+# Or, of course, various types of renewal, rectification etc.
 
 def get_update_information(cursor, reg_no, reg_date):
     return {
@@ -1355,7 +1479,7 @@ def get_additional_info(cursor, details):
     if 'amended_by' in details and details['amended_by']['type'] == 'Part Cancellation':
         additional_info_forward = get_part_cancellation_additional_info(cursor, details)
 
-    if 'amended'
+    #if 'amended'
 
 
     return additional_info_forward
