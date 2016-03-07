@@ -245,10 +245,22 @@ UPDATE_SCHEMA = {
             "type": "string",
             "enum": ['Rectification', 'Correction', 'Amendment', 'Cancellation', 'Part Cancellation']
         },
-        "plan_attached": "string",
-        "part_cancelled": "string",
-        "instrument": "string",
-        "chargee": "string"
+        "plan_attached": {"type": "string"},
+        "part_cancelled": {"type": "string"},
+        "instrument": {
+            "type": "object",
+            "properties": {
+                "original": DATE_SCHEMA,
+                "current": DATE_SCHEMA
+            }
+        },
+        "chargee": {
+            "type": "object",
+            "properties": {
+                "original": {"type": "string"},
+                "current": {"type": "string"}
+            }
+        }
     },
     "required": [
         "type"

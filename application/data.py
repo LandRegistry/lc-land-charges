@@ -227,7 +227,8 @@ def insert_register_details(cursor, request_id, data, date, amends):
         #     prio_notc_expires = data['prio_notice_expires']
 
     amend_info_type = None
-    amend_info_details = None
+    amend_info_details_orig = None
+    amend_info_details_current = None
 
     amend_type = None
     if 'update_registration' in data:
@@ -237,32 +238,35 @@ def insert_register_details(cursor, request_id, data, date, amends):
         if amend_type == 'Part Cancellation':
             if 'part_cancelled' in update and update['part_cancelled'] != '':
                 amend_info_type = 'Part Cancelled'
-                amend_info_details = update['part_cancelled']
+                amend_info_details_current = update['part_cancelled']
             elif 'plan_attached' in update and update['plan_attached'] != '':
                 amend_info_type = 'plan_attached'
-                amend_info_details = update['plan_attached']
+                amend_info_details_current = update['plan_attached']
         elif amend_type == 'Rectification':
             if 'instrument' in update and update['instrument'] != '':
                 amend_info_type = 'Instrument'
-                amend_info_details = update['instrument']
+                amend_info_details_orig = update['instrument']['original']
+                amend_info_details_current = update['instrument']['current']
             elif 'chargee' in update and update['chargee'] != '':
                 amend_info_type = 'Chargee'
-                amend_info_details = update['chargee']
+                amend_info_details_orig = update['chargee']['original']
+                amend_info_details_current = update['chargee']['current']
 
     cursor.execute("INSERT INTO register_details (request_id, class_of_charge, legal_body_ref, "
                    "amends, district, short_description, additional_info, amendment_type, priority_notice_no, "
                    "priority_notice_ind, prio_notice_expires, legal_body, legal_body_ref_no, "
-                   "amend_info_type, amend_info_details ) "
+                   "amend_info_type, amend_info_details, amend_info_details_orig ) "
                    "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s, %(atype)s, "
                    "%(pno)s, %(pind)s, %(pnx)s, %(legal_body)s, %(legal_ref_no)s, %(amd_type)s, "
-                   "%(amd_detl)s ) "
+                   "%(amd_detl_c)s, %(amd_detl_o)s ) "
                    "RETURNING id", {
                        "rid": request_id, "coc": data['class_of_charge'],
                        "legal_ref": legal_ref, "amends": amends, "dist": district,
                        "sdesc": short_description, "addl": additional_info, "atype": amend_type,
                        "pno": priority_notice, 'pind': is_priority_notice, "pnx": prio_notc_expires,
                        "legal_body": legal_body, "legal_ref_no": legal_ref_no,
-                       "amd_type": amend_info_type, "amd_detl": amend_info_details
+                       "amd_type": amend_info_type, "amd_detl_c": amend_info_details_current,
+                       "amd_detl_o": amend_info_details_orig
                    })
     return cursor.fetchone()[0]
 
@@ -988,7 +992,7 @@ def get_registration_details(cursor, reg_no, date):
                    "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
                    "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type, "
                    "rd.priority_notice_ind, rd.prio_notice_expires, rd.legal_body, rd.legal_body_ref_no, "
-                   "rd.request_id "
+                   "rd.request_id, rd.amend_info_type, rd.amend_info_details, rd.amend_info_details_orig "
                    "from register r, register_details rd "
                    "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id", {
                        'reg_no': reg_no, 'date': date
@@ -1035,6 +1039,16 @@ def get_registration_details(cursor, reg_no, date):
     if rows[0]['amends'] is not None:
         data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
         data['amends_registration']['type'] = rows[0]['amendment_type']
+
+        ait = rows[0]['amend_info_type']
+        if ait in ['instrument', 'chargee']:
+            data['amends_registration'][ait] = {
+                'original': rows[0]['amend_info_details_orig'],
+                'current': rows[0]['amend_info_details']
+            }
+        else:
+            data['amends_registration'][ait] = rows[0]['amend_info_details']
+
 
     if rows[0]['cancelled_by'] is not None:
         cursor.execute("select amends, amendment_type from register_details where amends=%(id)s",
@@ -1460,6 +1474,43 @@ def get_part_cancellation_additional_info(cursor, details):
     return additional_info + next_addtion
 
 
+def get_rectification_additional_info_prev(cursor, details):
+    prev_details = get_registration_details(cursor, details['amends']['number'], details['amends']['date'])
+    rect_type = get_rectification_type(prev_details, details)
+
+    if rect_type == 1:
+        if prev_details['particulars']['description'] != details['particulars']['description']:
+            return 'SHORT DESCRIPTION RECTIFIED FROM {} BY {} REGD {}'.format(
+               prev_details['particulars']['description'], details['registration']['number'], details['registration']['date']
+            )
+
+        if prev_details['particulars']['district'] != details['particulars']['district']:
+            return 'DISTRICT RECTIFIED FROM {} BY {} REGD {}'.format(
+                prev_details['particulars']['district'], details['registration']['number'], details['registration']['date']
+            )
+
+        if 'instrument' in details['amends']:
+            return 'DATE OF INSTRUMENT RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
+                details['amends']['instrument']['original'],
+                details['amends']['instrument']['current'],
+                details['registration']['number'], details['registration']['date']
+            )
+
+        if 'chargee' in details['amends']:
+            return 'CHARGEE RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
+                details['amends']['chargee']['original'],
+                details['amends']['chargee']['current'],
+                details['registration']['number'], details['registration']['date']
+            )
+
+    return ''
+
+
+def get_rectification_additional_info_next(cursor, details):
+    pass
+
+
+
 def get_additional_info(cursor, details):
     # details is being passed in...
     history = get_registration_history(cursor, details['registration']['number'], details['registration']['date'])
@@ -1479,8 +1530,12 @@ def get_additional_info(cursor, details):
         #raise RuntimeError('Get additional info for non-reveal entry is unsupported')  # TODO: ???
 
     additional_info_forward = None
-    if 'amended_by' in details and details['amended_by']['type'] == 'Part Cancellation':
-        additional_info_forward = get_part_cancellation_additional_info(cursor, details)
+    if 'amended_by' in details:
+        if details['amended_by']['type'] == 'Part Cancellation':
+            additional_info_forward = get_part_cancellation_additional_info(cursor, details)
+
+        if details['amended_by']['type'] == 'Rectification':
+
 
     #if 'amended'
 
