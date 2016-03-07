@@ -558,7 +558,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
     if alter_type == 1:
         mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
         updated_names, updated_details_id = insert_details(cursor, request_id, data, rect_reg_date, original_details_id)
-        names, pseudo_details_id = insert_details(cursor, request_id, data, date_today, updated_details_id)
+        pseudo_names, pseudo_details_id = insert_details(cursor, request_id, data, date_today, updated_details_id)
 
     elif alter_type == 2:
         new_names, new_details_id = insert_details(cursor, request_id, data, date_today, original_details_id)
@@ -573,6 +573,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
 
     elif alter_type == 5:
         pseudo_names, pseudo_details_id = insert_details(cursor, request_id, data, date_today, original_details_id)
+    # ---- Done with details records -------------------
 
     # Now apply registrations to everything; updated_ & new_ are always reveal: true; pseudo_ always reveal: false
     reg_nos = []
@@ -581,16 +582,16 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
         upd_reg_nos = []
         if data['class_of_charge'] not in ['PAB', 'WOB']:
             upd_counties = insert_counties(cursor, updated_details_id, data['particulars']['counties'])
-            for index, reg in original_regs:  # TODO: account for county added
+            for index, reg in enumerate(original_regs):  # TODO: account for county added
                 county = upd_counties[index]
-                name = names[0]['id'] if len(names) > 0 else None
-                reg_no, reg_id = insert_registration(cursor, updated_details_id, name, rect_reg_date, county['id'], reg['number'])
-                upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'county': county[name]})
+                name = updated_names[0]['id'] if len(updated_names) > 0 else None
+                reg_no, reg_id = insert_registration(cursor, updated_details_id, name, rect_reg_date, county['id'], reg['number'], version)
+                upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'county': county['name']})
 
         else:
-            for index, reg in original_regs:  # TODO: account for name added? or is that in sync?
+            for index, reg in enumerate(original_regs):  # TODO: account for name added? or is that in sync?
                 name = updated_names[index]
-                reg_no, reg_id = insert_registration(cursor, updated_details_id, name['id'], rect_reg_date, None, reg['number'])
+                reg_no, reg_id = insert_registration(cursor, updated_details_id, name['id'], rect_reg_date, None, reg['number'], version)
                 if 'forenames' in name:
                     upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'forenames': name['forenames'], 'surname': name['surname']})
                 else:
@@ -607,13 +608,14 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
     if pseudo_details_id is not None:
         if data['class_of_charge'] not in ['PAB', 'WOB']:
             pseudo_counties = insert_counties(cursor, pseudo_details_id, data['particulars']['counties'])
-            pseudo_reg_nos = insert_landcharge_regn(cursor, pseudo_details_id, pseudo_names, pseudo_counties, date_today)
+            pseudo_reg_nos = insert_landcharge_regn(cursor, pseudo_details_id, pseudo_names, pseudo_counties, date_today, None)
         else:
             pseudo_reg_nos = insert_bankruptcy_regn(cursor, pseudo_details_id, pseudo_names, date_today)
 
         for reg in pseudo_reg_nos:
             mark_as_no_reveal(cursor, reg['number'], reg['date'])
         reg_nos = pseudo_reg_nos
+    # --- Done with registrations
 
     return original_regs, reg_nos, request_id
 
