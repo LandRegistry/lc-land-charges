@@ -141,7 +141,7 @@ def insert_party_name(cursor, party_id, name):
     return return_data
 
 
-def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_no=None, version=1):
+def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_no=None):
     logging.debug('Insert registration')
     if orig_reg_no is None:
         # Get the next registration number
@@ -164,18 +164,18 @@ def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_n
 
     # Check if registration_no and date already exist, if they do then increase sequence number
     # TODO: consider if the solution here is actually more robust...
-    # cursor.execute('select MAX(reg_sequence_no) + 1 AS seq_no '
-    #                'from register  '
-    #                'where registration_no=%(reg_no)s AND date=%(date)s',
-    #                {
-    #                    'reg_no': reg_no,
-    #                    'date': date
-    #                })
-    # rows = cursor.fetchall()
-    # if rows[0]['seq_no'] is None:
-    #     reg_sequence_no = 1
-    # else:
-    #     reg_sequence_no = int(rows[0]['seq_no'])
+    cursor.execute('select MAX(reg_sequence_no) + 1 AS seq_no '
+                   'from register  '
+                   'where registration_no=%(reg_no)s AND date=%(date)s',
+                   {
+                       'reg_no': reg_no,
+                       'date': date
+                   })
+    rows = cursor.fetchall()
+    if rows[0]['seq_no'] is None:
+        version = 1
+    else:
+        version = int(rows[0]['seq_no'])
 
     # Cap it all off with the actual legal "one registration per name":
     cursor.execute("INSERT INTO register (registration_no, debtor_reg_name_id, details_id, date, county_id, reveal, " +
@@ -495,6 +495,21 @@ def insert_new_registration(cursor, data):
     return reg_nos, details_id, request_id
 
 
+def get_county_registration_map(cursor, details_id):
+    cursor.execute("SELECT r.registration_no, c.name, r.county_id, r.date "
+                   "FROM register r, county c "
+                   "WHERE register.county_id = county.id "
+                   "AND r.details_id=%(detl)s", {'detl': details_id})
+    rows = cursor.fetchall()
+    result = {}
+    for row in rows:
+        result[row['name']] = {
+            'number': row['registration_no'],
+            'date': row['date'].strftime('%Y-%m-%d')
+        }
+    return result
+
+
 # def insert_amendment(cursor, orig_reg_no, date, data):
 #     raise RuntimeError("This method should not be used")
 #
@@ -574,6 +589,8 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
     pseudo_details_id = None
     updated_details_id = None
 
+    logging.debug("Alteration type is %d", alter_type)
+
     if alter_type == 1:
         mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
         updated_names, updated_details_id = insert_details(cursor, request_id, data, rect_reg_date, original_details_id)
@@ -597,20 +614,20 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
     # Now apply registrations to everything; updated_ & new_ are always reveal: true; pseudo_ always reveal: false
     reg_nos = []
     if updated_details_id is not None:
-        version = original_regs[0]['sequence'] + 1  # Assumed: the sequence numbers always match
+        # version = original_regs[0]['sequence'] + 1  # Assumed: the sequence numbers always match
         upd_reg_nos = []
         if data['class_of_charge'] not in ['PAB', 'WOB']:
             upd_counties = insert_counties(cursor, updated_details_id, data['particulars']['counties'])
             for index, reg in enumerate(original_regs):  # TODO: account for county added
                 county = upd_counties[index]
                 name = updated_names[0]['id'] if len(updated_names) > 0 else None
-                reg_no, reg_id = insert_registration(cursor, updated_details_id, name, rect_reg_date, county['id'], reg['number'], version)
+                reg_no, reg_id = insert_registration(cursor, updated_details_id, name, rect_reg_date, county['id'], reg['number'])
                 upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'county': county['name']})
 
         else:
             for index, reg in enumerate(original_regs):  # TODO: account for name added? or is that in sync?
                 name = updated_names[index]
-                reg_no, reg_id = insert_registration(cursor, updated_details_id, name['id'], rect_reg_date, None, reg['number'], version)
+                reg_no, reg_id = insert_registration(cursor, updated_details_id, name['id'], rect_reg_date, None, reg['number'])
                 if 'forenames' in name:
                     upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'forenames': name['forenames'], 'surname': name['surname']})
                 else:
@@ -618,8 +635,17 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
 
     if new_details_id is not None:
         if data['class_of_charge'] not in ['PAB', 'WOB']:
-            new_counties = insert_counties(cursor, new_details_id, data['particulars']['counties'])
-            new_reg_nos = insert_landcharge_regn(cursor, new_details_id, new_names, new_counties, date_today, None)
+            if len(original_details['particulars']['counties']) < len(data['particulars']['counties']):
+                # Probably a county addition; TODO: ensure. Also, challenge assumption that -1 is the added county
+                #county = [data['particulars']['counties'][-1]]
+                county = data['particulars']['counties']
+                new_counties = insert_counties(cursor, new_details_id, county) # i_c expect array of str
+
+                reg_no, reg_id = insert_registration(cursor, new_details_id, None, date_today, new_counties[-1]['id'], None)
+                new_reg_nos = [reg_no]
+            else:
+                new_counties = insert_counties(cursor, new_details_id, data['particulars']['counties'])
+                new_reg_nos = insert_landcharge_regn(cursor, new_details_id, new_names, new_counties, date_today, None)
         else:
             new_reg_nos = insert_bankruptcy_regn(cursor, new_details_id, new_names, date_today)
         reg_nos = new_reg_nos
