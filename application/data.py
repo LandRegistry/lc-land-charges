@@ -600,7 +600,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
     if new_details_id is not None:
         if data['class_of_charge'] not in ['PAB', 'WOB']:
             new_counties = insert_counties(cursor, new_details_id, data['particulars']['counties'])
-            new_reg_nos = insert_landcharge_regn(cursor, new_details_id, new_names, new_counties, date_today)
+            new_reg_nos = insert_landcharge_regn(cursor, new_details_id, new_names, new_counties, date_today, None)
         else:
             new_reg_nos = insert_bankruptcy_regn(cursor, new_details_id, new_names, date_today)
         reg_nos = new_reg_nos
@@ -1475,7 +1475,8 @@ def get_additional_info(cursor, details):
     logging.debug(json.dumps(details))
 
     if not details['revealed']:
-        raise RuntimeError('Get additional info for non-reveal entry is unsupported')  # TODO: ???
+        return ''
+        #raise RuntimeError('Get additional info for non-reveal entry is unsupported')  # TODO: ???
 
     additional_info_forward = None
     if 'amended_by' in details and details['amended_by']['type'] == 'Part Cancellation':
