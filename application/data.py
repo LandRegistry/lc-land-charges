@@ -1727,7 +1727,7 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
             )
         pass
 
-    elif rect_type in [2, 3]:  #  == 2:
+    if rect_type in [2, 3]:  #  == 2:
         #prev_name = eo_name_string(prev_details) if prev_details is not None else None
         this_name = eo_name_string(details) if details is not None else None
         next_name = eo_name_string(next_details) if next_details is not None else None
@@ -1749,9 +1749,20 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
 
         pass
 
-    elif rect_type == 3:
+    if rect_type == 3:
         # As a type three is effectively a cancellation & new registration, there appears to
         # be no additional information to add...
+        # Bzzzt, untrue...
+
+        if details['particulars']['counties'][0] != next_details['particulars']['counties'][0]:
+            return 'COUNTY PREVIOUSLY REGD AS {} UNDER {} REGD {}'.format(
+                details['particulars']['counties'][0].upper(),
+                details['registration']['number'],
+                reformat_date_string(details['registration']['date'])
+            )
+
+
+
         pass
 
     logging.debug('======== /GET RECTIF ADDL INFO ========')
