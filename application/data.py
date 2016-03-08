@@ -1745,6 +1745,19 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
                 reformat_date_string(details['registration']['date'])
             )
 
+    if rect_type == 2:
+        counties = details['particulars']['counties']
+        next_counties = next_details['particulars']['counties']
+        logging.debug(counties)
+        logging.debug(next_counties)
+        if len(next_counties) > len(counties):
+            # As there's no facility to remove counties, assume counties is a subset of next_counties
+            return 'PREVIOUSLY REGISTERED ONLY IN COUNTY OF {} UNDER {} REGD {}'.format(
+                counties[0].upper(),
+                details['registration']['number'],
+                reformat_date_string(details['registration']['date'])
+            )
+
 
 
         pass
@@ -1783,6 +1796,24 @@ def get_rectification_additional_info_next(cursor, details, prev_details):
                 details['registration']['number'],
                 reformat_date_string(details['registration']['date'])
             )
+
+    if rect_type == 2:
+        counties = details['particulars']['counties']
+        prev_counties = prev_details['particulars']['counties']
+        logging.debug(counties)
+        logging.debug(prev_counties)
+        if len(prev_counties) < len(counties):
+            # As there's no facility to remove counties, assume counties is a subset of next_counties
+            return 'CHARGE PREVIOUSLY REGISTERED SOLELY UNDER COUNTY OF {} NOW REGD IN ADDITIONAL COUNTY OF {} UNDER {} REGD {}'.format(
+                prev_counties[0].upper(),
+                counties[0].upper(),
+                details['registration']['number'],
+                reformat_date_string(details['registration']['date'])
+            )
+
+
+
+
     return ''
 
 
