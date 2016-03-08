@@ -1677,61 +1677,65 @@ def get_part_cancellation_additional_info(cursor, details):
     return additional_info + next_addtion
 
 
-def get_rectification_additional_info_prev(cursor, details, prev_details, next_details):
-    rect_type = get_rectification_type(prev_details, details)
+def get_rectification_additional_info_prev(cursor, details, next_details):
+    rect_type = get_rectification_type(details, next_details)
 
     # logging.debug('======== GET RECTIF ADDL INFO ========')
     # logging.debug(json.dumps(details))
     # logging.debug('---')
     # logging.debug(json.dumps(prev_details))
     # logging.debug('---')
+
+    logging.debug('Rect type is %d', rect_type)
+
     if rect_type == 1:
         # In this case, prev and current have the same registration number; the amendment is recorded
         # by next, a non-revealed pseudo-entry (sigh)
-        if prev_details['particulars']['description'] != details['particulars']['description']:
-            return 'SHORT DESCRIPTION RECTIFIED FROM {} BY {} REGD {}'.format(
-                prev_details['particulars']['description'].upper(), next_details['registration']['number'],
-                reformat_date_string(next_details['registration']['date'])
-            )
-
-        if prev_details['particulars']['district'] != details['particulars']['district']:
-            return 'DISTRICT RECTIFIED FROM {} BY {} REGD {}'.format(
-                prev_details['particulars']['district'].upper(), next_details['registration']['number'],
-                reformat_date_string(next_details['registration']['date'])
-            )
-
-        if 'instrument' in details['amends_registration']:
-            return 'DATE OF INSTRUMENT RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
-                details['amends_registration']['instrument']['original'].upper(),
-                details['amends_registration']['instrument']['current'].upper(),
-                next_details['registration']['number'],
-                reformat_date_string(next_details['registration']['date'])
-            )
-
-        if 'chargee' in details['amends_registration']:
-            return 'CHARGEE RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
-                details['amends_registration']['chargee']['original'].upper(),
-                details['amends_registration']['chargee']['current'].upper(),
-                next_details['registration']['number'],
-                reformat_date_string(next_details['registration']['date'])
-            )
+        # if prev_details['particulars']['description'] != details['particulars']['description']:
+        #     return 'SHORT DESCRIPTION RECTIFIED FROM {} BY {} REGD {}'.format(
+        #         prev_details['particulars']['description'].upper(), next_details['registration']['number'],
+        #         reformat_date_string(next_details['registration']['date'])
+        #     )
+        #
+        # if prev_details['particulars']['district'] != details['particulars']['district']:
+        #     return 'DISTRICT RECTIFIED FROM {} BY {} REGD {}'.format(
+        #         prev_details['particulars']['district'].upper(), next_details['registration']['number'],
+        #         reformat_date_string(next_details['registration']['date'])
+        #     )
+        #
+        # if 'instrument' in details['amends_registration']:
+        #     return 'DATE OF INSTRUMENT RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
+        #         details['amends_registration']['instrument']['original'].upper(),
+        #         details['amends_registration']['instrument']['current'].upper(),
+        #         next_details['registration']['number'],
+        #         reformat_date_string(next_details['registration']['date'])
+        #     )
+        #
+        # if 'chargee' in details['amends_registration']:
+        #     return 'CHARGEE RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
+        #         details['amends_registration']['chargee']['original'].upper(),
+        #         details['amends_registration']['chargee']['current'].upper(),
+        #         next_details['registration']['number'],
+        #         reformat_date_string(next_details['registration']['date'])
+        #     )
+        pass
 
     elif rect_type in [2, 3]:  #  == 2:
-        prev_name = eo_name_string(prev_details) if prev_details is not None else None
+        #prev_name = eo_name_string(prev_details) if prev_details is not None else None
         this_name = eo_name_string(details) if details is not None else None
         next_name = eo_name_string(next_details) if next_details is not None else None
 
-        # logging.debug('Comparing names')
-        # logging.debug(prev_name)
-        # logging.debug(this_name)
-        # logging.debug(next_name)
-        # logging.debug('-----')
+        logging.debug('Comparing names')
+        #logging.debug(prev_name)
+        logging.debug(this_name)
+        logging.debug(next_name)
+        logging.debug('-----')
 
-        if prev_name is not None and prev_name != this_name:
+        if next_name is not None and next_name != this_name:
             return 'NAME PREVIOUSLY REGISTERED AS {} UNDER {} REGD {}'.format(
-                prev_name.upper(),
-                prev_details['registration']['number'],
-                reformat_date_string(prev_details['registration']['date'])
+                this_name.upper(),
+                details['registration']['number'],
+                reformat_date_string(details['registration']['date'])
             )
 
 
@@ -1747,19 +1751,19 @@ def get_rectification_additional_info_prev(cursor, details, prev_details, next_d
     return ''
 
 
-def get_rectification_additional_info_next(cursor, details, prev_details, next_details):
-    rect_type = get_rectification_type(details, next_details)
+def get_rectification_additional_info_next(cursor, details, prev_details):
+    rect_type = get_rectification_type(prev_details, details)
     if rect_type in [2, 3]:
         prev_name = eo_name_string(prev_details) if prev_details is not None else None
         this_name = eo_name_string(details) if details is not None else None
-        next_name = eo_name_string(next_details) if next_details is not None else None
+        #next_name = eo_name_string(next_details) if next_details is not None else None
 
 
-        if next_name is not None and next_name != this_name:
+        if prev_name is not None and prev_name != this_name:
             return 'NAME RECTIFIED TO {} BY {} REGD {}'.format(
-                next_name.upper(),
-                next_details['registration']['number'],
-                reformat_date_string(next_details['registration']['date'])
+                this_name.upper(),
+                details['registration']['number'],
+                reformat_date_string(details['registration']['date'])
             )
     return ''
 
@@ -1784,57 +1788,94 @@ def get_additional_info(cursor, details):
 
     #print(json.dumps(register))
 
-    following = False
-    revealed_head_index = -1
+    forward = True
     for index, entry in enumerate(register):
-        if entry['details_id'] == details['details_id']:
-            following = True
-            revealed_head_index = index
-            #continue
+        logging.debug('THIS (%d)', index)
 
-        prev = register[index - 1] if index > 0 else None
-        this = register[index]
-        next = register[index + 1] if index < len(register) - 1 else None
-
-        if next is not None and 'amended_by' in next and next['amended_by']['type'] == 'Part Cancellation':
-            addl_info += get_part_cancellation_additional_info(cursor, next) + "  "
-        # TODO: check --- should 'next' be 'prev', remember higher index = older record
-        # if prev is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
-        #     addl_info += get_rectification_additional_info_prev(cursor, this, prev)
-
-
-        if not following:
-            pass
+        if entry['details_id'] == details['details_id']:  # This is the record of interest
+            logging.debug('Switch')
+            forward = False
 
         else:
-            pass
 
-    # Step backwards in time from the current entry-of-interest
-    logging.debug('REVEALED_HEAD: %d', revealed_head_index)
-    logging.debug('LEN REGISTER -1: %d', len(register) - 1)
-    for index in range(revealed_head_index, len(register)):  # - 1):
-        logging.debug('CHECK: %d', index)
-        this = register[index]
-        prev = register[index + 1] if index < len(register) - 1 else None
-        next = register[index - 1] if index > 0 else None
-
-        logging.debug('THIS')
-        logging.debug(this['registration'])
-        logging.debug('PREV')
-        logging.debug(prev['registration'] if prev is not None else None)
-        logging.debug('NEXT')
-        logging.debug(next['registration'] if next is not None else None)
+            this = register[index]
+            prev = register[index + 1] if index < len(register) - 1 else None
+            next = register[index - 1] if index > 0 else None
 
 
-        # if prev is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
-        if 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
-            addl_info += get_rectification_additional_info_prev(cursor, this, prev, next)
+            logging.debug(this['registration'])
+            logging.debug('PREV')
+            logging.debug(prev['registration'] if prev is not None else None)
+            logging.debug('NEXT')
+            logging.debug(next['registration'] if next is not None else None)
 
-        if next is not None and 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
-            addl_info += get_rectification_additional_info_next(cursor, this, prev, next)
+            if not forward:
+                logging.debug('BACKWARD')
+
+
+                if 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
+                    addl_info += get_rectification_additional_info_prev(cursor, this, next)
+            else:
+
+                logging.debug('FORWARD')
+                if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
+                    addl_info += get_rectification_additional_info_next(cursor, this, prev)
+
 
 
     return addl_info.strip()
+
+    # following = False
+    # revealed_head_index = -1
+    # for index, entry in enumerate(register):
+    #     if entry['details_id'] == details['details_id']:
+    #         following = True
+    #         revealed_head_index = index
+    #         #continue
+    #
+    #     prev = register[index - 1] if index > 0 else None
+    #     this = register[index]
+    #     next = register[index + 1] if index < len(register) - 1 else None
+    #
+    #     if next is not None and 'amended_by' in next and next['amended_by']['type'] == 'Part Cancellation':
+    #         addl_info += get_part_cancellation_additional_info(cursor, next) + "  "
+    #     # TODO: check --- should 'next' be 'prev', remember higher index = older record
+    #     # if prev is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
+    #     #     addl_info += get_rectification_additional_info_prev(cursor, this, prev)
+    #
+    #
+    #     if not following:
+    #         pass
+    #
+    #     else:
+    #         pass
+    #
+    # # Step backwards in time from the current entry-of-interest
+    # logging.debug('REVEALED_HEAD: %d', revealed_head_index)
+    # logging.debug('LEN REGISTER -1: %d', len(register) - 1)
+    # for index in range(revealed_head_index, len(register)):  # - 1):
+    #     logging.debug('CHECK: %d', index)
+    #     this = register[index]
+    #     prev = register[index + 1] if index < len(register) - 1 else None
+    #     next = register[index - 1] if index > 0 else None
+    #
+    #     logging.debug('THIS')
+    #     logging.debug(this['registration'])
+    #     logging.debug('PREV')
+    #     logging.debug(prev['registration'] if prev is not None else None)
+    #     logging.debug('NEXT')
+    #     logging.debug(next['registration'] if next is not None else None)
+    #
+    #
+    #     # if prev is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
+    #     if 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
+    #         addl_info += get_rectification_additional_info_prev(cursor, this, prev, next)
+    #
+    #     if next is not None and 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
+    #         addl_info += get_rectification_additional_info_next(cursor, this, prev, next)
+    #
+    #
+    # return addl_info.strip()
 
 
 
