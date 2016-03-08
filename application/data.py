@@ -1656,25 +1656,26 @@ def get_part_cancellation_additional_info(cursor, details):
 
     if 'part_cancelled' in update_info:
         additional_info = 'PART CAN {} REGD {} SO FAR ONLY AS IT RELATES TO {} BEING PART OF LAND REGD'.format(
-            details['amended_by']['number'],
-            reformat_date_string(details['amended_by']['date']),
+            details['registration']['number'],
+            reformat_date_string(details['registration']['date']),
             update_info['part_cancelled'].upper()
         )
     elif 'plan_attached' in update_info:
         additional_info = 'PART CAN {} REGD {} SO FAR ONLY AS IT RELEATES TO {} AS DESC ON APPN TO CANCEL'.format(
-            details['amended_by']['number'],
-            reformat_date_string(details['amended_by']['date']),
+            details['registration']['number'],
+            reformat_date_string(details['registration']['date']),
             update_info['plan_attached'].upper()
         )
     else:
         raise RuntimeError('Invalid amendment information')
 
-    next_details = get_registration_details(cursor, details['amended_by']['number'], details['amended_by']['date'])
-    next_addtion = ''
-    if 'amended_by' in next_details and next_details['amended_by']['type'] == 'Part Cancellation':
-        next_addtion = get_part_cancellation_additional_info(cursor, next_details)
-
-    return additional_info + next_addtion
+    return additional_info
+    # next_details = get_registration_details(cursor, details['registration']['number'], details['amended_by']['date'])
+    # next_addtion = ''
+    # if 'amended_by' in next_details and next_details['registration']['type'] == 'Part Cancellation':
+    #     next_addtion = get_part_cancellation_additional_info(cursor, next_details)
+    #
+    # return additional_info + next_addtion
 
 
 def get_rectification_additional_info_prev(cursor, details, next_details):
@@ -1818,9 +1819,12 @@ def get_additional_info(cursor, details):
             else:
 
                 logging.debug('FORWARD')
+
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
                     addl_info += get_rectification_additional_info_next(cursor, this, prev)
 
+                if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Part Cancellation':
+                    addl_info += get_part_cancellation_additional_info(cursor, this)
 
 
     return addl_info.strip()
