@@ -1692,33 +1692,39 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
     if rect_type == 1:
         # In this case, prev and current have the same registration number; the amendment is recorded
         # by next, a non-revealed pseudo-entry (sigh)
-        # if prev_details['particulars']['description'] != details['particulars']['description']:
-        #     return 'SHORT DESCRIPTION RECTIFIED FROM {} BY {} REGD {}'.format(
-        #         prev_details['particulars']['description'].upper(), next_details['registration']['number'],
-        #         reformat_date_string(next_details['registration']['date'])
-        #     )
-        #
-        # if prev_details['particulars']['district'] != details['particulars']['district']:
-        #     return 'DISTRICT RECTIFIED FROM {} BY {} REGD {}'.format(
-        #         prev_details['particulars']['district'].upper(), next_details['registration']['number'],
-        #         reformat_date_string(next_details['registration']['date'])
-        #     )
-        #
-        # if 'instrument' in details['amends_registration']:
-        #     return 'DATE OF INSTRUMENT RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
-        #         details['amends_registration']['instrument']['original'].upper(),
-        #         details['amends_registration']['instrument']['current'].upper(),
-        #         next_details['registration']['number'],
-        #         reformat_date_string(next_details['registration']['date'])
-        #     )
-        #
-        # if 'chargee' in details['amends_registration']:
-        #     return 'CHARGEE RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
-        #         details['amends_registration']['chargee']['original'].upper(),
-        #         details['amends_registration']['chargee']['current'].upper(),
-        #         next_details['registration']['number'],
-        #         reformat_date_string(next_details['registration']['date'])
-        #     )
+        if 'amended_by' in next_details: # Because 'next' is the same registration, we need to know the number that amended next
+            amend_details = next_details['amended_by']
+        else:
+            return '' # not much we can do...
+
+        if details['particulars']['description'] != next_details['particulars']['description']:
+            return 'SHORT DESCRIPTION RECTIFIED FROM {} BY {} REGD {}'.format(
+                details['particulars']['description'].upper(), amend_details['number'],
+                reformat_date_string(amend_details['date'])
+            )
+
+        if details['particulars']['district'] != next_details['particulars']['district']:
+            return 'DISTRICT RECTIFIED FROM {} BY {} REGD {}'.format(
+                details['particulars']['district'].upper(), amend_details['registration']['number'],
+                reformat_date_string(amend_details['registration']['date'])
+            )
+
+        # TODO: these next two totally untested
+        if 'instrument' in next_details['amends_registration']:
+            return 'DATE OF INSTRUMENT RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
+                next_details['amends_registration']['instrument']['original'].upper(),
+                next_details['amends_registration']['instrument']['current'].upper(),
+                amend_details['number'],
+                reformat_date_string(amend_details['date'])
+            )
+
+        if 'chargee' in next_details['amends_registration']:
+            return 'CHARGEE RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
+                next_details['amends_registration']['chargee']['original'].upper(),
+                next_details['amends_registration']['chargee']['current'].upper(),
+                amend_details['number'],
+                reformat_date_string(amend_details['date'])
+            )
         pass
 
     elif rect_type in [2, 3]:  #  == 2:
