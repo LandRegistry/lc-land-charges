@@ -310,7 +310,8 @@ def create_pi_search_keys(name):
     if len(name['forenames']) > 0:
         inits = ''
         for forename in name['forenames']:
-            inits += forename[0]
+            if len(forename) > 0:
+                inits += forename[0]
         keys.append((inits + name['surname']).upper())
 
     keys.append(name['surname'].upper())
