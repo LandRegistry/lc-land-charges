@@ -1,6 +1,32 @@
 import logging
 
 
+def eo_name_string(details):
+    eo = None
+    for party in details['parties']:
+        if party['type'] in ['Estate Owner', 'Debtor']:
+            eo = party
+            break
+
+    if eo is None:
+        return ''
+
+    name = party['names'][0]
+
+    if name['type'] in ['County Council', 'Parish Council', 'Rural Council', 'Other Council']:
+        return name['local']['name']
+    elif name['type'] in ['Development Corporation', 'Other']:
+        return name['other']
+    elif name['type'] == 'Limited Company':
+        return name['company']
+    elif name['type'] == 'Complex Name':
+        return name['complex']['name']
+    elif name['type'] == 'Private Individual':
+        return ' '.join(name['private']['forenames']) + ' ' + name['private']['surname']
+    else:
+        raise RuntimeError("Unknown name type: {}".format(a['type']))
+
+
 def names_match(a, b):
     if a['type'] != b['type']:
         return False

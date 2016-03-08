@@ -27,10 +27,10 @@ end
 `clear-data`
 puts `ruby ../../../acceptance-tests/data/lc-lookups.rb`
 
-do_t1 = true
-do_t2 = false
-do_t3 = false
+do_t1 = false
+do_t2_name = true
 do_t2_county = false
+do_t3 = false
 do_t4 = false
 do_t5 = false
 
@@ -51,7 +51,7 @@ if do_t1
     end
 end
 
-if do_t2
+if do_t2_name
     lc_api = RestAPI.new($LAND_CHARGES_URI)
     reg = register(initial)
     rectify_t2 = '{"class_of_charge": "C1", "applicant": {"name": "P334 Team", "reference": "reference 11", "address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095"}, "particulars": {"description": "1 The Lane, Some Village", "district": "South Hams", "counties": ["Devon"]}, "parties": [{"names": [{"type": "Private Individual", "private": {"surname": "Johnson", "forenames": ["Johannes", "John"]}}], "type": "Estate Owner"}], "update_registration": {"type": "Rectification"}}'

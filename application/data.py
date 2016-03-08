@@ -4,7 +4,7 @@ import json
 import datetime
 import logging
 import re
-from application.data_diff import get_rectification_type
+from application.data_diff import get_rectification_type, eo_name_string
 from application.search_key import create_registration_key
 from application.logformat import format_message
 #from application.additional_info import get_additional_info
@@ -886,7 +886,6 @@ def read_names(cursor, party, party_id, lead_debtor_id):
         name = {
             'type': name_type
         }
-        print('name type', name_type)
         if name_type == 'Private Individual':
             fornames = [row['forename']]
             middle = row['middle_names']
@@ -1015,7 +1014,6 @@ def get_lc_counties(cursor, details_id, lead_county_id):
         counties = []
     else:
         counties = [row['name']]
-        logging.debug(counties)
 
         cursor.execute("select dcr.county_id, c.name  from detl_county_rel dcr, county c " +
                        "where dcr.details_id = %(id)s and dcr.county_id = c.id ", {'id': details_id})
@@ -1026,7 +1024,7 @@ def get_lc_counties(cursor, details_id, lead_county_id):
                 cty = row['name']
                 if cty not in counties:
                     counties.append(cty)
-        logging.debug(counties)
+
     return counties
 
 
@@ -1340,11 +1338,11 @@ def get_head_of_chain(cursor, reg_no, date):
                    'FETCH FIRST 1 ROW ONLY',
                    {"reg": reg_no, "date": date})
     row = cursor.fetchone()
-    request_id = row['request_id']
+    detail_id = row['id']  # row['request_id']
 
     # start at request id; get id where amends_id = this-id
 
-    next_id = request_id
+    next_id = detail_id
     while True:
         cursor.execute('SELECT id FROM register_details WHERE amends = %(id)s', {"id": next_id})
         rows = cursor.fetchall()
@@ -1442,7 +1440,7 @@ def get_register_request_details(request_id):
 
 def get_search_request_details(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    print("get  search request details")
+
     try:
         sql = " Select a.id as request_id, b.id as search_details_id, b.search_timestamp, b.type, b.counties, " \
               " a.key_number, a.application_type, a.application_reference, a.application_date, a.customer_name, " \
@@ -1455,7 +1453,7 @@ def get_search_request_details(request_id):
     finally:
         complete(cursor)
     request = {}
-    print('rows ' + str(len(rows)))
+
     for row in rows:
         request = {'request_id': row['request_id'], 'key_number': row['key_number'],
                    'certificate_date': str(row['certificate_date']), 'expiry_date': str(row['expiry_date']),
@@ -1465,7 +1463,7 @@ def get_search_request_details(request_id):
                    'search_details_id': row['search_details_id'],
                    'search_timestamp': str(row['search_timestamp']), 'type': row['type'],
                    'counties': row['counties'], 'search_details': []}
-        print(str(request))
+
         if request['search_details_id'] is None:
             request = {'noresult': 'nosearchdetlid'}
         else:
@@ -1509,7 +1507,7 @@ def get_search_details(search_details_id):
             }
         results = []
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-        print("res_id ", str(row['result']))
+
         for res_id in row['result']:
             results.append(get_registration_details_from_register_id(res_id))
         name_data['results'] = results
@@ -1550,7 +1548,7 @@ def get_k22_request_id(registration_no, registration_date):
     req_id = 'none'
     for row in rows:
         req_id = row['request_id']
-        print("request id is : ", req_id)
+
     data = {'request_id': req_id}
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     complete(cursor)
@@ -1565,6 +1563,10 @@ def get_entry_summary(cursor, details_id):
                        'did': details_id
                    })
     rows = cursor.fetchall()
+
+    if len(rows) == 0:
+        raise RuntimeError('No rows returned for id {}'.format(details_id))
+
     # if len(rows) != 1:
     #     raise RuntimeError("Unexpected return row count in get_entry_summary")
     registrations = []
@@ -1678,11 +1680,11 @@ def get_part_cancellation_additional_info(cursor, details):
 def get_rectification_additional_info_prev(cursor, details, prev_details, next_details):
     rect_type = get_rectification_type(prev_details, details)
 
-    logging.debug('======== GET RECTIF ADDL INFO ========')
-    logging.debug(json.dumps(details))
-    logging.debug('---')
-    logging.debug(json.dumps(prev_details))
-    logging.debug('---')
+    # logging.debug('======== GET RECTIF ADDL INFO ========')
+    # logging.debug(json.dumps(details))
+    # logging.debug('---')
+    # logging.debug(json.dumps(prev_details))
+    # logging.debug('---')
     if rect_type == 1:
         # In this case, prev and current have the same registration number; the amendment is recorded
         # by next, a non-revealed pseudo-entry (sigh)
@@ -1714,14 +1716,52 @@ def get_rectification_additional_info_prev(cursor, details, prev_details, next_d
                 reformat_date_string(next_details['registration']['date'])
             )
 
+    elif rect_type in [2, 3]:  #  == 2:
+        prev_name = eo_name_string(prev_details) if prev_details is not None else None
+        this_name = eo_name_string(details) if details is not None else None
+        next_name = eo_name_string(next_details) if next_details is not None else None
+
+        # logging.debug('Comparing names')
+        # logging.debug(prev_name)
+        # logging.debug(this_name)
+        # logging.debug(next_name)
+        # logging.debug('-----')
+
+        if prev_name is not None and prev_name != this_name:
+            return 'NAME PREVIOUSLY REGISTERED AS {} UNDER {} REGD {}'.format(
+                prev_name.upper(),
+                prev_details['registration']['number'],
+                reformat_date_string(prev_details['registration']['date'])
+            )
+
+
+
+        pass
+
+    elif rect_type == 3:
+        # As a type three is effectively a cancellation & new registration, there appears to
+        # be no additional information to add...
+        pass
 
     logging.debug('======== /GET RECTIF ADDL INFO ========')
     return ''
 
 
-def get_rectification_additional_info_next(cursor, details):
-    pass
+def get_rectification_additional_info_next(cursor, details, prev_details, next_details):
+    rect_type = get_rectification_type(details, next_details)
+    if rect_type in [2, 3]:
+        prev_name = eo_name_string(prev_details) if prev_details is not None else None
+        this_name = eo_name_string(details) if details is not None else None
+        next_name = eo_name_string(next_details) if next_details is not None else None
 
+
+        if next_name is not None and next_name != this_name:
+            return 'NAME RECTIFIED TO {} BY {} REGD {}'.format(
+                next_name.upper(),
+                next_details['registration']['number'],
+                reformat_date_string(next_details['registration']['date'])
+            )
+    return ''
 
 
 def get_additional_info(cursor, details):
@@ -1742,7 +1782,7 @@ def get_additional_info(cursor, details):
     # 'before' - get addl_info for this record as it pertains to the record before
     # 'after' - get add_info for this record as it pertains to the record after
 
-    print(json.dumps(register))
+    #print(json.dumps(register))
 
     following = False
     revealed_head_index = -1
@@ -1770,14 +1810,28 @@ def get_additional_info(cursor, details):
             pass
 
     # Step backwards in time from the current entry-of-interest
-    for index in range(revealed_head_index, len(register) - 1):
+    logging.debug('REVEALED_HEAD: %d', revealed_head_index)
+    logging.debug('LEN REGISTER -1: %d', len(register) - 1)
+    for index in range(revealed_head_index, len(register)):  # - 1):
         logging.debug('CHECK: %d', index)
         this = register[index]
         prev = register[index + 1] if index < len(register) - 1 else None
         next = register[index - 1] if index > 0 else None
 
-        if prev is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
+        logging.debug('THIS')
+        logging.debug(this['registration'])
+        logging.debug('PREV')
+        logging.debug(prev['registration'] if prev is not None else None)
+        logging.debug('NEXT')
+        logging.debug(next['registration'] if next is not None else None)
+
+
+        # if prev is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
+        if 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
             addl_info += get_rectification_additional_info_prev(cursor, this, prev, next)
+
+        if next is not None and 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
+            addl_info += get_rectification_additional_info_next(cursor, this, prev, next)
 
 
     return addl_info.strip()
