@@ -89,7 +89,15 @@ def get_rectification_type(original_data, new_data):
     # 'parties': [{'names': [{'private': {'forenames': ['Jo', 'John'], 'surname': 'Johnson'}, 'type':
     # 'Private Individual'}], 'type': 'Estate Owner'}], 'particulars': {'description': '1 The Lane, Some Village',
     # 'district': 'South Hams', 'counties': ['Devon']}}
-    if new_data['update_registration']['type'] == 'Amendment':
+
+    is_amend = False
+    if 'update_registration' in new_data:  # case of 'new_data' being incoming update data
+        is_amend = new_data['update_registration']['type'] == 'Amendment'
+
+    if 'amends_registration' in new_data:  # case of comparing data items at rest
+        is_amend = new_data['amends_registration']['type'] == 'Amendment'
+
+    if is_amend:  # new_data['update_registration']['type'] == 'Amendment':
         # loop through the names in original and new and then compare
         new_names = []
         for names in new_data['parties'][0]['names']:
