@@ -1374,11 +1374,26 @@ def get_search_details(search_details_id):
     sn_data = []
     for row in rows:  # for each name searched against
         name_data = {'id': row['search_name_id'],
-                     'name': {'name_type': row['name_type'], 'forenames': row['forenames'], 'surname': row['surname'],
-                              'complex_name': row['complex_name'], 'complex_number': row['complex_number'],
-                              'company_name': row['company_name'], 'local_authority_name': row['local_authority_name'],
-                              'local_authority_area': row['local_authority_area'], 'other_name': row['other_name']},
+                     'names': [{'type': row['name_type']}],
                      'year_from': row['year_from'], 'year_to': row['year_to'], 'results': []}
+        name_type = row['name_type']
+        if name_type == 'Private Individual':
+            name_data['names'][0]['private'] = {'forenames': row['forenames'].split(), 'surname': row['surname']}
+        elif name_type == 'Rural Council' or name_type == 'Parish Council' \
+                or name_type == 'County Council' or name_type == 'Other Council':
+            name_data['names'][0]['local'] = {
+                'name': row['local_authority_name'],
+                'area': row['local_authority_area']
+            }
+        elif name_type == 'Development Corporation' or name_type == 'Other' or name_type == 'Coded Name':
+            name_data['names'][0]['other'] = row['other_name']
+        elif name_type == 'Limited Company':
+            name_data['names'][0]['company'] = row['company_name']
+        elif name_type == 'Complex Name':
+            name_data['names'][0]['complex'] = {
+                'name': row['complex_name'],
+                'number': row['complex_number']
+            }
         results = []
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         print("res_id ", str(row['result']))
