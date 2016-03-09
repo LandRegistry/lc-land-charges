@@ -432,8 +432,11 @@ def insert():
 
     previous_id = None
     first_record = data[0]
+
+    failed_inserts = []
+
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     for reg in data:
-        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         try:
             if reg['type'] == 'CN':
                 details_id, request_id = insert_migrated_cancellation(cursor, data)
@@ -479,12 +482,17 @@ def insert():
                                        })
 
             previous_id = details_id
-            complete(cursor)
-        except:
-            rollback(cursor)
-            raise
+        except Exception as e:
+            failed_inserts.append({
+                "number": reg['registration']['registration_no'],
+                "date": reg['registration']['date'],
+                "class_of_charge": reg['class_of_charge'],
+                "message": str(e)
+            })
 
-    return Response(status=200)
+    complete(cursor)
+
+    return Response(json.dumps(failed_inserts), status=200)
 
 
 # ============= Dev routes ===============

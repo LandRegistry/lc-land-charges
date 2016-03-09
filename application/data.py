@@ -1282,7 +1282,11 @@ def insert_lc_county(cursor, register_details_id, county):
                    {
                        "county_id": county_id, "details_id": register_details_id
                    })
-    return cursor.fetchone()[0], county_id
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        raise RuntimeError("Invalid county ID: {}".format(county))
+
+    return rows[0], county_id
 
 
 def get_county_id(cursor, county):
@@ -1290,8 +1294,10 @@ def get_county_id(cursor, county):
                    {
                        "county": county.upper()
                    })
-    rows = cursor.fetchone()[0]
-    return rows
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        raise RuntimeError("Invalid county: {}".format(county))
+    return rows[0]['id']
 
 
 def get_register_request_details(request_id):
