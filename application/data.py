@@ -194,6 +194,12 @@ def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_n
     return reg_no, reg_id
 
 
+def mark_as_no_reveal_by_details(cursor, details_id):
+    cursor.execute("UPDATE register SET reveal=%(rev)s WHERE details_id=%(did)s", {
+        "rev": False, "did": details_id
+    })
+
+
 def mark_as_no_reveal(cursor, reg_no, date):
     cursor.execute("UPDATE register SET reveal=%(rev)s WHERE registration_no=%(regno)s AND date=%(date)s", {
         "rev": False, "regno": reg_no, "date": date
@@ -604,7 +610,8 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
         new_names, new_details_id = insert_details(cursor, request_id, data, date_today, original_details_id)
 
     elif alter_type == 4:
-        mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
+        #mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
+        mark_as_no_reveal_by_details(cursor, original_details_id)
         updated_names, updated_details_id = insert_details(cursor, request_id, data, rect_reg_date, original_details_id)
 
     elif alter_type == 5:

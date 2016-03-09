@@ -222,6 +222,8 @@ def amend_registration(date, reg_no):
             'date': request.args['dev_date']
         }
 
+    logging.debug(json.dumps(json_data))
+
     if len(errors) > 0:
         raise_error({
             "type": "E",
