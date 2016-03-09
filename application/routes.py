@@ -209,11 +209,21 @@ def amend_registration(date, reg_no):
         suppress = True
 
     json_data = request.get_json(force=True)
+
+    logging.debug(json.dumps(json_data))
+
     if 'pab_amendment' in json_data:
-        pab_amendment = json_data['pab_amendment']
+        json_data['update_registration']['pab'] = "{}({})".format(
+            json_data['pab_amendment']['reg_no'],
+            json_data['pab_amendment']['date']
+        )
+
+        # #     date =
+        #
+        # pab_amendment = json_data['pab_amendment']
         del json_data['pab_amendment']
-    else:
-        pab_amendment = None
+    # else:
+    #     pab_amendment = None
 
     errors = validate_update(json_data)
     if 'dev_date' in request.args and app.config['ALLOW_DEV_ROUTES']:
@@ -221,8 +231,6 @@ def amend_registration(date, reg_no):
         json_data['dev_registration'] = {
             'date': request.args['dev_date']
         }
-
-    logging.debug(json.dumps(json_data))
 
     if len(errors) > 0:
         raise_error({
@@ -247,14 +255,14 @@ def amend_registration(date, reg_no):
             "request_id": request_id
         }
 
-        if pab_amendment is not None:
-            reg_no = pab_amendment['reg_no']
-            date = pab_amendment['date']
-            today = datetime.datetime.now().strftime('%Y-%m-%d')
-            amendment = {'reg_no': data['new_registrations'][0]['number'],
-                         'date': today}
-            originals, reg_nos, request_id = insert_rectification(cursor, reg_no, date, json_data, amendment)
-            data['amended_registrations'].append(originals)
+        # if pab_amendment is not None:
+        #     reg_no = pab_amendment['reg_no']
+        #     date = pab_amendment['date']
+        #     today = datetime.datetime.now().strftime('%Y-%m-%d')
+        #     amendment = {'reg_no': data['new_registrations'][0]['number'],
+        #                  'date': today}
+        #     originals, reg_nos, request_id = insert_rectification(cursor, reg_no, date, json_data, amendment)
+        #     data['amended_registrations'].append(originals)
         complete(cursor)
         logging.info(format_message("Alteration committed"))
     except:

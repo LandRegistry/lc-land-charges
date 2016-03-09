@@ -272,6 +272,10 @@ def insert_register_details(cursor, request_id, data, date, amends):
                 amend_info_type = 'Chargee'
                 amend_info_details_orig = update['chargee']['original']
                 amend_info_details_current = update['chargee']['current']
+        elif amend_type == 'Amendment':
+            if 'pab' in update and update['pab'] != '':
+                amend_info_type = 'PAB'
+                amend_info_details_current = update['pab']
 
     cursor.execute("INSERT INTO register_details (request_id, class_of_charge, legal_body_ref, "
                    "amends, district, short_description, additional_info, amendment_type, priority_notice_no, "
@@ -654,7 +658,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
                 new_counties = insert_counties(cursor, new_details_id, data['particulars']['counties'])
                 new_reg_nos = insert_landcharge_regn(cursor, new_details_id, new_names, new_counties, date_today, None)
         else:
-            new_reg_nos = insert_bankruptcy_regn(cursor, new_details_id, new_names, date_today)
+            new_reg_nos = insert_bankruptcy_regn(cursor, new_details_id, new_names, date_today, None)
         reg_nos = new_reg_nos
 
     if pseudo_details_id is not None:
@@ -662,12 +666,28 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
             pseudo_counties = insert_counties(cursor, pseudo_details_id, data['particulars']['counties'])
             pseudo_reg_nos = insert_landcharge_regn(cursor, pseudo_details_id, pseudo_names, pseudo_counties, date_today, None)
         else:
-            pseudo_reg_nos = insert_bankruptcy_regn(cursor, pseudo_details_id, pseudo_names, date_today)
+            pseudo_reg_nos = insert_bankruptcy_regn(cursor, pseudo_details_id, pseudo_names, date_today, None)
 
         for reg in pseudo_reg_nos:
             mark_as_no_reveal(cursor, reg['number'], reg['date'])
         reg_nos = pseudo_reg_nos
     # --- Done with registrations
+
+    if data['update_registration']['type'] == "Amendment":
+        # A combined PAB/WOB amendment... we need to mark the PAB as no-reveal and cancelled by the incoming request
+        logging.debug(data['update_registration'])
+        matcher = re.match("(\d+)\((\d{4}\-\d\d\-\d\d)\)", data['update_registration']['pab'])
+        pab_reg_no = matcher.group(1)
+        pab_date = matcher.group(2)
+        pab_details_id = get_register_details_id(cursor, pab_reg_no, pab_date)
+        mark_as_no_reveal_by_details(cursor, pab_details_id)
+        update_previous_details(cursor, request_id, pab_details_id)
+
+        # json_data['update_registration']['pab'] = "{}({})".format(
+        #     json_data['pab_amendment']['reg_no'],
+        #     json_data['pab_amendment']['date']
+        # )
+
 
     return original_regs, reg_nos, request_id
 
@@ -1140,6 +1160,7 @@ def get_registration_details_by_id(cursor, details_id):
 
     # name, address, keyn, ref
     return data
+
 
 def get_registration_details(cursor, reg_no, date):
     cursor.execute("SELECT r.registration_no, r.date, r.reveal, rd.class_of_charge, rd.id, r.id as register_id, "
@@ -1824,6 +1845,18 @@ def get_rectification_additional_info_next(cursor, details, prev_details):
     return ''
 
 
+def get_court_additional_info(cursor, details):
+    debtor = None
+    for party in details['parties']:
+        if party['type'] == 'Debtor':
+            debtor = party
+
+    if debtor is None:
+        raise RuntimeError('Debtor not found')
+
+    return party['case_reference'].upper() + " [" + str(details['registration']['number']) + "]"
+
+
 def get_additional_info(cursor, details):
     # TODO: get addl info for migrated records
 
@@ -1852,6 +1885,9 @@ def get_additional_info(cursor, details):
             logging.debug('Switch')
             forward = False
 
+            if entry['class_of_charge'] in ['PAB', 'WOB']:
+                addl_info += get_court_additional_info(cursor, entry)
+
         else:
 
             this = register[index]
@@ -1864,6 +1900,8 @@ def get_additional_info(cursor, details):
             logging.debug(prev['registration'] if prev is not None else None)
             logging.debug('NEXT')
             logging.debug(next['registration'] if next is not None else None)
+
+
 
             if not forward:
                 logging.debug('BACKWARD')
