@@ -1250,29 +1250,22 @@ def insert_cancellation(orig_registration_no, orig_date, data):
     try:
         original_details_id = get_register_details_id(cursor, orig_registration_no, orig_date)
         original_regs = get_all_registration_nos(cursor, original_details_id)
-
         canc_date = datetime.datetime.now().strftime('%Y-%m-%d')
         canc_request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], canc_date)
         detl_data = get_registration_details(cursor, orig_registration_no, orig_date)
+        # update_registration contains part_cancelled and plan_attached data
         detl_data['update_registration'] = data['update_registration']
-
-        logging.debug("detl_data", str(data))
-        if data['update_registration']['type'] == "Part Cancellation":
-            detl_data["additional_information"] = data["additional_information"]
-
         reg_nos, canc_details_id = insert_record(cursor, detl_data, canc_request_id, canc_date, original_details_id)
         update_previous_details(cursor, canc_details_id, original_details_id)
         # if full cancellation mark all rows as no reveal
         if data['update_registration']['type'] == "Cancellation":
             for reg in original_regs:
                 mark_as_no_reveal(cursor, reg['number'], reg['date'])
-
         elif data['update_registration']['type'] == "Part Cancellation":
             # In the part cancellation world, the PC itself is not revealed, but the original is.
             # Addtional information will indicate the part-cancellation
             for reg in reg_nos:  # TODO: this is a normal PC, not a C4/D2 style one
                 mark_as_no_reveal(cursor, reg['number'], reg['date'])
-
         complete(cursor)
         logging.info(format_message("Cancellation committed"))
     except:
