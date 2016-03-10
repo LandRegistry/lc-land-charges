@@ -1388,7 +1388,7 @@ def get_search_details(search_details_id):
             name_data['names'][0]['other'] = row['other_name']
         elif name_type == 'Limited Company':
             name_data['names'][0]['company'] = row['company_name']
-        elif name_type == 'Complex Name':
+        elif name_type == 'Complex':
             name_data['names'][0]['complex'] = {
                 'name': row['complex_name'],
                 'number': row['complex_number']

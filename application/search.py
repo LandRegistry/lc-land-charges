@@ -321,7 +321,7 @@ def perform_search(cursor, parameters, cert_date):
         logging.debug(keys)
 
         if item['name_type'] == 'Complex':
-            cnumber = item['name']['complex']['number']
+            cnumber = item['name']['complex_number']
 
             if parameters['search_type'] == 'full':
                 if parameters['counties'][0] == 'ALL':
@@ -377,6 +377,26 @@ def read_searches(cursor, name):
         results.append({
             "result": row['result'],
         })
+    return results
+
+
+def get_search_ids_by_date(cursor, date):
+    cursor.execute("SELECT id, request_id " +
+                   "FROM search_details " +
+                   "WHERE date(search_timestamp)=%(date)s",
+                   {
+                       'date': date
+                   })
+    rows = cursor.fetchall()
+    results = []
+    if len(rows) > 0:
+        for row in rows:
+            results.append({
+                "search_id": row['id'],
+                "request_id": row['request_id']
+            })
+    else:
+        results = None
     return results
 
 
