@@ -44,10 +44,10 @@ def store_search_request(cursor, data):
     cursor.execute("INSERT INTO search_details (request_id, search_timestamp, type, counties, certificate_date,"
                    " expiry_date, certificate_no) "
                    "VALUES ( %(request_id)s, current_timestamp, %(type)s, %(counties)s, %(cdate)s, %(edate)s, "
-                   "%(cert_no) ) RETURNING id",
+                   "%(cert_no)s ) RETURNING id",
                    {
                        'request_id': request_id, 'type': search_type, 'counties': json.dumps(counties),
-                       'cdate': data['search_date'], 'edate': data['expiry_date'], 'cert_no':data['cert_no']
+                       'cdate': data['search_date'], 'edate': data['expiry_date'], 'cert_no': data['cert_no']
                    })
     details_id = cursor.fetchone()[0]
 
