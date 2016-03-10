@@ -1,6 +1,8 @@
+import json
+
 
 def get_ins_office_copy(cursor, class_of_charge, reg_no, date):
-    cursor.execute("SELECT ibr.request_data " +
+    cursor.execute("SELECT rg.registration_no as reg_no, rg.date as registration_date, ibr.request_data " +
                    "From register rg, register_details rd, request rq, ins_bankruptcy_request ibr " +
                    "WHERE rg.registration_no=%(reg_no)s AND rg.date=%(date)s " +
                    "AND rg.details_id=rd.id " +
@@ -16,4 +18,11 @@ def get_ins_office_copy(cursor, class_of_charge, reg_no, date):
     elif len(rows) > 1:
         raise RuntimeError("Too many rows retrieved")
     else:
-        return rows[0]['request_data']
+        data = rows[0]['request_data']
+        req_data = json.loads(data)
+        json_data = dict()
+        json_data["request_text"] = req_data
+        json_data['registration_no'] = rows[0]['reg_no']
+        json_data['registration_date'] = str(rows[0]['registration_date'])
+        json_data['new_registrations'] = [{"number": rows[0]['reg_no'], "date": str(rows[0]['registration_date'])}]
+        return json.dumps(json_data)
