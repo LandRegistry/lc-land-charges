@@ -333,7 +333,7 @@ def create_search_keys(cursor, name_type, name):
         keys.append(create_local_authority_key(name['local_authority_area']))
 
     elif name_type == 'Development Corporation':
-        devcorp = re.sub("\s(New Town\s)? Development Corporation", "", name['other'], flags=re.IGNORECASE)
+        devcorp = re.sub("\s(New Town\s)? Development Corporation", "", name['other_name'], flags=re.IGNORECASE)
         keys.append(create_local_authority_key(devcorp))
 
     elif name_type == 'Other':
@@ -341,7 +341,7 @@ def create_search_keys(cursor, name_type, name):
         keys.append(key)
 
     elif name_type == 'Complex':
-        key, ind = get_other_key(name['complex']['name'])
+        key, ind = get_other_key(name['complex_name'])
         keys.append(key)
     elif name_type == 'Coded Name':
         key, ind = get_other_key(name['other_name'])

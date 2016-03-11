@@ -16,7 +16,8 @@ from application.data import connect, get_registration_details, complete, \
     get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history, insert_migrated_cancellation, \
     get_additional_info
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
-from application.search import store_search_request, perform_search, store_search_result, read_searches, get_search_by_request_id
+from application.search import store_search_request, perform_search, store_search_result, read_searches, \
+    get_search_by_request_id, get_search_ids_by_date
 from application.oc import get_ins_office_copy
 import datetime
 
@@ -362,7 +363,7 @@ def create_search():
             store_search_result(cursor, search_request_id, search_details_id, item['name_id'], item['name_result'])
 
         complete(cursor)
-        logging.info(format_message("Search request and result comitted"))
+        logging.info(format_message("Search request and result committed"))
     except:
         rollback(cursor)
         raise
@@ -402,6 +403,21 @@ def get_searches():
         complete(cursor)
 
     return Response(json.dumps(data), status=200, mimetype='application/json')
+
+
+@app.route('/searches/<date>', methods=['GET'])
+def get_searches_by_date(date):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        data = get_search_ids_by_date(cursor, date)
+    finally:
+        complete(cursor)
+
+    if data is None:
+        logging.warning(format_message("Returning 404 for date {}".format(date)))
+        return Response(status=404)
+    else:
+        return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
 # ============== Office Copies ===============
@@ -444,8 +460,11 @@ def insert():
 
     previous_id = None
     first_record = data[0]
+
+    failed_inserts = []
+
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     for reg in data:
-        cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
         try:
             if reg['type'] == 'CN':
                 details_id, request_id = insert_migrated_cancellation(cursor, data)
@@ -491,12 +510,17 @@ def insert():
                                        })
 
             previous_id = details_id
-            complete(cursor)
-        except:
-            rollback(cursor)
-            raise
+        except Exception as e:
+            failed_inserts.append({
+                "number": reg['registration']['registration_no'],
+                "date": reg['registration']['date'],
+                "class_of_charge": reg['class_of_charge'],
+                "message": str(e)
+            })
 
-    return Response(status=200)
+    complete(cursor)
+
+    return Response(json.dumps(failed_inserts), status=200)
 
 
 # ============= Dev routes ===============

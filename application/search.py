@@ -41,11 +41,13 @@ def store_search_request(cursor, data):
     request_id = cursor.fetchone()[0]
 
     # Row on search details
-    cursor.execute("INSERT INTO search_details (request_id, search_timestamp, type, counties, certificate_date, expiry_date) "
-                   "VALUES ( %(request_id)s, current_timestamp, %(type)s, %(counties)s, %(cdate)s, %(edate)s ) RETURNING id",
+    cursor.execute("INSERT INTO search_details (request_id, search_timestamp, type, counties, certificate_date,"
+                   " expiry_date, certificate_no) "
+                   "VALUES ( %(request_id)s, current_timestamp, %(type)s, %(counties)s, %(cdate)s, %(edate)s, "
+                   "%(cert_no)s ) RETURNING id",
                    {
                        'request_id': request_id, 'type': search_type, 'counties': json.dumps(counties),
-                       'cdate': data['search_date'], 'edate': data['expiry_date']
+                       'cdate': data['search_date'], 'edate': data['expiry_date'], 'cert_no': data['cert_no']
                    })
     details_id = cursor.fetchone()[0]
 
@@ -321,7 +323,7 @@ def perform_search(cursor, parameters, cert_date):
         logging.debug(keys)
 
         if item['name_type'] == 'Complex':
-            cnumber = item['name']['complex']['number']
+            cnumber = item['name']['complex_number']
 
             if parameters['search_type'] == 'full':
                 if parameters['counties'][0] == 'ALL':
@@ -377,6 +379,26 @@ def read_searches(cursor, name):
         results.append({
             "result": row['result'],
         })
+    return results
+
+
+def get_search_ids_by_date(cursor, date):
+    cursor.execute("SELECT id, request_id " +
+                   "FROM search_details " +
+                   "WHERE date(search_timestamp)=%(date)s",
+                   {
+                       'date': date
+                   })
+    rows = cursor.fetchall()
+    results = []
+    if len(rows) > 0:
+        for row in rows:
+            results.append({
+                "search_id": row['id'],
+                "request_id": row['request_id']
+            })
+    else:
+        results = None
     return results
 
 

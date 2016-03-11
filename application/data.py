@@ -1389,29 +1389,22 @@ def insert_cancellation(orig_registration_no, orig_date, data):
     try:
         original_details_id = get_register_details_id(cursor, orig_registration_no, orig_date)
         original_regs = get_all_registration_nos(cursor, original_details_id)
-
         canc_date = datetime.datetime.now().strftime('%Y-%m-%d')
         canc_request_id = insert_request(cursor, data['applicant'], data['update_registration']['type'], canc_date)
         detl_data = get_registration_details(cursor, orig_registration_no, orig_date)
+        # update_registration contains part_cancelled and plan_attached data
         detl_data['update_registration'] = data['update_registration']
-
-        logging.debug("detl_data", str(data))
-        if data['update_registration']['type'] == "Part Cancellation":
-            detl_data["additional_information"] = data["additional_information"]
-
         reg_nos, canc_details_id = insert_record(cursor, detl_data, canc_request_id, canc_date, original_details_id)
         update_previous_details(cursor, canc_details_id, original_details_id)
         # if full cancellation mark all rows as no reveal
         if data['update_registration']['type'] == "Cancellation":
             for reg in original_regs:
                 mark_as_no_reveal(cursor, reg['number'], reg['date'])
-
         elif data['update_registration']['type'] == "Part Cancellation":
             # In the part cancellation world, the PC itself is not revealed, but the original is.
             # Addtional information will indicate the part-cancellation
             for reg in reg_nos:  # TODO: this is a normal PC, not a C4/D2 style one
                 mark_as_no_reveal(cursor, reg['number'], reg['date'])
-
         complete(cursor)
         logging.info(format_message("Cancellation committed"))
     except:
@@ -1428,7 +1421,11 @@ def insert_lc_county(cursor, register_details_id, county):
                    {
                        "county_id": county_id, "details_id": register_details_id
                    })
-    return cursor.fetchone()[0], county_id
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        raise RuntimeError("Invalid county ID: {}".format(county))
+
+    return rows[0], county_id
 
 
 def get_county_id(cursor, county):
@@ -1436,8 +1433,10 @@ def get_county_id(cursor, county):
                    {
                        "county": county.upper()
                    })
-    rows = cursor.fetchone()[0]
-    return rows
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        raise RuntimeError("Invalid county: {}".format(county))
+    return rows[0]['id']
 
 
 def get_register_request_details(request_id):
@@ -1528,7 +1527,7 @@ def get_search_details(search_details_id):
             name_data['names'][0]['other'] = row['other_name']
         elif name_type == 'Limited Company':
             name_data['names'][0]['company'] = row['company_name']
-        elif name_type == 'Complex Name':
+        elif name_type == 'Complex':
             name_data['names'][0]['complex'] = {
                 'name': row['complex_name'],
                 'number': row['complex_number']
