@@ -564,7 +564,7 @@ def get_alteration_type(original_details, data):
     # are added for this system. Apologies for just giving these numbers. They are:
     # 1: Alters an existing registration entry; implemented by creating a second version, plus chaining a
     #       pseudo-entry to hold the details of the rectification. Only the 'second version' is revealed [Rectifications only]
-    # 2: Adds a new registration and keeps the original around [Rectifications only]
+    # 2: Adds a new registration and keeps the original around [Rectifications and renewals]
     # 3: Adds a new registration and 'removes' (as in set no-reveal) the original [Rectifications and Amendments]
     # 4: Alters an existing registration entry; implemented by creating a second version. Only the 'second
     #       version' is revealed [Corrections]
@@ -572,6 +572,8 @@ def get_alteration_type(original_details, data):
     #       information generated. [Part Cancellations of the non-C4/D2 variety]
     if data['update_registration']['type'] == 'Rectification':
         return get_rectification_type(original_details, data)  # will be 1, 2 or 3
+    elif data['update_registration']['type'] == 'Renewal':
+        return 2
     elif data['update_registration']['type'] == 'Amendment':
         return 3
     elif data['update_registration']['type'] == 'Correction':
