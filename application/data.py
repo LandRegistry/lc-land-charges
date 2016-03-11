@@ -1680,6 +1680,13 @@ def get_update_information(cursor, reg_no, reg_date):
     }
 
 
+def additional_info_index(addl_info, substring):
+    for index, line in enumerate(addl_info):
+        if substring in line:
+            return index
+    return -1
+
+
 def get_part_cancellation_additional_info(cursor, details):
     update_info = get_update_information(cursor, details['registration']['number'], details['registration']['date'])
 
@@ -1879,34 +1886,25 @@ def get_amendment_additional_info(cursor, details, next_details):
     return wob_fragment + pab_fragment
 
 
-def get_renewal_additional_info_prev(cursor, details, next, renewed, addl_info):
-    logging.debug('ADDL_INFO: ' + addl_info)
+def get_renewal_additional_info_prev(cursor, details, next, addl_info):
+    logging.debug(addl_info)
     logging.debug(details['registration'])
-    if 'RENEWAL OF' in addl_info:
 
-        if 'NOW FURTHER RENEWED' in addl_info:
-            # WHICH RENEWED has to be before
+    index = additional_info_index(addl_info, 'RENEWED BY')
+    logging.debug('INDEX: ' + str(index))
 
-
-        else:
-            return "{} WHICH RENEWED {} REGD {}".format(
-                addl_info,
-                details['registration']['number'],
-                reformat_date_string(details['registration']['date'])
-            )
-
-    elif 'RENEWED BY' in addl_info:
-        return "RENEWAL OF {} REGD {} NOW FURTHER {}".format(
-            details['registration']['number'],
-            reformat_date_string(details['registration']['date']),
-            addl_info
-        )
-
-    else:
-        return "RENEWAL OF {} REGD {}".format(
+    if index != -1:
+        addl_info.insert(index, "RENEWAL OF {} REGD {}".format(
+        #addl_info.append(index, "RENEWAL OF {} REGD {}".format(
             details['registration']['number'],
             reformat_date_string(details['registration']['date'])
-        )
+        ))
+    else:
+        addl_info.append("RENEWAL OF {} REGD {}".format(
+            details['registration']['number'],
+            reformat_date_string(details['registration']['date'])
+        ))
+
 
 
 # 2nd renewal (1002)
@@ -1918,15 +1916,40 @@ def get_renewal_additional_info_prev(cursor, details, next, renewed, addl_info):
 # RENEWAL OF 1001 REGD 11/03/2016 NOW FURTHER RENEWED BY 1003 REGD 11/03/2016
 
 def get_renewal_additional_info_next(cursor, details, prev, addl_info):
-    rn = ""
-    if "RENEWED BY" in addl_info:
-        rn = " NOW FURTHER " + addl_info
-
-    return "RENEWED BY {} REGD {}{}".format(
+    addl_info.insert(0, "RENEWED BY {} REGD {}".format(
         details['registration']['number'],
-        reformat_date_string(details['registration']['date']),
-        rn
-    )
+        reformat_date_string(details['registration']['date'])
+    ))
+
+
+def get_additional_info_text(addl_info):
+    result = ''
+    for index, line in enumerate(addl_info):
+        if index == 0:
+            result = line
+        else:
+            previous_line = addl_info[index - 1]
+
+            if 'RENEWED BY' in line and ('RENEWED BY' in previous_line or 'RENEWAL OF' in previous_line):
+                result += ' NOW FURTHER ' + line
+
+            elif 'RENEWAL OF' in line and 'RENEWAL OF' in previous_line:
+                new_line = re.sub('RENEWAL OF', 'WHICH RENEWED', line)
+                result += ' ' + new_line
+
+
+
+            else:
+                result += ' ' + line
+
+    return result
+
+
+
+
+
+
+
 
 
 def get_additional_info(cursor, details):
@@ -1942,7 +1965,7 @@ def get_additional_info(cursor, details):
 
     addl_info_before = ""
     addl_info_after = ""
-    addl_info = ""
+    addl_info = []
 
     # 'before' - get addl_info for this record as it pertains to the record before
     # 'after' - get add_info for this record as it pertains to the record after
@@ -1982,13 +2005,13 @@ def get_additional_info(cursor, details):
                 logging.debug('BACKWARD')
 
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
-                    addl_info += get_rectification_additional_info_prev(cursor, this, next)
+                    addl_info.append(get_rectification_additional_info_prev(cursor, this, next))
 
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Amendment':
-                    addl_info += get_amendment_additional_info(cursor, this, next)
+                    addl_info.append(get_amendment_additional_info(cursor, this, next))
 
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Renewal':
-                    addl_info = get_renewal_additional_info_prev(cursor, this, next, renewed, addl_info)
+                    get_renewal_additional_info_prev(cursor, this, next, addl_info)
                     renewed = True
 
                 # if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Amendment':
@@ -1998,20 +2021,24 @@ def get_additional_info(cursor, details):
                 logging.debug('FORWARD')
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
-                    addl_info += get_rectification_additional_info_next(cursor, this, prev)
+                    addl_info.append(get_rectification_additional_info_next(cursor, this, prev))
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Part Cancellation':
-                    addl_info += get_part_cancellation_additional_info(cursor, this)
+                    addl_info.append(get_part_cancellation_additional_info(cursor, this))
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Renewal':
-                    addl_info = get_renewal_additional_info_next(cursor, this, prev, addl_info)
+                    get_renewal_additional_info_next(cursor, this, prev, addl_info)
 
 
 
 
 
 
-    return addl_info.strip()
+    #return ' '.join(addl_info).strip()
+    return {
+        "array": addl_info,
+        "text": get_additional_info_text(addl_info)
+    }
 
     # following = False
     # revealed_head_index = -1
