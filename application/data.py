@@ -341,19 +341,19 @@ def insert_party(cursor, details_id, party):
     return cursor.fetchone()[0]
 
 
-def insert_migration_status(cursor, register_id, registration_number, registration_date, class_of_charge,
-                            additional_data):
-    cursor.execute("INSERT INTO migration_status (register_id, original_regn_no, date, class_of_charge, "
-                   "migration_complete, extra_data ) "
-                   "VALUES( %(register_id)s, %(reg_no)s, %(date)s, %(class)s, True, %(extra)s ) RETURNING id",
-                   {
-                       "register_id": register_id,
-                       "reg_no": registration_number,
-                       "date": registration_date,
-                       "class": class_of_charge,
-                       "extra": json.dumps(additional_data)
-                   })
-    return cursor.fetchone()[0]
+# def insert_migration_status(cursor, register_id, registration_number, registration_date, class_of_charge,
+#                             additional_data):
+#     cursor.execute("INSERT INTO migration_status (register_id, original_regn_no, date, class_of_charge, "
+#                    "migration_complete, extra_data ) "
+#                    "VALUES( %(register_id)s, %(reg_no)s, %(date)s, %(class)s, True, %(extra)s ) RETURNING id",
+#                    {
+#                        "register_id": register_id,
+#                        "reg_no": registration_number,
+#                        "date": registration_date,
+#                        "class": class_of_charge,
+#                        "extra": json.dumps(additional_data)
+#                    })
+#     return cursor.fetchone()[0]
 
 
 def insert_details(cursor, request_id, data, date, amends_id):
@@ -1276,18 +1276,6 @@ def insert_migrated_record(cursor, data):
     data["class_of_charge"] = re.sub(r"\(|\)", "", data["class_of_charge"])
 
     # TODO: using registration date as request date. Valid? Always?
-
-    logging.debug(data)
-    # if data['type'] in ['CN']:  # TODO: remove this leg
-    #
-    #     data['customer_name'] = ''
-    #     data['customer_address'] = ''
-    #     insert_cancellation(data['migration_data']['original']['registration_no'],
-    #                         data['migration_data']['original']['date'], data)
-    #     registration_id = None
-    #     details_id = None
-    #     request_id = None
-    # else:
     types = {
         'NR': 'New registration',
         'AM': 'Amendment',
@@ -1339,14 +1327,6 @@ def insert_migrated_cancellation(cursor, data):
 
         logging.debug('PREVDETL UPDATED')
         logging.debug(data)
-
-        # [{'registration': {'date': '2016-02-01', 'registration_no': '6000'}, 'class_of_charge': 'PAB',
-        # 'additional_information': '', 'migration_data': {'unconverted_reg_no': '6000', 'flags':
-        # ['Last item lacks name information']}, 'applicant': {'address': '', 'reference': '', 'name': '', 'key_number': ''},
-        # 'type': 'NR', 'parties': []}, {'registration': {'date': '2016-02-10', 'registration_no': '6010'}, 'class_of_charge':
-        # 'PAB', 'additional_information': '', 'migration_data': {'unconverted_reg_no': '6010', 'flags':
-        # ['Last item lacks name information']}, 'applicant': {'address': '', 'reference': '', 'name': '', 'key_number': ''},
-        # 'type': 'CN', 'parties': []}]
 
         for reg in data:
             logging.debug(reg)
@@ -1884,10 +1864,6 @@ def get_amendment_additional_info(cursor, details, next_details):
         pab_fragment = " & {} DATED {}".format(pab_reg_no, pab_date)
 
 
-
-
-    logging.debug(next_details)
-
     return wob_fragment + pab_fragment
 
 
@@ -1939,22 +1915,32 @@ def get_additional_info_text(addl_info):
             elif 'NAME PREVIOUSLY REGISTERED' in line and 'NAME PREVIOUSLY REGISTERED AS' in previous_line:
                 new_line = re.sub('NAME PREVIOUSLY REGISTERED AS', 'AND LATER RECTIFIED TO', line)
                 result += ' ' + new_line
-                
+
             else:
                 result += ' ' + line
 
     return result
 
 
+def get_migration_info(cursor, reg_no, date):
+    cursor.execute('SELECT m.extra_data FROM register r, migration_status m '
+                   'WHERE r.registration_no=%(reg_no)s AND r.date=%(date)s AND r.id = m.register_id '
+                   'ORDER BY r.reg_sequence_no DESC ' +
+                   'FETCH FIRST 1 ROW ONLY', {
+                       'date': date, 'reg_no': reg_no
+                   })
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        return None
 
-
-
-
-
+    return json.loads(rows[0]['extra_data'])
 
 
 def get_additional_info(cursor, details):
     # TODO: get addl info for migrated records
+    migrated = get_migration_info(cursor, details['registration']['number'], details['registration']['date'])
+    if migrated is not None:
+        return migrated['amend_info']
 
     # details is being passed in...
     head_details_id = get_head_of_chain(cursor, details['registration']['number'], details['registration']['date'])
@@ -1964,17 +1950,9 @@ def get_additional_info(cursor, details):
     for record in history:
         register.append(get_registration_details_by_id(cursor, record['id']))
 
-    addl_info_before = ""
-    addl_info_after = ""
     addl_info = []
 
-    # 'before' - get addl_info for this record as it pertains to the record before
-    # 'after' - get add_info for this record as it pertains to the record after
-
-    #print(json.dumps(register))
-
     forward = True
-    renewed = False
     for index, entry in enumerate(register):
         logging.debug('THIS (%d)', index)
 
@@ -1991,17 +1969,6 @@ def get_additional_info(cursor, details):
 
         else:
 
-
-
-
-            logging.debug(this['registration'])
-            logging.debug('PREV')
-            logging.debug(prev['registration'] if prev is not None else None)
-            logging.debug('NEXT')
-            logging.debug(next['registration'] if next is not None else None)
-
-
-
             if not forward:
                 logging.debug('BACKWARD')
 
@@ -2013,12 +1980,8 @@ def get_additional_info(cursor, details):
 
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Renewal':
                     get_renewal_additional_info_prev(cursor, this, next, addl_info)
-                    renewed = True
 
-                # if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Amendment':
-                #     addl_info += get_amendment_additional_info(cursor, this, prev)
             else:
-
                 logging.debug('FORWARD')
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
@@ -2030,134 +1993,7 @@ def get_additional_info(cursor, details):
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Renewal':
                     get_renewal_additional_info_next(cursor, this, prev, addl_info)
 
-
-
-
-
-
-    #return ' '.join(addl_info).strip()
-    return {
-        "array": addl_info,
-        "text": get_additional_info_text(addl_info).strip()
-    }
-
-    # following = False
-    # revealed_head_index = -1
-    # for index, entry in enumerate(register):
-    #     if entry['details_id'] == details['details_id']:
-    #         following = True
-    #         revealed_head_index = index
-    #         #continue
-    #
-    #     prev = register[index - 1] if index > 0 else None
-    #     this = register[index]
-    #     next = register[index + 1] if index < len(register) - 1 else None
-    #
-    #     if next is not None and 'amended_by' in next and next['amended_by']['type'] == 'Part Cancellation':
-    #         addl_info += get_part_cancellation_additional_info(cursor, next) + "  "
-    #     # TODO: check --- should 'next' be 'prev', remember higher index = older record
-    #     # if prev is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
-    #     #     addl_info += get_rectification_additional_info_prev(cursor, this, prev)
-    #
-    #
-    #     if not following:
-    #         pass
-    #
-    #     else:
-    #         pass
-    #
-    # # Step backwards in time from the current entry-of-interest
-    # logging.debug('REVEALED_HEAD: %d', revealed_head_index)
-    # logging.debug('LEN REGISTER -1: %d', len(register) - 1)
-    # for index in range(revealed_head_index, len(register)):  # - 1):
-    #     logging.debug('CHECK: %d', index)
-    #     this = register[index]
-    #     prev = register[index + 1] if index < len(register) - 1 else None
-    #     next = register[index - 1] if index > 0 else None
-    #
-    #     logging.debug('THIS')
-    #     logging.debug(this['registration'])
-    #     logging.debug('PREV')
-    #     logging.debug(prev['registration'] if prev is not None else None)
-    #     logging.debug('NEXT')
-    #     logging.debug(next['registration'] if next is not None else None)
-    #
-    #
-    #     # if prev is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
-    #     if 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
-    #         addl_info += get_rectification_additional_info_prev(cursor, this, prev, next)
-    #
-    #     if next is not None and 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
-    #         addl_info += get_rectification_additional_info_next(cursor, this, prev, next)
-    #
-    #
-    # return addl_info.strip()
-
-
-
-
-
-    # history = get_registration_history(cursor, details['registration']['number'], details['registration']['date'])
-    # register = []
-    # for record in history:
-    #     # TODO: test assumption that item 0 is always valid
-    #     register.append(get_registration_details(cursor, record['registrations'][0]['number'], record['registrations'][0]['date']))
-
-
-
-
-    # next_record = None
-    # if 'amended_by' in details:  # and details['amended_by']['type'] == 'Renewal':  # TODO: confirm type is 'Renewal' (hint: nope)
-    #     next_record = get_registration_details(cursor, details['amended_by']['number'], details['amended_by']['date'])
-
-    # logging.debug(json.dumps(details))
-    #
-    # if not details['revealed']:
-    #     return ''
-    #     #raise RuntimeError('Get additional info for non-reveal entry is unsupported')  # TODO: ???
-    #
-    # additional_info_forward = None
-    # if 'amended_by' in details:
-    #     if details['amended_by']['type'] == 'Part Cancellation':
-    #         additional_info_forward = get_part_cancellation_additional_info(cursor, details)
-    #
-    #     if details['amended_by']['type'] == 'Rectification':
-    #         pass
-    #
-    # #if 'amended'
-
-
-    #return additional_info_forward
-
-    #
-    # # History is: current record at 0, previous at 1, etc...
-    # # Go back in, for each n -> n + 1 work out the additional information line
-    # # Squish the lines together and return
-    # for x in range(0, len(register) - 2):
-    #     current = register[x]
-    #     previous = register[x + 1]
-    #
-    #     amend_type = current['amends_registration']['type']
-
-
-        # 'Rectification', 'Correction', 'Amendment', 'Cancellation', 'Part Cancellation'
-
-
-    # PART CAN [1ST REG] REGD [1ST DATE]
-
-    # if rows[0]['amends'] is not None:
-    #     data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
-    #     data['amends_registration']['type'] = rows[0]['amendment_type']
-
-    # 0, 1, 2, 3
-
-    # data['amended_by'] = {
-    #     'number': rows[0]['registration_no'],
-    #     'date': rows[0]['date'].strftime('%Y-%m-%d'),
-    #     'type': rows[0]['amendment_type']
-    # }
-
-    # get_registration_history(cursor, reg_no, date) -> gets array of object containing
-    #       'registrations', an array of object {date, number}
-
-    # def get_registration_details(cursor, reg_no, date):
+    return ' '.join(addl_info).strip()
+    # return {
+    #     "array": addl_info,
+    #     "text": get_additional_info_text(addl_info).strip()
