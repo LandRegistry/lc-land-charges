@@ -1796,8 +1796,6 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
 
 
 
-        pass
-
     if rect_type == 3:
         # As a type three is effectively a cancellation & new registration, there appears to
         # be no additional information to add...
@@ -1806,6 +1804,13 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
         if details['particulars']['counties'][0] != next_details['particulars']['counties'][0]:
             return 'COUNTY PREVIOUSLY REGD AS {} UNDER {} REGD {}'.format(
                 details['particulars']['counties'][0].upper(),
+                details['registration']['number'],
+                reformat_date_string(details['registration']['date'])
+            )
+
+        if details['class_of_charge'] != next_details['class_of_charge']:
+            return 'CLASS OF CHARGE PREVIOUSLY REGD AS {} UNDER {} REGD {}'.format(
+                details['class_of_charge'],
                 details['registration']['number'],
                 reformat_date_string(details['registration']['date'])
             )
@@ -1895,7 +1900,6 @@ def get_renewal_additional_info_prev(cursor, details, next, addl_info):
 
     if index != -1:
         addl_info.insert(index, "RENEWAL OF {} REGD {}".format(
-        #addl_info.append(index, "RENEWAL OF {} REGD {}".format(
             details['registration']['number'],
             reformat_date_string(details['registration']['date'])
         ))
@@ -1905,15 +1909,6 @@ def get_renewal_additional_info_prev(cursor, details, next, addl_info):
             reformat_date_string(details['registration']['date'])
         ))
 
-
-
-# 2nd renewal (1002)
-# RENEWAL OF 1001 REGD 11/03/2016 NOW FURTHER RENEWED BY 1003 REGD 11/03/2016 WHICH RENEWED 1000 REGD 11/03/2016
-# should be
-# RENEWAL OF 1001 REGD 11/03/2016 WHICH RENEWED 1000 REGD 11/03/2016 NOW FURTHER RENEWED BY 1003 REGD 11/03/2016
-
-# incoming to _prev:
-# RENEWAL OF 1001 REGD 11/03/2016 NOW FURTHER RENEWED BY 1003 REGD 11/03/2016
 
 def get_renewal_additional_info_next(cursor, details, prev, addl_info):
     addl_info.insert(0, "RENEWED BY {} REGD {}".format(
@@ -1937,8 +1932,14 @@ def get_additional_info_text(addl_info):
                 new_line = re.sub('RENEWAL OF', 'WHICH RENEWED', line)
                 result += ' ' + new_line
 
+            elif 'NAME RECTIFIED TO' in line and ('NAME RECTIFIED TO' in previous_line or 'NAME PREVIOUSLY REGISTERED' in previous_line):
+                new_line = re.sub('NAME RECTIFIED TO', 'NOW FURTHER RECTIFIED TO', line)
+                result += ' ' + new_line
 
-
+            elif 'NAME PREVIOUSLY REGISTERED' in line and 'NAME PREVIOUSLY REGISTERED AS' in previous_line:
+                new_line = re.sub('NAME PREVIOUSLY REGISTERED AS', 'AND LATER RECTIFIED TO', line)
+                result += ' ' + new_line
+                
             else:
                 result += ' ' + line
 
@@ -2005,7 +2006,7 @@ def get_additional_info(cursor, details):
                 logging.debug('BACKWARD')
 
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
-                    addl_info.append(get_rectification_additional_info_prev(cursor, this, next))
+                    addl_info.insert(0, get_rectification_additional_info_prev(cursor, this, next))
 
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Amendment':
                     addl_info.append(get_amendment_additional_info(cursor, this, next))
@@ -2021,7 +2022,7 @@ def get_additional_info(cursor, details):
                 logging.debug('FORWARD')
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Rectification':
-                    addl_info.append(get_rectification_additional_info_next(cursor, this, prev))
+                    addl_info.insert(0, get_rectification_additional_info_next(cursor, this, prev))
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Part Cancellation':
                     addl_info.append(get_part_cancellation_additional_info(cursor, this))
@@ -2037,7 +2038,7 @@ def get_additional_info(cursor, details):
     #return ' '.join(addl_info).strip()
     return {
         "array": addl_info,
-        "text": get_additional_info_text(addl_info)
+        "text": get_additional_info_text(addl_info).strip()
     }
 
     # following = False
