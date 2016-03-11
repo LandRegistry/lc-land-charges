@@ -42,3 +42,7 @@ puts reg2
 reg = reg2['new_registrations'][0]
 reg3 = lc_api.put("/registrations/#{reg['date']}/#{reg['number']}", renewal)
 puts reg3
+
+reg = reg3['new_registrations'][0]
+reg4 = lc_api.put("/registrations/#{reg['date']}/#{reg['number']}", renewal)
+puts reg4

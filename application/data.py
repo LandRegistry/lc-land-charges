@@ -1883,11 +1883,17 @@ def get_renewal_additional_info_prev(cursor, details, next, renewed, addl_info):
     logging.debug('ADDL_INFO: ' + addl_info)
     logging.debug(details['registration'])
     if 'RENEWAL OF' in addl_info:
-        return "{} WHICH RENEWED {} REGD {}".format(
-            addl_info,
-            details['registration']['number'],
-            reformat_date_string(details['registration']['date'])
-        )
+
+        if 'NOW FURTHER RENEWED' in addl_info:
+            # WHICH RENEWED has to be before
+
+
+        else:
+            return "{} WHICH RENEWED {} REGD {}".format(
+                addl_info,
+                details['registration']['number'],
+                reformat_date_string(details['registration']['date'])
+            )
 
     elif 'RENEWED BY' in addl_info:
         return "RENEWAL OF {} REGD {} NOW FURTHER {}".format(
@@ -1902,6 +1908,14 @@ def get_renewal_additional_info_prev(cursor, details, next, renewed, addl_info):
             reformat_date_string(details['registration']['date'])
         )
 
+
+# 2nd renewal (1002)
+# RENEWAL OF 1001 REGD 11/03/2016 NOW FURTHER RENEWED BY 1003 REGD 11/03/2016 WHICH RENEWED 1000 REGD 11/03/2016
+# should be
+# RENEWAL OF 1001 REGD 11/03/2016 WHICH RENEWED 1000 REGD 11/03/2016 NOW FURTHER RENEWED BY 1003 REGD 11/03/2016
+
+# incoming to _prev:
+# RENEWAL OF 1001 REGD 11/03/2016 NOW FURTHER RENEWED BY 1003 REGD 11/03/2016
 
 def get_renewal_additional_info_next(cursor, details, prev, addl_info):
     rn = ""
