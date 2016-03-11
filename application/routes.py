@@ -291,15 +291,15 @@ def cancel_registration():
         return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
-@app.route('/court_check/<court>/<ref>', methods=['GET'])
-def court_ref_existence_check(court, ref):
+@app.route('/court_check/<ref>', methods=['GET'])
+def court_ref_existence_check(ref):
     logging.debug("Court existence checking")
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         cursor.execute("SELECT registration_no, date FROM register r, register_details rd " +
-                       "WHERE UPPER(rd.legal_body)=%(court)s AND UPPER(rd.legal_body_ref_no)=%(ref)s " +
+                       "WHERE UPPER(rd.legal_body_ref)=%(body_ref)s " +
                        "AND rd.id=r.details_id AND r.reveal='t'",
-                       {"court": court.upper(), "ref": ref.upper()})
+                       {"body_ref": ref.upper()})
         rows = cursor.fetchall()
         results = []
         if len(rows) > 0:
