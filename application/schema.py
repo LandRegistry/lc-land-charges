@@ -243,7 +243,7 @@ UPDATE_SCHEMA = {
     "properties": {
         "type": {
             "type": "string",
-            "enum": ['Rectification', 'Correction', 'Amendment', 'Cancellation', 'Part Cancellation']
+            "enum": ['Rectification', 'Correction', 'Amendment', 'Cancellation', 'Part Cancellation', 'Renewal']
         },
         "plan_attached": {"type": "string"},
         "part_cancelled": {"type": "string"},
@@ -429,12 +429,14 @@ def validate_update(data):
 
     update = data['update_registration']
     if update['type'] == 'Part Cancellation':
-
         if 'plan_attached' not in update and 'part_cancelled' not in update:
             errors.append({'error_message': "Part cancellation requires plan_attached or part_cancelled"})
 
     elif update['type'] == 'Rectification':
         pass  # both the intrument and chargee fields are optional for rectifications
+    elif update['type'] == 'Renewal':
+        if not data['class_of_charge'] in ['PA', 'WO', 'DA']:  # Is 'DA' going to happen?
+            errors.append({'error_message': "Invalid class of charge for renewal"})
     else:
         if 'plan_attached' in update or 'part_cancelled' in update or 'instrument' in update or 'chargee' in update:
             errors.append({'error_message': 'update_registration contains 1 or more invalid fields'})
