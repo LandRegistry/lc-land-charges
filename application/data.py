@@ -1857,6 +1857,26 @@ def get_court_additional_info(cursor, details):
     return party['case_reference'].upper() + " [" + str(details['registration']['number']) + "]"
 
 
+def get_amendment_additional_info(cursor, details, next_details):
+    wob_fragment = "THIS REGISTRATION AMENDS {} DATED {}".format(
+        details['registration']['number'],
+        reformat_date_string(details['registration']['date'])
+    )
+
+    pab_fragment = ""
+    if 'amends_registration' in next_details and 'PAB' in next_details['amends_registration']:
+        matcher = re.match("(\d+)\((\d{4}\-\d\d\-\d\d)\)", next_details['amends_registration']['PAB'])
+        pab_reg_no = matcher.group(1)
+        pab_date = matcher.group(2)
+        pab_fragment = " & {} DATED {}".format(pab_reg_no, pab_date)
+
+
+
+
+    logging.debug(next_details)
+
+    return wob_fragment + pab_fragment
+
 def get_additional_info(cursor, details):
     # TODO: get addl info for migrated records
 
@@ -1881,6 +1901,10 @@ def get_additional_info(cursor, details):
     for index, entry in enumerate(register):
         logging.debug('THIS (%d)', index)
 
+        this = register[index]
+        prev = register[index + 1] if index < len(register) - 1 else None
+        next = register[index - 1] if index > 0 else None
+
         if entry['details_id'] == details['details_id']:  # This is the record of interest
             logging.debug('Switch')
             forward = False
@@ -1890,9 +1914,7 @@ def get_additional_info(cursor, details):
 
         else:
 
-            this = register[index]
-            prev = register[index + 1] if index < len(register) - 1 else None
-            next = register[index - 1] if index > 0 else None
+
 
 
             logging.debug(this['registration'])
@@ -1909,6 +1931,12 @@ def get_additional_info(cursor, details):
 
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
                     addl_info += get_rectification_additional_info_prev(cursor, this, next)
+
+                if 'amends_registration' in next and next['amends_registration']['type'] == 'Amendment':
+                    addl_info += get_amendment_additional_info(cursor, this, next)
+
+                # if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Amendment':
+                #     addl_info += get_amendment_additional_info(cursor, this, prev)
             else:
 
                 logging.debug('FORWARD')
@@ -1918,6 +1946,8 @@ def get_additional_info(cursor, details):
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Part Cancellation':
                     addl_info += get_part_cancellation_additional_info(cursor, this)
+
+
 
 
     return addl_info.strip()

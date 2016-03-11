@@ -64,8 +64,9 @@ def error_handler(err):
 
 @app.before_request
 def before_request():
-    logging.info(format_message("BEGIN %s %s [%s]"),
-                 request.method, request.url, request.remote_addr)
+    #logging.info(format_message("BEGIN %s %s [%s]"),
+    #             request.method, request.url, request.remote_addr)
+    pass
 
 
 @app.after_request
@@ -180,6 +181,7 @@ def register():
     try:
         new_regns, details_id, request_id = insert_new_registration(cursor, json_data)
         complete(cursor)
+        logging.debug(new_regns)
         logging.info(format_message("Registration committed"))
     except:
         rollback(cursor)
