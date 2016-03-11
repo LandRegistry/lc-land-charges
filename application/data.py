@@ -1878,6 +1878,43 @@ def get_amendment_additional_info(cursor, details, next_details):
 
     return wob_fragment + pab_fragment
 
+
+def get_renewal_additional_info_prev(cursor, details, next, renewed, addl_info):
+    logging.debug('ADDL_INFO: ' + addl_info)
+    logging.debug(details['registration'])
+    if 'RENEWAL OF' in addl_info:
+        return "{} WHICH RENEWED {} REGD {}".format(
+            addl_info,
+            details['registration']['number'],
+            reformat_date_string(details['registration']['date'])
+        )
+
+    elif 'RENEWED BY' in addl_info:
+        return "RENEWAL OF {} REGD {} NOW FURTHER {}".format(
+            details['registration']['number'],
+            reformat_date_string(details['registration']['date']),
+            addl_info
+        )
+
+    else:
+        return "RENEWAL OF {} REGD {}".format(
+            details['registration']['number'],
+            reformat_date_string(details['registration']['date'])
+        )
+
+
+def get_renewal_additional_info_next(cursor, details, prev, addl_info):
+    rn = ""
+    if "RENEWED BY" in addl_info:
+        rn = " NOW FURTHER " + addl_info
+
+    return "RENEWED BY {} REGD {}{}".format(
+        details['registration']['number'],
+        reformat_date_string(details['registration']['date']),
+        rn
+    )
+
+
 def get_additional_info(cursor, details):
     # TODO: get addl info for migrated records
 
@@ -1899,6 +1936,7 @@ def get_additional_info(cursor, details):
     #print(json.dumps(register))
 
     forward = True
+    renewed = False
     for index, entry in enumerate(register):
         logging.debug('THIS (%d)', index)
 
@@ -1929,12 +1967,15 @@ def get_additional_info(cursor, details):
             if not forward:
                 logging.debug('BACKWARD')
 
-
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
                     addl_info += get_rectification_additional_info_prev(cursor, this, next)
 
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Amendment':
                     addl_info += get_amendment_additional_info(cursor, this, next)
+
+                if 'amends_registration' in next and next['amends_registration']['type'] == 'Renewal':
+                    addl_info = get_renewal_additional_info_prev(cursor, this, next, renewed, addl_info)
+                    renewed = True
 
                 # if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Amendment':
                 #     addl_info += get_amendment_additional_info(cursor, this, prev)
@@ -1947,6 +1988,11 @@ def get_additional_info(cursor, details):
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Part Cancellation':
                     addl_info += get_part_cancellation_additional_info(cursor, this)
+
+                if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Renewal':
+                    addl_info = get_renewal_additional_info_next(cursor, this, prev, addl_info)
+
+
 
 
 
