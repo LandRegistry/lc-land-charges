@@ -14,7 +14,7 @@ from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
     get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history, insert_migrated_cancellation, \
-    get_additional_info
+    get_additional_info, get_multi_registrations
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches, \
     get_search_by_request_id, get_search_ids_by_date
@@ -109,9 +109,13 @@ def all_registrations():
 
 @app.route('/registrations/<date>/<int:reg_no>', methods=['GET'])
 def registration(date, reg_no):
+    if "class_of_charge" in request.args:
+        class_of_charge = request.args["class_of_charge"]
+    else:
+        class_of_charge = None
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        details = get_registration_details(cursor, reg_no, date)
+        details = get_registration_details(cursor, reg_no, date, class_of_charge)
         addl_info = get_additional_info(cursor, details)
 
         if addl_info is not None:
@@ -137,7 +141,6 @@ def registration_history(date, reg_no):
         return Response(status=404)
     else:
         return Response(json.dumps(details), status=200, mimetype='application/json')
-
 
 
 @app.route('/registrations', methods=['POST'])
@@ -277,9 +280,7 @@ def cancel_registration():
     logging.debug("Received: %s", json_data)
     reg = json_data['registration']
     logging.debug("Reg: %s", reg)
-    reg_no = json_data['registration_no']
-    reg_date = json_data['registration']['date']
-    rows, nos, canc_request_id = insert_cancellation(reg_no, reg_date, json_data)
+    rows, nos, canc_request_id = insert_cancellation(json_data)
     if rows == 0:
         return Response(status=404)
     else:
@@ -470,29 +471,29 @@ def insert():
 
                     # TODO repeating code is bad.
                     if reg['type'] == 'AM':
-                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
+                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
                                        "id = %(id)s",
                                        {
                                            "amend": previous_id, "id": details_id, "type": "Amendment"
                                        })
 
                     if reg['type'] == 'RN':
-                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
+                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
                                        "id = %(id)s",
                                        {
                                            "amend": previous_id, "id": details_id, "type": "Renewal"
                                        })
 
                     if reg['type'] == 'RC':
-                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
-                                       "id = %(id)s",
+                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
+                                       " id = %(id)s",
                                        {
                                            "amend": previous_id, "id": details_id, "type": "Rectification"
                                        })
 
                     if reg['type'] == 'CP':
-                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE " +
-                                       "id = %(id)s",
+                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s "
+                                       "WHERE id = %(id)s",
                                        {
                                            "amend": previous_id, "id": details_id, "type": "Part Cancellation"
                                        })
@@ -645,7 +646,7 @@ def get_request_details(request_id):
     request_type = get_request_type(request_id)
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        if request_type.lower() in ('search'):
+        if request_type.lower() == 'search':
             data = get_search_request_details(request_id)
         else:  # not a search - reg register details
             data = get_register_request_details(request_id)
@@ -849,3 +850,17 @@ def clear_area_variants():
     cursor.execute('DELETE FROM county_search_keys')
     complete(cursor)
     return Response(status=200)
+
+
+@app.route('/multi_reg_check/<registration_date>/<int:registration_no>', methods=['GET'])
+def multi_reg_check(registration_date, registration_no):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        details = get_multi_registrations(cursor, registration_date, registration_no)
+    finally:
+        complete(cursor)
+    if details is None:
+        # this is not a multi_reg application
+        return Response(None, status=200, mimetype='application/json')
+    else:
+        return Response(json.dumps(details), status=200, mimetype='application/json')
