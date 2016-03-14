@@ -1638,17 +1638,12 @@ def get_registration_history(cursor, reg_no, date):
     return results
 
 
-
 # There's a convention on how the additional information is to be recorded on the various
 # types of registration, rectification, part cancellation etc.
 # These follow a fixed format, so there is no real need for people to actually type it in.
 # With just a few parameters, we should be able to figure out the additional information
 # for any record.
 
-# Assumptions
-# Where record A is 'updated' to become record B, the addlinfo is only on record B
-# Except: where the update is a renewal, when we need the +1 record
-# Or, of course, various types of renewal, rectification etc.
 
 def reformat_date_string(date):
     return re.sub("(\d{4})\-(\d\d)\-(\d\d)", r"\3/\2/\1", date)
@@ -1686,12 +1681,6 @@ def get_part_cancellation_additional_info(cursor, details):
         raise RuntimeError('Invalid amendment information')
 
     return additional_info
-    # next_details = get_registration_details(cursor, details['registration']['number'], details['amended_by']['date'])
-    # next_addtion = ''
-    # if 'amended_by' in next_details and next_details['registration']['type'] == 'Part Cancellation':
-    #     next_addtion = get_part_cancellation_additional_info(cursor, next_details)
-    #
-    # return additional_info + next_addtion
 
 
 def get_rectification_additional_info_prev(cursor, details, next_details):
@@ -1711,7 +1700,7 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
         if 'amended_by' in next_details: # Because 'next' is the same registration, we need to know the number that amended next
             amend_details = next_details['amended_by']
         else:
-            return '' # not much we can do...
+            return ''  # not much we can do...
 
         if details['particulars']['description'] != next_details['particulars']['description']:
             return 'SHORT DESCRIPTION RECTIFIED FROM {} BY {} REGD {}'.format(
@@ -1744,15 +1733,8 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
         pass
 
     if rect_type in [2, 3]:  #  == 2:
-        #prev_name = eo_name_string(prev_details) if prev_details is not None else None
         this_name = eo_name_string(details) if details is not None else None
         next_name = eo_name_string(next_details) if next_details is not None else None
-
-        logging.debug('Comparing names')
-        #logging.debug(prev_name)
-        logging.debug(this_name)
-        logging.debug(next_name)
-        logging.debug('-----')
 
         if next_name is not None and next_name != this_name:
             return 'NAME PREVIOUSLY REGISTERED AS {} UNDER {} REGD {}'.format(
@@ -1774,13 +1756,7 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
                 reformat_date_string(details['registration']['date'])
             )
 
-
-
     if rect_type == 3:
-        # As a type three is effectively a cancellation & new registration, there appears to
-        # be no additional information to add...
-        # Bzzzt, untrue...
-
         if details['particulars']['counties'][0] != next_details['particulars']['counties'][0]:
             return 'COUNTY PREVIOUSLY REGD AS {} UNDER {} REGD {}'.format(
                 details['particulars']['counties'][0].upper(),
@@ -1795,11 +1771,6 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
                 reformat_date_string(details['registration']['date'])
             )
 
-
-
-        pass
-
-    logging.debug('======== /GET RECTIF ADDL INFO ========')
     return ''
 
 
@@ -1808,8 +1779,6 @@ def get_rectification_additional_info_next(cursor, details, prev_details):
     if rect_type in [2, 3]:
         prev_name = eo_name_string(prev_details) if prev_details is not None else None
         this_name = eo_name_string(details) if details is not None else None
-        #next_name = eo_name_string(next_details) if next_details is not None else None
-
 
         if prev_name is not None and prev_name != this_name:
             return 'NAME RECTIFIED TO {} BY {} REGD {}'.format(
@@ -1831,9 +1800,6 @@ def get_rectification_additional_info_next(cursor, details, prev_details):
                 details['registration']['number'],
                 reformat_date_string(details['registration']['date'])
             )
-
-
-
 
     return ''
 
@@ -1862,7 +1828,6 @@ def get_amendment_additional_info(cursor, details, next_details):
         pab_reg_no = matcher.group(1)
         pab_date = matcher.group(2)
         pab_fragment = " & {} DATED {}".format(pab_reg_no, pab_date)
-
 
     return wob_fragment + pab_fragment
 
@@ -1991,9 +1956,13 @@ def get_additional_info(cursor, details):
                     addl_info.append(get_part_cancellation_additional_info(cursor, this))
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Renewal':
-                    get_renewal_additional_info_next(cursor, this, prev, addl_info)
+                    addl_info.append(get_renewal_additional_info_next(cursor, this, prev, addl_info))
 
-    return ' '.join(addl_info).strip()
+    return get_additional_info_text(addl_info)
+    # Convienient debug array:
     # return {
     #     "array": addl_info,
-    #     "text": get_additional_info_text(addl_info).strip()
+    #     "text": get_additional_info_text(addl_info)
+    # }
+
+
