@@ -1,6 +1,32 @@
 import logging
 
 
+def eo_name_string(details):
+    eo = None
+    for party in details['parties']:
+        if party['type'] in ['Estate Owner', 'Debtor']:
+            eo = party
+            break
+
+    if eo is None:
+        return ''
+
+    name = party['names'][0]
+
+    if name['type'] in ['County Council', 'Parish Council', 'Rural Council', 'Other Council']:
+        return name['local']['name']
+    elif name['type'] in ['Development Corporation', 'Other']:
+        return name['other']
+    elif name['type'] == 'Limited Company':
+        return name['company']
+    elif name['type'] == 'Complex Name':
+        return name['complex']['name']
+    elif name['type'] == 'Private Individual':
+        return ' '.join(name['private']['forenames']) + ' ' + name['private']['surname']
+    else:
+        raise RuntimeError("Unknown name type: {}".format(a['type']))
+
+
 def names_match(a, b):
     if a['type'] != b['type']:
         return False
@@ -89,7 +115,15 @@ def get_rectification_type(original_data, new_data):
     # 'parties': [{'names': [{'private': {'forenames': ['Jo', 'John'], 'surname': 'Johnson'}, 'type':
     # 'Private Individual'}], 'type': 'Estate Owner'}], 'particulars': {'description': '1 The Lane, Some Village',
     # 'district': 'South Hams', 'counties': ['Devon']}}
-    if new_data['update_registration']['type'] == 'Amendment':
+
+    is_amend = False
+    if 'update_registration' in new_data:  # case of 'new_data' being incoming update data
+        is_amend = new_data['update_registration']['type'] == 'Amendment'
+
+    if 'amends_registration' in new_data:  # case of comparing data items at rest
+        is_amend = new_data['amends_registration']['type'] == 'Amendment'
+
+    if is_amend:  # new_data['update_registration']['type'] == 'Amendment':
         # loop through the names in original and new and then compare
         new_names = []
         for names in new_data['parties'][0]['names']:

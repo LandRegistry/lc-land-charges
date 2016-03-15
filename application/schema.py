@@ -247,6 +247,7 @@ UPDATE_SCHEMA = {
         },
         "plan_attached": {"type": "string"},
         "part_cancelled": {"type": "string"},
+        "pab": {"type": "string"},
         "instrument": {
             "type": "object",
             "properties": {

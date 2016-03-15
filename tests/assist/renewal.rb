@@ -39,7 +39,10 @@ reg = register(initial)
 reg2 = lc_api.put("/registrations/#{reg['date']}/#{reg['number']}", renewal)
 puts reg2
 
-reg2['new_registrations'].each do |rect|
-    puts rect['date']
-    puts rect['number']
-end
+reg = reg2['new_registrations'][0]
+reg3 = lc_api.put("/registrations/#{reg['date']}/#{reg['number']}", renewal)
+puts reg3
+
+reg = reg3['new_registrations'][0]
+reg4 = lc_api.put("/registrations/#{reg['date']}/#{reg['number']}", renewal)
+puts reg4
