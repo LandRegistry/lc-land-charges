@@ -14,7 +14,7 @@ from application.data import connect, get_registration_details, complete, \
     get_registration, insert_migrated_record, insert_cancellation,  \
     insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
     get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history, insert_migrated_cancellation, \
-    get_additional_info, get_multi_registrations
+    get_additional_info, get_multi_registrations, insert_renewal
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches, \
     get_search_by_request_id, get_search_ids_by_date
@@ -302,6 +302,30 @@ def cancel_registration():
         if not suppress:
             publish_cancellation(producer, nos)
         return Response(json.dumps(data), status=200, mimetype='application/json')
+
+
+@app.route('/renewals', methods=["POST"])
+def renew_registration():
+    print("renewing...")
+    if request.headers['Content-Type'] != "application/json":
+        logging.error('Content-Type is not JSON')
+        return Response(status=415)
+    json_data = json.loads(request.data.decode('utf-8'))
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        row_count, reg_nos, request_id = insert_renewal(json_data)
+        data = {
+            "new_registrations": reg_nos,
+            "request_id": request_id
+            }
+
+        complete(cursor)
+        logging.info(format_message("Renewal committed"))
+    except:
+        rollback(cursor)
+        raise
+
+    return Response(json.dumps(data), status=200)
 
 
 @app.route('/court_check/<ref>', methods=['GET'])
