@@ -1190,7 +1190,6 @@ def get_registration_details_by_id(cursor, details_id):
 
 
 def get_registration_details(cursor, reg_no, date, class_of_charge=None):
-    print("called get reg detl cofc = ", str(class_of_charge))
     params = {'reg_no': reg_no, 'date': date}
     sql = "SELECT r.registration_no, r.date, r.reveal, rd.class_of_charge, rd.id, r.id as register_id, " \
           "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, rd.district, " \
