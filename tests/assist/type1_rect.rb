@@ -27,9 +27,9 @@ end
 `clear-data`
 puts `ruby ../../../acceptance-tests/data/lc-lookups.rb`
 
-do_t1 = false
-do_t2_name = true
-do_t2_name_2 = true
+do_t1 = true
+do_t2_name = false
+do_t2_name_2 = false
 do_t2_county = false
 do_t3 = false
 do_t3_county = false

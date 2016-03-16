@@ -258,7 +258,7 @@ def insert_register_details(cursor, request_id, data, date, amends):
 
         if amend_type == 'Part Cancellation':
             if 'part_cancelled' in update and update['part_cancelled'] != '':
-                amend_info_type = 'Part Cancelled'
+                amend_info_type = 'part_cancelled'
                 amend_info_details_current = update['part_cancelled']
             elif 'plan_attached' in update and update['plan_attached'] != '':
                 amend_info_type = 'plan_attached'
@@ -837,7 +837,7 @@ def get_registration_no_from_details_id(cursor, details_id):
                    {'id': details_id})
     rows = cursor.fetchall()
     if len(rows) == 0:
-        return None
+        raise RuntimeError("No registration found for details {}".format(details_id))
     else:
         return {
             'number': rows[0]['registration_no'],
@@ -1225,7 +1225,7 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
     legal_body = rows[0]['legal_body']
     legal_ref_no = rows[0]['legal_body_ref_no']
     if rows[0]['amends'] is not None:
-        data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
+        data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends']) # returns dict
         data['amends_registration']['type'] = rows[0]['amendment_type']
 
         ait = rows[0]['amend_info_type']
@@ -1236,6 +1236,7 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
             }
         else:
             data['amends_registration'][ait] = rows[0]['amend_info_details']
+
     if rows[0]['cancelled_by'] is not None:
         cursor.execute("select amends, amendment_type from register_details where amends=%(id)s",
                        {"id": details_id})
@@ -1677,17 +1678,26 @@ def additional_info_index(addl_info, substring):
 def get_part_cancellation_additional_info(cursor, details):
     update_info = get_update_information(cursor, details['registration']['number'], details['registration']['date'])
 
-    if 'part_cancelled' in update_info:
-        additional_info = 'PART CAN {} REGD {} SO FAR ONLY AS IT RELATES TO {} BEING PART OF LAND REGD'.format(
+    # "amends_registration": {
+    #   "plan_attached": "the land edged red",
+    #   "number": 1007,
+    #   "date": "2014-06-06",
+    #   "type": "Part Cancellation"
+    # },
+
+
+    if 'part_cancelled' in details['amends_registration']:
+        additional_info = 'PART CAN {} REGD {} SO FAR ONLY AS IT RELATES TO {} BEING PART OF LAND REGD.'.format(
             details['registration']['number'],
             reformat_date_string(details['registration']['date']),
-            update_info['part_cancelled'].upper()
+            details['amends_registration']['part_cancelled'].upper()
         )
-    elif 'plan_attached' in update_info:
-        additional_info = 'PART CAN {} REGD {} SO FAR ONLY AS IT RELEATES TO {} AS DESC ON APPN TO CANCEL'.format(
+    elif 'plan_attached' in details['amends_registration']:
+        additional_info = 'PART CAN {} REGD {} SO FAR ONLY AS IT RELATES TO {} AS DESC ON APPN TO CANCEL.'.format(
             details['registration']['number'],
             reformat_date_string(details['registration']['date']),
-            update_info['plan_attached'].upper()
+            details['amends_registration']['plan_attached'].upper()
+
         )
     else:
         raise RuntimeError('Invalid amendment information')
