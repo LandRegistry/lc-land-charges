@@ -551,11 +551,20 @@ def get_county_registration_map(cursor, details_id):
 #     return original_regs, reg_nos, rows
 
 
-def update_previous_details(cursor, request_id, original_detl_id):
+def update_previous_details(cursor, detl_id, original_detl_id):
     cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
                    "id = %(id)s AND cancelled_by IS NULL",
                    {
-                       "canc": request_id, "id": original_detl_id
+                       "canc": detl_id, "id": original_detl_id
+                   })
+
+
+def set_amends(cursor, new_detl_id, original_detl_id):
+    print("setting amends on ", new_detl_id, original_detl_id)
+    cursor.execute("UPDATE register_details SET amends = %(original_detl_id)s WHERE " +
+                   "id = %(new_detl_id)s AND cancelled_by IS NULL",
+                   {
+                       "original_detl_id": original_detl_id, "new_detl_id": new_detl_id
                    })
 
 
@@ -610,6 +619,9 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
 
     elif alter_type == 2:
         new_names, new_details_id = insert_details(cursor, request_id, data, date_today, original_details_id)
+        if data["update_registration"]["type"] == "Renewal":
+            update_previous_details(cursor, new_details_id, original_details_id)
+            set_amends(cursor, new_details_id, original_details_id)
 
     elif alter_type == 3:
         mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
@@ -1405,6 +1417,23 @@ def insert_cancellation(data):
         rollback(cursor)
         raise
     return len(reg_nos), reg_nos, canc_request_id
+
+
+def insert_renewal(data):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        orig_registration_no = data["registration_no"]
+        orig_date = data["registration"]["date"]
+        orig_class_of_charge = data["class_of_charge"]
+        detl_data = get_registration_details(cursor, orig_registration_no, orig_date, orig_class_of_charge)
+        detl_data['update_registration'] = data['update_registration']
+        original_regs, reg_nos, renewal_request_id = \
+            insert_rectification(cursor, orig_registration_no, orig_date, detl_data, None)
+        complete(cursor)
+    except:
+        rollback(cursor)
+        raise
+    return len(reg_nos), reg_nos, renewal_request_id
 
 
 def insert_lc_county(cursor, register_details_id, county):
