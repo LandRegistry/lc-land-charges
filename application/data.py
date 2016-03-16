@@ -208,7 +208,7 @@ def mark_as_no_reveal(cursor, reg_no, date):
 
 def insert_register_details(cursor, request_id, data, date, amends):
     additional_info = data['additional_information'] if 'additional_information' in data else None
-    logging.debug(data)
+    #logging.debug(data)
     priority_notice = None
     if 'particulars' in data:
         district = data['particulars']['district']
@@ -239,7 +239,7 @@ def insert_register_details(cursor, request_id, data, date, amends):
     is_priority_notice = None
     prio_notc_expires = None
 
-    logging.debug(data)
+    #logging.debug(data)
     if 'priority_notice' in data:
         is_priority_notice = True
         # if 'expires' in 'priority_notice':
@@ -639,10 +639,13 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
     # Now apply registrations to everything; updated_ & new_ are always reveal: true; pseudo_ always reveal: false
     reg_nos = []
     if updated_details_id is not None:
+        logging.debug('Updated details...')
         # version = original_regs[0]['sequence'] + 1  # Assumed: the sequence numbers always match
         upd_reg_nos = []
         if data['class_of_charge'] not in ['PAB', 'WOB']:
             upd_counties = insert_counties(cursor, updated_details_id, data['particulars']['counties'])
+            logging.debug(upd_counties)
+            logging.debug(original_regs)
             for index, reg in enumerate(original_regs):  # TODO: account for county added
                 county = upd_counties[index]
                 name = updated_names[0]['id'] if len(updated_names) > 0 else None
@@ -659,6 +662,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
                     upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'name': name['name']})
 
     if new_details_id is not None:
+        logging.debug('New details...')
         if data['class_of_charge'] not in ['PAB', 'WOB']:
             if len(original_details['particulars']['counties']) < len(data['particulars']['counties']):
                 # Probably a county addition; TODO: ensure. Also, challenge assumption that -1 is the added county
@@ -676,6 +680,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
         reg_nos = new_reg_nos
 
     if pseudo_details_id is not None:
+        logging.debug('Pseudo details...')
         if data['class_of_charge'] not in ['PAB', 'WOB']:
             pseudo_counties = insert_counties(cursor, pseudo_details_id, data['particulars']['counties'])
             pseudo_reg_nos = insert_landcharge_regn(cursor, pseudo_details_id, pseudo_names, pseudo_counties, date_today, None)
@@ -702,7 +707,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
         #     json_data['pab_amendment']['date']
         # )
 
-
+    logging.debug('End of insert rectification')
     return original_regs, reg_nos, request_id
 
     # original_details = get_registration_details(cursor,
@@ -790,7 +795,7 @@ def amend_pab(cursor, pab_reg_no, pab_date, amend_reg_no, amend_date, data):
 
 def get_register_details_id(cursor, reg_no, date, class_of_charge=None):
     params = {"regno": reg_no, "date": date}
-    if "class_of_charge" is None:
+    if class_of_charge is None:
         sql = "SELECT details_id FROM register WHERE registration_no = %(regno)s AND date=%(date)s "
     else:  # deal with multiple registers having duplicate reg_no and date
         sql = "SELECT details_id FROM register r, register_details rd" \
@@ -798,7 +803,9 @@ def get_register_details_id(cursor, reg_no, date, class_of_charge=None):
               " and rd.class_of_charge = %(class_of_charge)s "
         params["class_of_charge"] = class_of_charge
     sql += " ORDER BY reg_sequence_no DESC FETCH FIRST 1 ROW ONLY"
+    logging.debug(sql)
     cursor.execute(sql, params)
+
     rows = cursor.fetchall()
     if len(rows) == 0:
         return None
@@ -809,6 +816,7 @@ def get_register_details_id(cursor, reg_no, date, class_of_charge=None):
 
 
 def get_all_registration_nos(cursor, details_id):
+    logging.debug("Get reg nos for {}".format(details_id))
     cursor.execute("SELECT registration_no, date, reg_sequence_no FROM register WHERE details_id = %(details)s",
                    {"details": details_id})
     rows = cursor.fetchall()
@@ -819,6 +827,7 @@ def get_all_registration_nos(cursor, details_id):
             'date': row['date'].strftime('%Y-%m-%d'),
             'sequence': row['reg_sequence_no']
         })
+    logging.debug(results)
     return results
 
 
@@ -1437,7 +1446,6 @@ def insert_renewal(data):
 
 
 def insert_lc_county(cursor, register_details_id, county):
-    logging.debug('Inserting: ' + county)
     county_id = get_county_id(cursor, county)
     cursor.execute("INSERT INTO detl_county_rel (county_id, details_id) " +
                    "VALUES( %(county_id)s, %(details_id)s ) RETURNING id",
@@ -1606,7 +1614,6 @@ def get_k22_request_id(registration_no, registration_date):
 
 
 def get_entry_summary(cursor, details_id):
-    logging.debug('GET ENTRY SUMMARY: %d', details_id)
     cursor.execute('SELECT r.registration_no, r.date, r.reg_sequence_no, r.reveal, d.amendment_type, d.amends, d.class_of_charge '
                    'FROM register r, register_details d '
                    'WHERE r.details_id = d.id AND d.id = %(did)s', {
@@ -1638,19 +1645,14 @@ def get_entry_summary(cursor, details_id):
 
 
 def get_registration_history_from_details(cursor, details_id):
-    logging.debug('------- GET REG HISTORY FROM DETAILS -------')
     results = []
-
-    logging.debug('Start with: %d', details_id)
     entry = get_entry_summary(cursor, details_id)
     results.append(entry)
 
     while entry['amends'] is not None:
-        logging.debug('Then: %d', entry['amends'])
         entry = get_entry_summary(cursor, entry['amends'])
         results.append(entry)
 
-    logging.debug('------- /GET REG HISTORY FROM DETAILS -------')
     return results
 
 
@@ -1789,8 +1791,6 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
     if rect_type == 2:
         counties = details['particulars']['counties']
         next_counties = next_details['particulars']['counties']
-        logging.debug(counties)
-        logging.debug(next_counties)
         if len(next_counties) > len(counties):
             # As there's no facility to remove counties, assume counties is a subset of next_counties
             return 'PREVIOUSLY REGISTERED ONLY IN COUNTY OF {} UNDER {} REGD {}'.format(
@@ -1833,8 +1833,6 @@ def get_rectification_additional_info_next(cursor, details, prev_details):
     if rect_type == 2:
         counties = details['particulars']['counties']
         prev_counties = prev_details['particulars']['counties']
-        logging.debug(counties)
-        logging.debug(prev_counties)
         if len(prev_counties) < len(counties):
             # As there's no facility to remove counties, assume counties is a subset of next_counties
             return 'CHARGE PREVIOUSLY REGISTERED SOLELY UNDER COUNTY OF {} NOW REGD IN ADDITIONAL COUNTY OF {} UNDER {} REGD {}'.format(
@@ -1876,11 +1874,7 @@ def get_amendment_additional_info(cursor, details, next_details):
 
 
 def get_renewal_additional_info_prev(cursor, details, next, addl_info):
-    logging.debug(addl_info)
-    logging.debug(details['registration'])
-
     index = additional_info_index(addl_info, 'RENEWED BY')
-    logging.debug('INDEX: ' + str(index))
 
     if index != -1:
         addl_info.insert(index, "RENEWAL OF {} REGD {}".format(
@@ -1961,8 +1955,6 @@ def get_additional_info(cursor, details):
     addl_info = []
     forward = True
     for index, entry in enumerate(register):
-        logging.debug('THIS (%d)', index)
-
         this = register[index]
         prev = register[index + 1] if index < len(register) - 1 else None
         next = register[index - 1] if index > 0 else None
