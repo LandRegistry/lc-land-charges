@@ -4,7 +4,7 @@ import json
 import datetime
 import logging
 import re
-from application.data_diff import get_rectification_type, eo_name_string, names_match
+from application.data_diff import get_rectification_type, eo_name_string, names_match, all_names_match
 from application.search_key import create_registration_key
 from application.logformat import format_message
 #from application.additional_info import get_additional_info
@@ -608,6 +608,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
     new_details_id = None
     pseudo_details_id = None
     updated_details_id = None
+    pseudo_names = None
 
     logging.debug("Alteration type is %d", alter_type)
 
@@ -618,11 +619,13 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
 
     elif alter_type == 2:
         new_names, new_details_id = insert_details(cursor, request_id, data, date_today, original_details_id)
-        if data["update_registration"]["type"] == "Renewal":
-            update_previous_details(cursor, new_details_id, original_details_id)  # set cancelled_by but leave reveal
+        # if data["update_registration"]["type"] == "Renewal":
+        update_previous_details(cursor, new_details_id, original_details_id)  # set cancelled_by but leave reveal
+
     elif alter_type == 3:
         mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
         new_names, new_details_id = insert_details(cursor, request_id, data, date_today, original_details_id)
+        update_previous_details(cursor, new_details_id, original_details_id)
 
     elif alter_type == 4:
         # mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
@@ -693,17 +696,19 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
     if data['update_registration']['type'] == "Amendment":
         # A combined PAB/WOB amendment... we need to mark the PAB as no-reveal and cancelled by the incoming request
         logging.debug(data['update_registration'])
-        matcher = re.match("(\d+)\((\d{4}\-\d\d\-\d\d)\)", data['update_registration']['pab'])
-        pab_reg_no = matcher.group(1)
-        pab_date = matcher.group(2)
-        pab_details_id = get_register_details_id(cursor, pab_reg_no, pab_date)
-        mark_as_no_reveal_by_details(cursor, pab_details_id)
-        update_previous_details(cursor, request_id, pab_details_id)
+        if 'pab' in data['update_registration']:
+            matcher = re.match("(\d+)\((\d{4}\-\d\d\-\d\d)\)", data['update_registration']['pab'])
 
-        # json_data['update_registration']['pab'] = "{}({})".format(
-        #     json_data['pab_amendment']['reg_no'],
-        #     json_data['pab_amendment']['date']
-        # )
+            # TODO: only no-reveal the PAB if the names match
+            pab_reg_no = matcher.group(1)
+            pab_date = matcher.group(2)
+            pab_details_id = get_register_details_id(cursor, pab_reg_no, pab_date)
+            pab = get_registration_details_by_id(cursor, pab_details_id)
+
+            if all_names_match(pab['parties'][0], data['parties'][0]):
+                mark_as_no_reveal_by_details(cursor, pab_details_id)
+
+            update_previous_details(cursor, request_id, pab_details_id)
 
     logging.debug('End of insert rectification')
     return original_regs, reg_nos, request_id
@@ -1850,7 +1855,14 @@ def get_court_additional_info(cursor, details):
     if debtor is None:
         raise RuntimeError('Debtor not found')
 
-    return party['case_reference'].upper()  # + " [" + str(details['registration']['number']) + "]"
+    caseref = party['case_reference'].upper()
+    m = re.match("^(.+) (\d+ OF \d{4})$", caseref)
+    if m:
+        caseref = "{} NO {}".format(m.group(1), m.group(2))
+    else:
+        caseref = 'ADJUDICATOR REF ' + caseref
+
+    return caseref
 
 
 def get_amend_additional_info_next(cursor, details, previous):
