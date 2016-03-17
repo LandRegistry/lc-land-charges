@@ -4,7 +4,7 @@ import json
 import datetime
 import logging
 import re
-from application.data_diff import get_rectification_type, eo_name_string
+from application.data_diff import get_rectification_type, eo_name_string, names_match
 from application.search_key import create_registration_key
 from application.logformat import format_message
 #from application.additional_info import get_additional_info
@@ -265,11 +265,11 @@ def insert_register_details(cursor, request_id, data, date, amends):
                 amend_info_details_current = update['plan_attached']
         elif amend_type == 'Rectification':
             if 'instrument' in update and update['instrument'] != '':
-                amend_info_type = 'Instrument'
+                amend_info_type = 'instrument'
                 amend_info_details_orig = update['instrument']['original']
                 amend_info_details_current = update['instrument']['current']
             elif 'chargee' in update and update['chargee'] != '':
-                amend_info_type = 'Chargee'
+                amend_info_type = 'chargee'
                 amend_info_details_orig = update['chargee']['original']
                 amend_info_details_current = update['chargee']['current']
         elif amend_type == 'Amendment':
@@ -584,7 +584,7 @@ def get_alteration_type(original_details, data):
     elif data['update_registration']['type'] == 'Renewal':
         return 2
     elif data['update_registration']['type'] == 'Amendment':
-        return 3
+        return get_rectification_type(original_details, data)  # will be 1 or 3
     elif data['update_registration']['type'] == 'Correction':
         return 4
     elif data['update_registration']['type'] == 'Part Cancellation':
@@ -671,7 +671,7 @@ def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment
                 new_counties = insert_counties(cursor, new_details_id, county) # i_c expect array of str
 
                 reg_no, reg_id = insert_registration(cursor, new_details_id, None, date_today, new_counties[-1]['id'], None)
-                new_reg_nos = [reg_no]
+                new_reg_nos = [{"number": reg_no, "date": date_today}]
             else:
                 new_counties = insert_counties(cursor, new_details_id, data['particulars']['counties'])
                 new_reg_nos = insert_landcharge_regn(cursor, new_details_id, new_names, new_counties, date_today, None)
@@ -1442,7 +1442,7 @@ def insert_renewal(data):
     except:
         rollback(cursor)
         raise
-    return len(reg_nos), reg_nos, renewal_request_id
+    return len(reg_nos), reg_nos, renewal_request_id, original_regs
 
 
 def insert_lc_county(cursor, register_details_id, county):
@@ -1748,30 +1748,30 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
             return ''  # not much we can do...
 
         if details['particulars']['description'] != next_details['particulars']['description']:
-            return 'SHORT DESCRIPTION RECTIFIED FROM {} BY {} REGD {}'.format(
+            return 'SHORT DESCRIPTION RECTIFIED FROM {} BY {} REGD {}.'.format(
                 details['particulars']['description'].upper(), amend_details['number'],
                 reformat_date_string(amend_details['date'])
             )
 
         if details['particulars']['district'] != next_details['particulars']['district']:
-            return 'DISTRICT RECTIFIED FROM {} BY {} REGD {}'.format(
-                details['particulars']['district'].upper(), amend_details['registration']['number'],
-                reformat_date_string(amend_details['registration']['date'])
+            return 'DISTRICT RECTIFIED FROM {} BY {} REGD {}.'.format(
+                details['particulars']['district'].upper(), amend_details['number'],
+                reformat_date_string(amend_details['date'])
             )
 
         # TODO: these next two totally untested
         if 'instrument' in next_details['amends_registration']:
-            return 'DATE OF INSTRUMENT RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
-                next_details['amends_registration']['instrument']['original'].upper(),
-                next_details['amends_registration']['instrument']['current'].upper(),
+            return 'DATE OF INSTRUMENT RECTIFIED FROM {} TO {} BY {} REGD {}.'.format(
+                reformat_date_string(next_details['amends_registration']['instrument']['original'].upper()),
+                reformat_date_string(next_details['amends_registration']['instrument']['current'].upper()),
                 amend_details['number'],
                 reformat_date_string(amend_details['date'])
             )
 
         if 'chargee' in next_details['amends_registration']:
-            return 'CHARGEE RECTIFIED FROM {} TO {} BY {} REGD {}'.format(
-                next_details['amends_registration']['chargee']['original'].upper(),
+            return 'CHARGEE RECTIFIED TO {} FROM {} BY {} REGD {}.'.format(
                 next_details['amends_registration']['chargee']['current'].upper(),
+                next_details['amends_registration']['chargee']['original'].upper(),
                 amend_details['number'],
                 reformat_date_string(amend_details['date'])
             )
@@ -1782,7 +1782,7 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
         next_name = eo_name_string(next_details) if next_details is not None else None
 
         if next_name is not None and next_name != this_name:
-            return 'NAME PREVIOUSLY REGISTERED AS {} UNDER {} REGD {}'.format(
+            return 'NAME PREVIOUSLY REGISTERED AS {} UNDER {} REGD {}.'.format(
                 this_name.upper(),
                 details['registration']['number'],
                 reformat_date_string(details['registration']['date'])
@@ -1793,7 +1793,7 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
         next_counties = next_details['particulars']['counties']
         if len(next_counties) > len(counties):
             # As there's no facility to remove counties, assume counties is a subset of next_counties
-            return 'PREVIOUSLY REGISTERED ONLY IN COUNTY OF {} UNDER {} REGD {}'.format(
+            return 'PREVIOUSLY REGISTERED ONLY IN COUNTY OF {} UNDER {} REGD {}.'.format(
                 counties[0].upper(),
                 details['registration']['number'],
                 reformat_date_string(details['registration']['date'])
@@ -1801,14 +1801,14 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
 
     if rect_type == 3:
         if details['particulars']['counties'][0] != next_details['particulars']['counties'][0]:
-            return 'COUNTY PREVIOUSLY REGD AS {} UNDER {} REGD {}'.format(
+            return 'COUNTY PREVIOUSLY REGD AS {} UNDER {} REGD {}.'.format(
                 details['particulars']['counties'][0].upper(),
                 details['registration']['number'],
                 reformat_date_string(details['registration']['date'])
             )
 
         if details['class_of_charge'] != next_details['class_of_charge']:
-            return 'CLASS OF CHARGE PREVIOUSLY REGD AS {} UNDER {} REGD {}'.format(
+            return 'CLASS OF CHARGE PREVIOUSLY REGD AS {} UNDER {} REGD {}.'.format(
                 details['class_of_charge'],
                 details['registration']['number'],
                 reformat_date_string(details['registration']['date'])
@@ -1824,7 +1824,7 @@ def get_rectification_additional_info_next(cursor, details, prev_details):
         this_name = eo_name_string(details) if details is not None else None
 
         if prev_name is not None and prev_name != this_name:
-            return 'NAME RECTIFIED TO {} BY {} REGD {}'.format(
+            return 'NAME RECTIFIED TO {} BY {} REGD {}.'.format(
                 this_name.upper(),
                 details['registration']['number'],
                 reformat_date_string(details['registration']['date'])
@@ -1835,7 +1835,7 @@ def get_rectification_additional_info_next(cursor, details, prev_details):
         prev_counties = prev_details['particulars']['counties']
         if len(prev_counties) < len(counties):
             # As there's no facility to remove counties, assume counties is a subset of next_counties
-            return 'CHARGE PREVIOUSLY REGISTERED SOLELY UNDER COUNTY OF {} NOW REGD IN ADDITIONAL COUNTY OF {} UNDER {} REGD {}'.format(
+            return 'CHARGE PREVIOUSLY REGD SOLELY UNDER COUNTY OF {} NOW REGD IN ADDITIONAL COUNTY OF {} BY {} REGD {}.'.format(
                 prev_counties[0].upper(),
                 counties[0].upper(),
                 details['registration']['number'],
@@ -1854,7 +1854,23 @@ def get_court_additional_info(cursor, details):
     if debtor is None:
         raise RuntimeError('Debtor not found')
 
-    return party['case_reference'].upper() + " [" + str(details['registration']['number']) + "]"
+    return party['case_reference'].upper()  # + " [" + str(details['registration']['number']) + "]"
+
+
+def get_amend_additional_info_next(cursor, details, previous):
+    # assume debtor is party one for now...
+    name1 = details['parties'][0]['names'][0]
+    name2 = previous['parties'][0]['names'][0]
+
+    if not names_match(name1, name2):
+        name = ' '.join(name1['private']['forenames']) + ' ' + name1['private']['surname']
+        #return 'HEY, THEY NAME CHANGE TO ' + name.upper()
+        return "NAME OF DEBTOR AMENDED TO {} BY {} REGD {}.".format(
+            name.upper(),
+            details['registration']['number'],
+            reformat_date_string(details['registration']['date'])
+        )
+    return ''
 
 
 def get_amendment_additional_info(cursor, details, next_details):
@@ -1868,9 +1884,9 @@ def get_amendment_additional_info(cursor, details, next_details):
         matcher = re.match("(\d+)\((\d{4}\-\d\d\-\d\d)\)", next_details['amends_registration']['PAB'])
         pab_reg_no = matcher.group(1)
         pab_date = matcher.group(2)
-        pab_fragment = " & {} DATED {}".format(pab_reg_no, pab_date)
+        pab_fragment = " & {} DATED {}".format(pab_reg_no, reformat_date_string(pab_date))
 
-    return wob_fragment + pab_fragment
+    return wob_fragment + pab_fragment + "."
 
 
 def get_renewal_additional_info_prev(cursor, details, next, addl_info):
@@ -1898,30 +1914,31 @@ def get_renewal_additional_info_next(cursor, details, prev, addl_info):
 def get_additional_info_text(addl_info):
     result = ''
     for index, line in enumerate(addl_info):
+        logging.debug("{}: {}".format(index, line))
         if index == 0:
             result = line
         else:
-            previous_line = addl_info[index - 1]
+            # previous_line = addl_info[index - 1]
+            #
+            # if 'RENEWED BY' in line and ('RENEWED BY' in previous_line or 'RENEWAL OF' in previous_line):
+            #     result += ' NOW FURTHER ' + line
+            #
+            # elif 'RENEWAL OF' in line and 'RENEWAL OF' in previous_line:
+            #     new_line = re.sub('RENEWAL OF', 'WHICH RENEWED', line)
+            #     result += ' ' + new_line
+            #
+            # elif 'NAME RECTIFIED TO' in line and ('NAME RECTIFIED TO' in previous_line or 'NAME PREVIOUSLY REGISTERED' in previous_line):
+            #     new_line = re.sub('NAME RECTIFIED TO', 'NOW FURTHER RECTIFIED TO', line)
+            #     result += ' ' + new_line
+            #
+            # elif 'NAME PREVIOUSLY REGISTERED' in line and 'NAME PREVIOUSLY REGISTERED AS' in previous_line:
+            #     new_line = re.sub('NAME PREVIOUSLY REGISTERED AS', 'AND LATER RECTIFIED TO', line)
+            #     result += ' ' + new_line
+            #
+            # else:
+            result += ' ' + line
 
-            if 'RENEWED BY' in line and ('RENEWED BY' in previous_line or 'RENEWAL OF' in previous_line):
-                result += ' NOW FURTHER ' + line
-
-            elif 'RENEWAL OF' in line and 'RENEWAL OF' in previous_line:
-                new_line = re.sub('RENEWAL OF', 'WHICH RENEWED', line)
-                result += ' ' + new_line
-
-            elif 'NAME RECTIFIED TO' in line and ('NAME RECTIFIED TO' in previous_line or 'NAME PREVIOUSLY REGISTERED' in previous_line):
-                new_line = re.sub('NAME RECTIFIED TO', 'NOW FURTHER RECTIFIED TO', line)
-                result += ' ' + new_line
-
-            elif 'NAME PREVIOUSLY REGISTERED' in line and 'NAME PREVIOUSLY REGISTERED AS' in previous_line:
-                new_line = re.sub('NAME PREVIOUSLY REGISTERED AS', 'AND LATER RECTIFIED TO', line)
-                result += ' ' + new_line
-
-            else:
-                result += ' ' + line
-
-    return result
+    return result.strip()
 
 
 def get_migration_info(cursor, reg_no, date):
@@ -1963,7 +1980,7 @@ def get_additional_info(cursor, details):
             logging.debug('Switch')
             forward = False
             if entry['class_of_charge'] in ['PAB', 'WOB']:
-                addl_info += get_court_additional_info(cursor, entry)
+                addl_info.insert(0, get_court_additional_info(cursor, entry))
 
         else:
             if not forward:
@@ -1988,7 +2005,10 @@ def get_additional_info(cursor, details):
                     addl_info.append(get_part_cancellation_additional_info(cursor, this))
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Renewal':
-                    addl_info.append(get_renewal_additional_info_next(cursor, this, prev, addl_info))
+                    get_renewal_additional_info_next(cursor, this, prev, addl_info)
+
+                if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Amendment':
+                    addl_info.append(get_amend_additional_info_next(cursor, this, prev))
 
     return get_additional_info_text(addl_info)
     # Convienient debug array:

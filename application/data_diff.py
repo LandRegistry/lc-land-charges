@@ -145,7 +145,7 @@ def get_rectification_type(original_data, new_data):
         # else:
         #    return 2
 
-        return 1
+        return 3
 
     names_are_the_same = names_match(original_data['parties'][0]['names'][0],
                                      new_data['parties'][0]['names'][0])
