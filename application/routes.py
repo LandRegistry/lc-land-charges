@@ -182,6 +182,14 @@ def register():
         logging.error(format_message("Input data failed validation"))
         return Response(json.dumps(errors), status=400, mimetype='application/json')
 
+    if 'postdate' in request.args:
+        date = request.args['postdate']
+        logging.error(format_message('Registration submitted after closing date. Date set to {}'.format(date)))
+        logging.debug(json_data)
+        json_data['dev_registration'] = {
+            'date': date
+        }
+
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # pylint: disable=unused-variable
     try:

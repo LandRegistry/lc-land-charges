@@ -53,6 +53,17 @@ def names_match(a, b):
         raise RuntimeError("Unknown name type: {}".format(a['type']))
 
 
+def all_names_match(party_a, party_b):
+    if len(party_a['names']) != len(party_b['names']):
+        return False
+
+    for index, name in enumerate(party_a['names']):
+        if not names_match(name, party_b['names'][index]):
+            return False
+
+    return True
+
+
 def is_name_change_type3(before, after):
 
     if len(before['forenames']) == 0 and len(after['forenames']) > 0 and \
