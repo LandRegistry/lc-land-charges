@@ -27,7 +27,7 @@ end
 `clear-data`
 puts `ruby ../../../acceptance-tests/data/lc-lookups.rb`
 
-do_t1 = true
+do_t1 = false
 do_t2_name = false
 do_t2_name_2 = false
 do_t2_county = false
@@ -39,7 +39,8 @@ do_t5 = false
 initial = '{"particulars": {"description": "1 The Lane, Some Village", "counties": ["Devon"], "district": "South Hams"}, "class_of_charge": "C1", "applicant": {"address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095", "name": "P334 Team", "reference": "reference 11"}, "parties": [{"type": "Estate Owner", "names": [{"type": "Private Individual", "private": {"surname": "Johnson", "forenames": ["James", "John"]}}]}]}'
 
 if do_t1
-    rectify_t1 = '{"class_of_charge": "C1", "applicant": {"name": "P334 Team", "reference": "reference 11", "address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095"}, "particulars": {"description": "1 The Altered Lane, Some Village", "district": "South Hams", "counties": ["Devon"]}, "parties": [{"names": [{"type": "Private Individual", "private": {"surname": "Johnson", "forenames": ["James", "John"]}}], "type": "Estate Owner"}], "update_registration": {"type": "Rectification"}}'
+    #rectify_t1 = '{"particulars": {"description": "1 The Altered Lane, Some Village", "district": "South Hams", "counties": ["Devon"]}, "class_of_charge": "C1", "applicant": {"name": "P334 Team", "reference": "reference 11", "address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095"}, "parties": [{"names": [{"type": "Private Individual", "private": {"surname": "Johnson", "forenames": ["James", "John"]}}], "type": "Estate Owner"}], "update_registration": {"type": "Rectification"}}'
+    rectify_t1 = '{"particulars": {"description": "1 The Lane, Some Village", "district": "North Hams", "counties": ["Devon"]}, "class_of_charge": "C1", "applicant": {"name": "P334 Team", "reference": "reference 11", "address": "Land Registry Information Systems, 2 William Prance Road, Plymouth", "key_number": "244095"}, "parties": [{"names": [{"type": "Private Individual", "private": {"surname": "Johnson", "forenames": ["James", "John"]}}], "type": "Estate Owner"}], "update_registration": {"type": "Rectification"}}'
 
     lc_api = RestAPI.new($LAND_CHARGES_URI)
     reg = register(initial)

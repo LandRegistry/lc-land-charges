@@ -53,6 +53,17 @@ def names_match(a, b):
         raise RuntimeError("Unknown name type: {}".format(a['type']))
 
 
+def all_names_match(party_a, party_b):
+    if len(party_a['names']) != len(party_b['names']):
+        return False
+
+    for index, name in enumerate(party_a['names']):
+        if not names_match(name, party_b['names'][index]):
+            return False
+
+    return True
+
+
 def is_name_change_type3(before, after):
 
     if len(before['forenames']) == 0 and len(after['forenames']) > 0 and \
@@ -145,7 +156,7 @@ def get_rectification_type(original_data, new_data):
         # else:
         #    return 2
 
-        return 1
+        return 3
 
     names_are_the_same = names_match(original_data['parties'][0]['names'][0],
                                      new_data['parties'][0]['names'][0])

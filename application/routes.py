@@ -182,6 +182,14 @@ def register():
         logging.error(format_message("Input data failed validation"))
         return Response(json.dumps(errors), status=400, mimetype='application/json')
 
+    if 'postdate' in request.args:
+        date = request.args['postdate']
+        logging.error(format_message('Registration submitted after closing date. Date set to {}'.format(date)))
+        logging.debug(json_data)
+        json_data['dev_registration'] = {
+            'date': date
+        }
+
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # pylint: disable=unused-variable
     try:
@@ -315,11 +323,13 @@ def renew_registration():
     json_data = json.loads(request.data.decode('utf-8'))
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        row_count, reg_nos, request_id = insert_renewal(json_data)
+        row_count, reg_nos, request_id, originals = insert_renewal(json_data)
+
         data = {
             "new_registrations": reg_nos,
+            "amended_registrations": originals,
             "request_id": request_id
-            }
+        }
 
         complete(cursor)
         logging.info(format_message("Renewal committed"))
