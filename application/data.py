@@ -224,14 +224,8 @@ def insert_register_details(cursor, request_id, data, date, amends):
             if party['type'] == 'Debtor':
                 debtor = party
 
-    legal_body = None
-    legal_ref_no = None
-
     if debtor is not None:
         legal_ref = debtor['case_reference']
-        if 'legal_body' in debtor:
-            legal_body = debtor['legal_body']
-            legal_ref_no = debtor['legal_body_ref_no']
     else:
         legal_ref = None
 
@@ -278,17 +272,16 @@ def insert_register_details(cursor, request_id, data, date, amends):
 
     cursor.execute("INSERT INTO register_details (request_id, class_of_charge, legal_body_ref, "
                    "amends, district, short_description, additional_info, amendment_type, priority_notice_no, "
-                   "priority_notice_ind, prio_notice_expires, legal_body, legal_body_ref_no, "
+                   "priority_notice_ind, prio_notice_expires, "
                    "amend_info_type, amend_info_details, amend_info_details_orig ) "
                    "VALUES (%(rid)s, %(coc)s, %(legal_ref)s, %(amends)s, %(dist)s, %(sdesc)s, %(addl)s, %(atype)s, "
-                   "%(pno)s, %(pind)s, %(pnx)s, %(legal_body)s, %(legal_ref_no)s, %(amd_type)s, "
+                   "%(pno)s, %(pind)s, %(pnx)s, %(amd_type)s, "
                    "%(amd_detl_c)s, %(amd_detl_o)s ) "
                    "RETURNING id", {
                        "rid": request_id, "coc": data['class_of_charge'],
                        "legal_ref": legal_ref, "amends": amends, "dist": district,
                        "sdesc": short_description, "addl": additional_info, "atype": amend_type,
                        "pno": priority_notice, 'pind': is_priority_notice, "pnx": prio_notc_expires,
-                       "legal_body": legal_body, "legal_ref_no": legal_ref_no,
                        "amd_type": amend_info_type, "amd_detl_c": amend_info_details_current,
                        "amd_detl_o": amend_info_details_orig
                    })
@@ -1024,7 +1017,7 @@ def read_addresses(cursor, party, party_id):
         party['addresses'].append(address)
 
 
-def read_parties(cursor, data, details_id, legal_ref, lead_debtor_id, legal_body, legal_ref_no):
+def read_parties(cursor, data, details_id, legal_ref, lead_debtor_id):
     cursor.execute('SELECT id, party_type, occupation, date_of_birth, residence_withheld '
                    'FROM party '
                    'WHERE register_detl_id = %(id)s', {
@@ -1048,8 +1041,6 @@ def read_parties(cursor, data, details_id, legal_ref, lead_debtor_id, legal_body
                 party['date_of_birth'] = None
             party['residence_withheld'] = row['residence_withheld']
             party['case_reference'] = legal_ref
-            party['legal_body'] = legal_body
-            party['legal_body_ref_no'] = legal_ref_no
             read_addresses(cursor, party, row['id'])
             # TODO: case_reference
 
@@ -1084,7 +1075,7 @@ def get_registration_details_by_id(cursor, details_id):
     cursor.execute("SELECT r.registration_no, r.date, r.reveal, rd.class_of_charge, rd.id, r.id as register_id, "
                    "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
                    "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type, "
-                   "rd.priority_notice_ind, rd.prio_notice_expires, rd.legal_body, rd.legal_body_ref_no, "
+                   "rd.priority_notice_ind, rd.prio_notice_expires, "
                    "rd.request_id, rd.amend_info_type, rd.amend_info_details, rd.amend_info_details_orig, "
                    "r.reg_sequence_no "
                    "from register r, register_details rd "
@@ -1130,8 +1121,6 @@ def get_registration_details_by_id(cursor, details_id):
 
     register_id = rows[0]['register_id']
     legal_ref = rows[0]['legal_body_ref']
-    legal_body = rows[0]['legal_body']
-    legal_ref_no = rows[0]['legal_body_ref_no']
     if rows[0]['amends'] is not None:
         data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
         data['amends_registration']['type'] = rows[0]['amendment_type']
@@ -1169,7 +1158,7 @@ def get_registration_details_by_id(cursor, details_id):
             'type': rows[0]['amendment_type']
         }
 
-    read_parties(cursor, data, details_id, legal_ref, lead_debtor_id, legal_body, legal_ref_no)
+    read_parties(cursor, data, details_id, legal_ref, lead_debtor_id)
 
     cursor.execute("select key_number, application_reference, customer_name, customer_address FROM "
                    "request WHERE id=%(rid)s", {'rid': request_id})
@@ -1191,7 +1180,7 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
     sql = "SELECT r.registration_no, r.date, r.reveal, rd.class_of_charge, rd.id, r.id as register_id, " \
           "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, rd.district, " \
           "rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type, rd.priority_notice_ind, " \
-          "rd.prio_notice_expires, rd.legal_body, rd.legal_body_ref_no, rd.request_id, rd.amend_info_type, " \
+          "rd.prio_notice_expires, rd.request_id, rd.amend_info_type, " \
           "rd.amend_info_details, rd.amend_info_details_orig, r.reg_sequence_no " \
           "from register r, register_details rd " \
           "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id "
@@ -1239,8 +1228,6 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
 
     register_id = rows[0]['register_id']
     legal_ref = rows[0]['legal_body_ref']
-    legal_body = rows[0]['legal_body']
-    legal_ref_no = rows[0]['legal_body_ref_no']
     if rows[0]['amends'] is not None:
         data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])  # returns dict
         data['amends_registration']['type'] = rows[0]['amendment_type']
@@ -1278,7 +1265,7 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
             'type': rows[0]['amendment_type']
         }
 
-    read_parties(cursor, data, details_id, legal_ref, lead_debtor_id, legal_body, legal_ref_no)
+    read_parties(cursor, data, details_id, legal_ref, lead_debtor_id)
 
     cursor.execute("select key_number, application_reference, customer_name, customer_address FROM "
                    "request WHERE id=%(rid)s", {'rid': request_id})
