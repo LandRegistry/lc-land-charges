@@ -117,10 +117,11 @@ def registration(date, reg_no):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         details = get_registration_details(cursor, reg_no, date, class_of_charge)
-        addl_info = get_additional_info(cursor, details)
+        if details is not None:
+            addl_info = get_additional_info(cursor, details)
 
-        if addl_info is not None:
-            details['additional_information'] = addl_info
+            if addl_info is not None:
+                details['additional_information'] = addl_info
     finally:
         complete(cursor)
     if details is None:
