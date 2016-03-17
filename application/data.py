@@ -1495,7 +1495,6 @@ def get_search_request_details(request_id):
               " where a.id = %(request_id)s and a.id = b.request_id "
         cursor.execute(sql, {"request_id": request_id})
         rows = cursor.fetchall()
-        print('sql 1')
     finally:
         complete(cursor)
     request = {}
@@ -2017,7 +2016,6 @@ def get_additional_info(cursor, details):
 
 def get_multi_registrations(cursor, registration_date, registration_no):
     # when multiple registrations exist for the same reg no and date return the relevant data
-    print("hey fellas*****")
     cursor.execute("select r.registration_no, r.date, d.class_of_charge, d.amends, d.cancelled_by, d.request_id, "
                    "d.amendment_type from register r, register_details d where r.details_id = d.id and "
                    "r.date=%(date)s and r.registration_no=%(registration_no)s and cancelled_by is null ",
