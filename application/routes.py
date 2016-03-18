@@ -879,6 +879,16 @@ def get_request_type(request_id):
     return data
 
 
+@app.route('/request/<request_id>/<transaction_fee>', methods=['PUT'])
+def update_request_fee(request_id, transaction_fee):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute('UPDATE request SET transaction_fee = %(fee)s '
+                   'WHERE id = %(request_id)s', {'request_id': request_id, 'fee': transaction_fee})
+
+    complete(cursor)
+    return Response(status=200)
+
+
 @app.route('/area_variants', methods=['PUT'])
 def set_area_variants():
     data = json.loads(request.data.decode('utf-8'))
