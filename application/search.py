@@ -125,7 +125,6 @@ def perform_bankruptcy_search(cursor, name_type, keys, cert_date):
                    "WHERE n.searchable_string = ANY(%(keys)s) "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
-                   "  AND rd.cancelled_by is null"
                    "  AND r.date <= %(date)s"
                    "  AND r.reveal='t'"
                    "  AND rd.class_of_charge in ('PAB', 'WOB', 'PA', 'WO', 'DA') "
@@ -147,7 +146,6 @@ def perform_bankruptcy_search_complex_name(cursor, name_type, keys, number, cert
                    "WHERE n.complex_number = %(number)s "
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
-                   "  AND rd.cancelled_by is null"
                    "  AND r.date <= %(date)s"
                    "  AND r.reveal='t'"
                    "  AND rd.class_of_charge in ('PAB', 'WOB', 'PA', 'WO', 'DA') "
@@ -178,7 +176,6 @@ def perform_full_search_all_counties(cursor, name_type, keys, year_from, year_to
                    "     extract(year from r.date) between %(from_date)s and %(to_date)s "
                    "     or rd.class_of_charge in ('PA', 'WO', 'DA', 'PAB', 'WOB')"
                    "  ) "
-                   "  and rd.cancelled_by is null "
                    "  and r.date <= %(date)s and r.reveal='t'",
                    {
                        'keys': keys, 'from_date': year_from, 'to_date': year_to,
@@ -216,7 +213,7 @@ def perform_full_search(cursor, name_type, keys, counties, year_from, year_to, c
                    "          ) "
                    "      ) "
                    "  ) "
-                   "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
+                   "and r.date <= %(date)s and r.reveal='t'",
                    {
                        'keys': keys, 'from_date': year_from, 'to_date': year_to,
                        'counties': counties, 'date': cert_date, 'exdate': cert_date,
@@ -245,7 +242,6 @@ def perform_full_search_complex_name_all_counties(cursor, name_type, keys, numbe
                    "     extract(year from r.date) between %(from_date)s and %(to_date)s "
                    "     or rd.class_of_charge in ('PA', 'WO', 'DA', 'PAB', 'WOB')"
                    "  ) "
-                   "  and rd.cancelled_by is null "
                    "  and r.date <= %(date)s and r.reveal='t'",
                    {
                        'number': number, 'from_date': year_from, 'to_date': year_to,
@@ -284,7 +280,7 @@ def perform_full_search_complex_name(cursor, name_type, keys, number, counties, 
                    "          ) "
                    "      ) "
                    "  ) "
-                   "and rd.cancelled_by is null and r.date <= %(date)s and r.reveal='t'",
+                   "and r.date <= %(date)s and r.reveal='t'",
                    {
                        'number': number, 'from_date': year_from, 'to_date': year_to,
                        'counties': counties, 'date': cert_date, 'exdate': cert_date,
