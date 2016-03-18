@@ -506,10 +506,10 @@ def validate_generic_registration(data):
                     errors.append({'error_message': "Attribute '{}' required for bankruptcy debtor".format(item)})
 
             if 'residence_withheld' in debtor:
-                if debtor['residence_withheld'] == True and len(debtor['addresses']) > 0:
+                if debtor['residence_withheld'] == True and ('addresses' in debtor and len(debtor['addresses']) > 0):
                     errors.append({'error_message': 'Debtor residence_withheld is true and addresses are present'})
 
-                if debtor['residence_withheld'] == False and len(debtor['addresses']) == 0:
+                if debtor['residence_withheld'] == False and ('addresses' not in debtor or len(debtor['addresses']) == 0):
                     errors.append({'error_message': 'Debtor residence_withheld is false but addresses are missing'})
 
     # TODO ensure update_registration is not present - somehow - validate update uses this method
