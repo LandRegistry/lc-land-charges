@@ -147,6 +147,7 @@ def registration_history(date, reg_no):
 
 @app.route('/registrations', methods=['POST'])
 def register():
+    logging.log(25, format_message('Registration submitted'))
 
     logging.info(format_message("Received registration data: %s"), request.data.decode('utf-8'))
     suppress = False

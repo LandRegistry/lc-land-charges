@@ -1082,7 +1082,7 @@ def get_registration_details_by_id(cursor, details_id):
                    "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type, "
                    "rd.priority_notice_ind, rd.prio_notice_expires, "
                    "rd.request_id, rd.amend_info_type, rd.amend_info_details, rd.amend_info_details_orig, "
-                   "r.reg_sequence_no "
+                   "r.reg_sequence_no, rd.priority_notice_no "
                    "from register r, register_details rd "
                    "where r.details_id = rd.id and r.details_id = %(did)s ", {
                        'did': details_id
@@ -1123,6 +1123,9 @@ def get_registration_details_by_id(cursor, details_id):
             'district': rows[0]['district'],
             'description': rows[0]['short_description']
         }
+
+        if rows[0]['priority_notice_no']:
+            data['particulars']['priority_notice'] = rows[0]['priority_notice_no']
 
     register_id = rows[0]['register_id']
     legal_ref = rows[0]['legal_body_ref']
@@ -1186,7 +1189,7 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
           "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, rd.district, " \
           "rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type, rd.priority_notice_ind, " \
           "rd.prio_notice_expires, rd.request_id, rd.amend_info_type, " \
-          "rd.amend_info_details, rd.amend_info_details_orig, r.reg_sequence_no " \
+          "rd.amend_info_details, rd.amend_info_details_orig, r.reg_sequence_no, rd.priority_notice_no " \
           "from register r, register_details rd " \
           "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id "
     if class_of_charge is not None:
@@ -1230,6 +1233,9 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
             'district': rows[0]['district'],
             'description': rows[0]['short_description']
         }
+
+        if rows[0]['priority_notice_no']:
+            data['particulars']['priority_notice'] = rows[0]['priority_notice_no']
 
     register_id = rows[0]['register_id']
     legal_ref = rows[0]['legal_body_ref']
@@ -1864,6 +1870,7 @@ def get_amend_additional_info_next(cursor, details, previous):
             details['registration']['number'],
             reformat_date_string(details['registration']['date'])
         )
+
     return ''
 
 

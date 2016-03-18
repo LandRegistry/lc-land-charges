@@ -4,14 +4,20 @@ import inspect
 
 
 class OutputFilter(logging.Filter):
-    def __init__(self, is_error):
+    def __init__(self, is_error, is_audit):
         self.is_error = is_error
+        self.is_audit = is_audit
 
     def filter(self, record):
-        if record.levelno <= logging.INFO:
-            return not self.is_error
+        # if record.levelno == 25 and self.is_audit:
+        #     return True
+        if self.is_audit:
+            return record.levelno == 25
         else:
-            return self.is_error
+            if record.levelno <= logging.INFO:
+                return not self.is_error
+            else:
+                return self.is_error
 
 
 old_factory = logging.getLogRecordFactory()
@@ -27,12 +33,19 @@ def record_factory(*args, **kwargs):
     return record
 
 
+def audit(message, *args, **kwargs):
+    logging.log(25, message, *args, **kwargs)
+
+
 def setup_logging(config):
     level = logging.DEBUG if config['DEBUG'] else logging.INFO
     # Our logging routines signal the start and end of the routes,
     # so the Werkzeug defaults aren't required. Keep warnings and above.
     logging.getLogger('werkzeug').setLevel(logging.WARN)
     logging.getLogger('requests.packages.urllib3.connectionpool').setLevel(logging.WARN)
+    logging.addLevelName(25, 'AUDIT')
+
+    logging.audit = audit
 
     global app_name
     app_name = config['APPLICATION_NAME']
@@ -44,12 +57,18 @@ def setup_logging(config):
                                   "%Y-%m-%d %H:%M:%S")
 
     out_handler = logging.StreamHandler(sys.stdout)
-    out_handler.addFilter(OutputFilter(False))
+    out_handler.addFilter(OutputFilter(False, False))
     out_handler.setFormatter(formatter)
     root_logger.addHandler(out_handler)
 
     err_handler = logging.StreamHandler(sys.stderr)
-    err_handler.addFilter(OutputFilter(True))
+    err_handler.addFilter(OutputFilter(True, False))
     err_handler.setFormatter(formatter)
     root_logger.addHandler(err_handler)
+
+    audit_handler = logging.FileHandler(config['AUDIT_LOG_FILENAME'])
+    audit_handler.addFilter(OutputFilter(False, True))
+    audit_handler.setFormatter(formatter)
+    root_logger.addHandler(audit_handler)
+
     root_logger.setLevel(level)
