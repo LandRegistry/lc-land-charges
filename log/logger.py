@@ -66,10 +66,10 @@ def setup_logging(config):
     err_handler.setFormatter(formatter)
     root_logger.addHandler(err_handler)
 
-    if 'AUDIT_LOG_FILENAME' in config:
-        audit_handler = logging.FileHandler(config['AUDIT_LOG_FILENAME'])
-    else:
-        audit_handler = logging.StreamHandler(sys.stdout)
+    # if 'AUDIT_LOG_FILENAME' in config:
+    #     audit_handler = logging.FileHandler(config['AUDIT_LOG_FILENAME'])
+    # else:
+    audit_handler = logging.StreamHandler(sys.stdout)
     audit_handler.addFilter(OutputFilter(False, True))
     audit_handler.setFormatter(formatter)
     root_logger.addHandler(audit_handler)
