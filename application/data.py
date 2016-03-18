@@ -1430,6 +1430,7 @@ def insert_renewal(data):
         orig_class_of_charge = data["class_of_charge"]
         detl_data = get_registration_details(cursor, orig_registration_no, orig_date, orig_class_of_charge)
         detl_data['update_registration'] = data['update_registration']
+        detl_data['applicant'] = data['applicant']
         original_regs, reg_nos, renewal_request_id = \
             insert_rectification(cursor, orig_registration_no, orig_date, detl_data, None)
         complete(cursor)
