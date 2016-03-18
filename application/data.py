@@ -1395,7 +1395,10 @@ def insert_cancellation(data):
     try:
         orig_registration_no = data["registration_no"]
         orig_date = data["registration"]["date"]
-        orig_class_of_charge = data["class_of_charge"]
+        if "class_of_charge" in data:
+            orig_class_of_charge = data["class_of_charge"]
+        else:
+            orig_class_of_charge = None
         original_details_id = get_register_details_id(cursor, orig_registration_no, orig_date, orig_class_of_charge)
         original_regs = get_all_registration_nos(cursor, original_details_id)
         canc_date = datetime.datetime.now().strftime('%Y-%m-%d')
