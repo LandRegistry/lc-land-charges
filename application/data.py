@@ -297,14 +297,19 @@ def insert_request(cursor, applicant, application_type, date, original_data=None
     else:
         ins_request_id = None  # TODO: consider when ins data should be added...
 
+    if 'address_type' in applicant:
+        addr_type = applicant['address_type']
+    else:
+        addr_type = ''
+
     cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
-                   "ins_request_id, customer_name, customer_address) " +
+                   "ins_request_id, customer_name, customer_address, customer_addr_type) " +
                    "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s, " +
-                   "%(cust_name)s, %(cust_addr)s ) RETURNING id",
+                   "%(cust_name)s, %(cust_addr)s , %(cust_addr_type)s) RETURNING id",
                    {
                        "key": applicant['key_number'], "app_type": application_type, "app_ref": applicant['reference'],
                        "app_date": date, "ins_id": ins_request_id, "cust_name": applicant['name'],
-                       "cust_addr": applicant['address']
+                       "cust_addr": applicant['address'], "cust_addr_type": addr_type
                    })
     return cursor.fetchone()[0]
 
