@@ -223,6 +223,10 @@ APPLICANT_SCHEMA = {
     "properties": {
         "name": {"type": "string"},
         "address": {"type": "string"},
+        "address_type": {
+            "type": "string",
+            "enum": ['RM', 'DX']
+        },
         "key_number": {
             "type": "string",
             "pattern": "(^\d{3,7}$)|(^$)"
