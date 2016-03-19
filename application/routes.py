@@ -1,7 +1,7 @@
 from application import app, producer
 from application.exchange import publish_new_bankruptcy, publish_amendment, publish_cancellation
 from application.logformat import format_message
-from flask import Response, request
+from flask import Response, request, g
 import psycopg2
 import psycopg2.extras
 import json
@@ -56,9 +56,15 @@ def error_handler(err):
 
     error = {
         "type": "F",
-        "message": str(err),
-        "stack": call_stack
+        "stack": lines[0:-2]
     }
+
+    try:
+        error["dict"] = json.loads(str(err))
+    except ValueError as e:
+        error["text"] = str(err)
+
+    logging.debug(json.dumps(error, indent=4))
     raise_error(error)
     return Response(json.dumps(error), status=500)
 
@@ -67,6 +73,7 @@ def error_handler(err):
 def before_request():
     #logging.info(format_message("BEGIN %s %s [%s]"),
     #             request.method, request.url, request.remote_addr)
+
     pass
 
 
@@ -77,6 +84,13 @@ def after_request(response):
     #              response.status)
     return response
 
+
+def get_username():
+    if 'X-LC-Username' in request.headers:
+        return request.headers['X-LC-Username']
+    return '?'
+
+
 # ============== /registrations ===============
 
 
@@ -84,6 +98,7 @@ def after_request(response):
 def registrations_by_date(date):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
+        logging.audit(format_message("Retrieve registrations dated %s"), date)
         details = get_registrations_by_date(cursor, date)
     finally:
         complete(cursor)
@@ -98,6 +113,7 @@ def registrations_by_date(date):
 def all_registrations():
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
+        logging.audit(format_message("Retrieve all registrations"))
         details = get_all_registrations(cursor)
     finally:
         complete(cursor)
@@ -116,6 +132,8 @@ def registration(date, reg_no):
         class_of_charge = None
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
+        logging.audit(format_message("Retrieve entry details for %s, %s"), reg_no, date)
+
         details = get_registration_details(cursor, reg_no, date, class_of_charge)
         if details is not None:
             addl_info = get_additional_info(cursor, details)
@@ -135,6 +153,7 @@ def registration(date, reg_no):
 def registration_history(date, reg_no):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
+        logging.audit(format_message("Retrieve entry history for %s, %s"), reg_no, date)
         details = get_registration_history(cursor, reg_no, date)
     finally:
         complete(cursor)
@@ -147,7 +166,7 @@ def registration_history(date, reg_no):
 
 @app.route('/registrations', methods=['POST'])
 def register():
-    logging.log(25, format_message('Registration submitted'))
+    #logging.log(25, format_message('Registration submitted'))
 
     logging.info(format_message("Received registration data: %s"), request.data.decode('utf-8'))
     suppress = False
@@ -194,12 +213,20 @@ def register():
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # pylint: disable=unused-variable
     try:
+        logging.audit(format_message("Submit new entries"))
+
         new_regns, details_id, request_id = insert_new_registration(cursor, json_data)
         complete(cursor)
         logging.debug(new_regns)
         logging.info(format_message("Registration committed"))
+
+        reg_message = ''
+        for r in new_regns:
+            reg_message += r['number'] + ' ' + r['date'] + ', '
+        logging.audit(format_message("Committed new entries: %s"), reg_message)
     except:
-        rollback(cursor)
+        if not cursor.closed:
+            rollback(cursor)
         raise
 
     if not suppress:

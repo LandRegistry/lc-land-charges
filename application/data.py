@@ -487,8 +487,6 @@ def insert_new_registration(cursor, data):
         original = data['original_request']
 
     request_id = insert_request(cursor, data['applicant'], 'New registration', date, original)
-    # request_id = insert_request(cursor, data['key_number'], data["class_of_charge"], data['application_ref'],
-    #                             data['date'], document, original, data['customer_name'], data['customer_address'])
 
     if 'dev_registration' in data:
         date = data['dev_registration']['date']
