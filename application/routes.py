@@ -222,7 +222,7 @@ def register():
 
         reg_message = ''
         for r in new_regns:
-            reg_message += r['number'] + ' ' + r['date'] + ', '
+            reg_message += str(r['number']) + ' ' + r['date'] + ', '
         logging.audit(format_message("Committed new entries: %s"), reg_message)
     except:
         if not cursor.closed:
