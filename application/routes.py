@@ -11,9 +11,9 @@ import kombu
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from application.data import connect, get_registration_details, complete, \
-    get_registration, insert_migrated_record, insert_cancellation,  \
+    get_registration, insert_cancellation,  \
     insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
-    get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history, insert_migrated_cancellation, \
+    get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history, \
     get_additional_info, get_multi_registrations, insert_renewal
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches, \
@@ -213,9 +213,9 @@ def register():
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # pylint: disable=unused-variable
     try:
-        logging.audit(format_message("Submit new entries"))
+        #logging.audit(format_message("Submit new entries"))
 
-        new_regns, details_id, request_id = insert_new_registration(cursor, json_data)
+        new_regns, details_id, request_id = insert_new_registration(cursor, get_username(), json_data)
         complete(cursor)
         logging.debug(new_regns)
         logging.info(format_message("Registration committed"))
@@ -223,7 +223,7 @@ def register():
         reg_message = ''
         for r in new_regns:
             reg_message += str(r['number']) + ' ' + r['date'] + ', '
-        logging.audit(format_message("Committed new entries: %s"), reg_message)
+        logging.audit(format_message("Committed new entries: %s"), json.dumps(new_regns))
     except:
         if not cursor.closed:
             rollback(cursor)
@@ -292,23 +292,15 @@ def amend_registration(date, reg_no):
     # originals, reg_nos, rows = insert_amendment(cursor, reg_no, date, json_data)
     # else:
     try:
-        originals, reg_nos, request_id = insert_rectification(cursor, reg_no, date, json_data, None)
+        originals, reg_nos, request_id = insert_rectification(cursor, get_username(), reg_no, date, json_data, None)
         data = {
             "new_registrations": reg_nos,
             "amended_registrations": originals,
             "request_id": request_id
         }
 
-        # if pab_amendment is not None:
-        #     reg_no = pab_amendment['reg_no']
-        #     date = pab_amendment['date']
-        #     today = datetime.datetime.now().strftime('%Y-%m-%d')
-        #     amendment = {'reg_no': data['new_registrations'][0]['number'],
-        #                  'date': today}
-        #     originals, reg_nos, request_id = insert_rectification(cursor, reg_no, date, json_data, amendment)
-        #     data['amended_registrations'].append(originals)
+        logging.audit(format_message("Updated entries: was %s, now %s"), json.dumps(originals), json.dumps(reg_nos))
         complete(cursor)
-        logging.info(format_message("Alteration committed"))
     except:
         rollback(cursor)
         raise
@@ -330,7 +322,7 @@ def cancel_registration():
     logging.debug("Received: %s", json_data)
     reg = json_data['registration']
     logging.debug("Reg: %s", reg)
-    rows, nos, canc_request_id = insert_cancellation(json_data)
+    rows, nos, canc_request_id = insert_cancellation(json_data, get_username())
     if rows == 0:
         return Response(status=404)
     else:
@@ -351,7 +343,7 @@ def renew_registration():
     json_data = json.loads(request.data.decode('utf-8'))
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        row_count, reg_nos, request_id, originals = insert_renewal(json_data)
+        row_count, reg_nos, request_id, originals = insert_renewal(json_data, get_username())
 
         data = {
             "new_registrations": reg_nos,
@@ -373,6 +365,7 @@ def court_ref_existence_check(ref):
     logging.debug("Court existence checking")
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
+        logging.audit(format_message("Retrieve details by court: %s"), ref)
         cursor.execute("SELECT registration_no, date FROM register r, register_details rd " +
                        "WHERE UPPER(rd.legal_body_ref)=%(body_ref)s " +
                        "AND rd.id=r.details_id AND r.reveal='t'",
@@ -427,6 +420,7 @@ def create_search():
         for item in results:
             store_search_result(cursor, search_request_id, search_details_id, item['name_id'], item['name_result'])
 
+        logging.audit(format_message("Submit search request: %d, ID: %d"), search_request_id, search_details_id)
         complete(cursor)
         logging.info(format_message("Search request and result committed"))
     except:
@@ -465,6 +459,15 @@ def get_searches():
                              })
 
     finally:
+        if 'name' in request.args:
+            logging.audit(format_message("Retrieve search results by name: %s"), request.args['name'])
+
+        elif 'id' in request.args:
+            logging.audit(format_message("Retrieve search results by ID: %s"), request.args['id'])
+
+        else:
+            logging.audit(format_message("Retrieve search results"))
+
         complete(cursor)
 
     return Response(json.dumps(data), status=200, mimetype='application/json')
@@ -476,6 +479,7 @@ def get_searches_by_date(date):
     try:
         data = get_search_ids_by_date(cursor, date)
     finally:
+        logging.audit(format_message("Retrieve searches for date: %s"), date)
         complete(cursor)
 
     if data is None:
@@ -498,6 +502,7 @@ def retrieve_office_copy():
     try:
         data = get_ins_office_copy(cursor, class_of_charge, reg_no, date)
     finally:
+        logging.audit(format_message("Retrieve office copy for %s, %s (%s)"), reg_no, date, class_of_charge)
         complete(cursor)
 
     if data is None:
@@ -508,92 +513,99 @@ def retrieve_office_copy():
 
 @app.route('/migrated_record', methods=['POST'])
 def insert():
-    if request.headers['Content-Type'] != "application/json":
-        logging.error(format_message('Content-Type is not JSON'))
-        return Response(status=415)
-
-    data = request.get_json(force=True)
-    errors = validate_migration(data)
-    if len(errors) > 0:
-        raise_error({
-            "type": "E",
-            "message": "Input data failed validation",
-            "stack": ""
-        })
-        logging.error(format_message("Input data failed validation"))
-        return Response(json.dumps(errors), status=400, mimetype='application/json')
-
-    previous_id = None
-    first_record = data[0]
-
-    failed_inserts = []
-
-    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    for reg in data:
-        try:
-            if reg['type'] == 'CN':
-                details_id, request_id = insert_migrated_cancellation(cursor, data)
-            else:
-                details_id, request_id = insert_migrated_record(cursor, reg)
-                if reg['type'] in ['AM', 'CN', 'CP', 'RN', 'RC']:
-                    if details_id is not None:
-                        cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
-                                       "id = %(id)s AND cancelled_by IS NULL",
-                                       {
-                                           "canc": request_id, "id": previous_id
-                                       })
-                    else:
-                        pass
-
-                    # TODO repeating code is bad.
-                    if reg['type'] == 'AM':
-                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
-                                       "id = %(id)s",
-                                       {
-                                           "amend": previous_id, "id": details_id, "type": "Amendment"
-                                       })
-
-                    if reg['type'] == 'RN':
-                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
-                                       "id = %(id)s",
-                                       {
-                                           "amend": previous_id, "id": details_id, "type": "Renewal"
-                                       })
-
-                    if reg['type'] == 'RC':
-                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
-                                       " id = %(id)s",
-                                       {
-                                           "amend": previous_id, "id": details_id, "type": "Rectification"
-                                       })
-
-                    if reg['type'] == 'CP':
-                        cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s "
-                                       "WHERE id = %(id)s",
-                                       {
-                                           "amend": previous_id, "id": details_id, "type": "Part Cancellation"
-                                       })
-
-            previous_id = details_id
-        except Exception as e:
-            failed_inserts.append({
-                "number": reg['registration']['registration_no'],
-                "date": reg['registration']['date'],
-                "class_of_charge": reg['class_of_charge'],
-                "message": str(e)
-            })
-
-    complete(cursor)
-
-    return Response(json.dumps(failed_inserts), status=200)
+    return Response(status=403)
+    # if request.headers['Content-Type'] != "application/json":
+    #     logging.error(format_message('Content-Type is not JSON'))
+    #     return Response(status=415)
+    #
+    # data = request.get_json(force=True)
+    # errors = validate_migration(data)
+    # if len(errors) > 0:
+    #     raise_error({
+    #         "type": "E",
+    #         "message": "Input data failed validation",
+    #         "stack": ""
+    #     })
+    #     logging.error(format_message("Input data failed validation"))
+    #     return Response(json.dumps(errors), status=400, mimetype='application/json')
+    #
+    # previous_id = None
+    # first_record = data[0]
+    #
+    # failed_inserts = []
+    #
+    # cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    # for reg in data:
+    #     try:
+    #         if reg['type'] == 'CN':
+    #             details_id, request_id = insert_migrated_cancellation(cursor, data)
+    #         else:
+    #             details_id, request_id = insert_migrated_record(cursor, reg)
+    #             if reg['type'] in ['AM', 'CN', 'CP', 'RN', 'RC']:
+    #                 if details_id is not None:
+    #                     cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
+    #                                    "id = %(id)s AND cancelled_by IS NULL",
+    #                                    {
+    #                                        "canc": request_id, "id": previous_id
+    #                                    })
+    #                 else:
+    #                     pass
+    #
+    #                 # TODO repeating code is bad.
+    #                 if reg['type'] == 'AM':
+    #                     cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
+    #                                    "id = %(id)s",
+    #                                    {
+    #                                        "amend": previous_id, "id": details_id, "type": "Amendment"
+    #                                    })
+    #
+    #                 if reg['type'] == 'RN':
+    #                     cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
+    #                                    "id = %(id)s",
+    #                                    {
+    #                                        "amend": previous_id, "id": details_id, "type": "Renewal"
+    #                                    })
+    #
+    #                 if reg['type'] == 'RC':
+    #                     cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
+    #                                    " id = %(id)s",
+    #                                    {
+    #                                        "amend": previous_id, "id": details_id, "type": "Rectification"
+    #                                    })
+    #
+    #                 if reg['type'] == 'CP':
+    #                     cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s "
+    #                                    "WHERE id = %(id)s",
+    #                                    {
+    #                                        "amend": previous_id, "id": details_id, "type": "Part Cancellation"
+    #                                    })
+    #
+    #         previous_id = details_id
+    #     except Exception as e:
+    #         failed_inserts.append({
+    #             "number": reg['registration']['registration_no'],
+    #             "date": reg['registration']['date'],
+    #             "class_of_charge": reg['class_of_charge'],
+    #             "message": str(e)
+    #         })
+    #
+    # complete(cursor)
+    #
+    # return Response(json.dumps(failed_inserts), status=200)
 
 
 # ============= Dev routes ===============
 
+# Add a check to the dev routes. The closer we get to live deployment, the more nervous these things make me.
+# Especially DELETE /registrations...
+def is_dev_VM():
+    import platform
+    return platform.node() == 'landregistry.box'
+
 
 @app.route('/registrations', methods=['DELETE'])
 def delete_all_regs():  # pragma: no cover
-    if not app.config['ALLOW_DEV_ROUTES']:
+    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
         return Response(status=403)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -627,7 +639,7 @@ def delete_all_regs():  # pragma: no cover
 # the synchroniser's queue!
 @app.route('/synchronise', methods=["POST"])
 def synchronise():  # pragma: no cover
-    if not app.config['ALLOW_DEV_ROUTES']:
+    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
         return Response(status=403)
 
     if request.headers['Content-Type'] != "application/json":
@@ -641,7 +653,7 @@ def synchronise():  # pragma: no cover
 
 @app.route('/counties', methods=['POST'])
 def load_counties():  # pragma: no cover
-    if not app.config['ALLOW_DEV_ROUTES']:
+    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
         return Response(status=403)
 
     if request.headers['Content-Type'] != "application/json":
@@ -729,6 +741,7 @@ def get_request_details(request_id):
             details = get_registration_details(cursor, data[0]["registration_no"], data[0]["registration_date"])
             data[0]['details'] = details
     finally:
+        logging.audit(format_message("Retrieve request details for ID: %s"), request_id)
         complete(cursor)
     return Response(json.dumps(data), status=200, mimetype='application/json')
 
@@ -740,14 +753,18 @@ def get_request_id():
         reg_no = request.args['registration_no']
     else:
         return Response(json.dumps({'error': 'no registration_no'}), status=400)
+
     if 'registration_date' in request.args:
         reg_date = request.args['registration_date']
     else:
         return Response(json.dumps({'error': 'no registration_date'}), status=400)
+
     if 'reprint_type' in request.args:
         reprint_type = request.args['reprint_type']
     else:
         return Response("no reprint_type specified", status=400)
+
+    logging.audit(format_message("Retrieve request details for registration %s of %s"), reg_no, reg_date)
     request_id = 0
     if reprint_type == 'registration':
         request_id = get_k22_request_id(reg_no, reg_date)
@@ -773,6 +790,10 @@ def get_search_request_ids():
     date_from = date_from + datetime.timedelta(days=-1)
     date_to = datetime.datetime.strptime(data['date_to'], '%Y-%m-%d')
     date_to = date_to + datetime.timedelta(days=1)
+
+    logging.audit(format_message("Retrieve search results in range %s - %s"),
+                  date_from.strftime('%Y-%m-%d'), date_to.strftime('%Y-%m-%d'))
+
     params = {"key_number": data['key_number'], "date_from": date_from, "date_to": date_to}
     if data['estate_owner_ind'].lower() == "privateindividual":
         forenames = ""
@@ -831,6 +852,9 @@ def get_search_request_ids():
 # count is the amount of ids to return
 @app.route('/request_ids/<count>', methods=["GET"])
 def get_request_ids(count):
+    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
+        return Response(status=403)
+
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         sql = "Select id as request_id from request fetch first " + str(count) + " rows only"
@@ -857,6 +881,7 @@ def get_search_type(request_id):
         cursor.execute(sql, {"request_id": request_id})
         rows = cursor.fetchall()
     finally:
+        logging.audit(format_message("Retrieve search results for request: %s"), request_id)
         complete(cursor)
     search_type = {'search_type': 'search nr'}
     for row in rows:
@@ -868,6 +893,9 @@ def get_search_type(request_id):
 # test route
 @app.route('/last_search', methods=["GET"])
 def last_search():
+    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
+        return Response(status=403)
+
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # get all rows for this request id, if none contain results then search type is 'search_nr'
     data = {}
@@ -895,7 +923,9 @@ def get_request_type(request_id):
                        "from request where id = %(request_id)s ", {"request_id": request_id})
         rows = cursor.fetchall()
     finally:
+        logging.audit(format_message("Retrieve request type for request: %s"), request_id)
         complete(cursor)
+
     data = ""
     if rows:
         for row in rows:
@@ -911,13 +941,16 @@ def update_request_fee(request_id, transaction_fee):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     cursor.execute('UPDATE request SET transaction_fee = %(fee)s '
                    'WHERE id = %(request_id)s', {'request_id': request_id, 'fee': transaction_fee})
-
+    logging.audit(format_message("Set transaction fee to %s for request %s"), transaction_fee, request_id)
     complete(cursor)
     return Response(status=200)
 
 
 @app.route('/area_variants', methods=['PUT'])
 def set_area_variants():
+    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
+        return Response(status=403)
+
     data = json.loads(request.data.decode('utf-8'))
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     for item in data:
@@ -932,6 +965,9 @@ def set_area_variants():
 
 @app.route('/area_variants', methods=['DELETE'])
 def clear_area_variants():
+    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
+        return Response(status=403)
+
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     cursor.execute('DELETE FROM county_search_keys')
     complete(cursor)

@@ -27,9 +27,14 @@ app_name = ""
 def record_factory(*args, **kwargs):
     record = old_factory(*args, **kwargs)
     record.appname = app_name
-    record.file = inspect.stack()[5][1]
-    record.line = inspect.stack()[5][2]
-    record.method = inspect.stack()[5][3]
+    if record.levelno == 25:
+        record.file = inspect.stack()[6][1]
+        record.line = inspect.stack()[6][2]
+        record.method = inspect.stack()[6][3]
+    else:
+        record.file = inspect.stack()[5][1]
+        record.line = inspect.stack()[5][2]
+        record.method = inspect.stack()[5][3]
     return record
 
 
