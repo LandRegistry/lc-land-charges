@@ -6,7 +6,7 @@ def format_message(message):
     if 'X-Transaction-ID' in request.headers:
         transid = "T:{}".format(request.headers['X-Transaction-ID'])
 
-    userstr = ''
+    userstr = 'U:?'
     if 'X-LC-Username' in request.headers:
         userstr = "U:{}".format(request.headers['X-LC-Username'])
 
