@@ -225,7 +225,7 @@ APPLICANT_SCHEMA = {
         "address": {"type": "string"},
         "address_type": {
             "type": "string",
-            "enum": ['RM', 'DX']
+            "enum": ['RM', 'DX', 'NA']
         },
         "key_number": {
             "type": "string",
