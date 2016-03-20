@@ -236,7 +236,7 @@ APPLICANT_SCHEMA = {
         }
     },
     "required": [
-        "name", "address", "key_number", "reference"
+        "name", "address", "key_number", "reference", "address_type"
     ],
     "additionalProperties": False
 }
@@ -385,6 +385,7 @@ SEARCH_SCHEMA = {
         "document_id": {"type": "integer"},
         "expiry_date": DATE_SCHEMA,
         "search_date": DATE_SCHEMA,
+        "cert_no": {"type": "string"},
         "parameters": {
             "type": "object",
             "properties": {
@@ -398,7 +399,8 @@ SEARCH_SCHEMA = {
             "required": ["search_type", "search_items"]
         }
     },
-    "required": ["customer", "parameters", "expiry_date", "search_date"]
+    "required": ["customer", "parameters", "expiry_date", "search_date", "cert_no"],
+    "additionalProperties": False
 }
 
 
