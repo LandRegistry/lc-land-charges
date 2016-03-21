@@ -605,7 +605,7 @@ def is_dev_VM():
 
 @app.route('/registrations', methods=['DELETE'])
 def delete_all_regs():  # pragma: no cover
-    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']:# and is_dev_VM()):
         return Response(status=403)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -639,7 +639,7 @@ def delete_all_regs():  # pragma: no cover
 # the synchroniser's queue!
 @app.route('/synchronise', methods=["POST"])
 def synchronise():  # pragma: no cover
-    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
         return Response(status=403)
 
     if request.headers['Content-Type'] != "application/json":
@@ -653,7 +653,7 @@ def synchronise():  # pragma: no cover
 
 @app.route('/counties', methods=['POST'])
 def load_counties():  # pragma: no cover
-    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
         return Response(status=403)
 
     if request.headers['Content-Type'] != "application/json":
@@ -852,7 +852,7 @@ def get_search_request_ids():
 # count is the amount of ids to return
 @app.route('/request_ids/<count>', methods=["GET"])
 def get_request_ids(count):
-    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
         return Response(status=403)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -893,7 +893,7 @@ def get_search_type(request_id):
 # test route
 @app.route('/last_search', methods=["GET"])
 def last_search():
-    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
         return Response(status=403)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -948,7 +948,7 @@ def update_request_fee(request_id, transaction_fee):
 
 @app.route('/area_variants', methods=['PUT'])
 def set_area_variants():
-    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
         return Response(status=403)
 
     data = json.loads(request.data.decode('utf-8'))
@@ -965,7 +965,7 @@ def set_area_variants():
 
 @app.route('/area_variants', methods=['DELETE'])
 def clear_area_variants():
-    if not (app.config['ALLOW_DEV_ROUTES'] and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
         return Response(status=403)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
