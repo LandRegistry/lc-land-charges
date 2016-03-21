@@ -606,6 +606,7 @@ def is_dev_VM():
 @app.route('/registrations', methods=['DELETE'])
 def delete_all_regs():  # pragma: no cover
     if not app.config['ALLOW_DEV_ROUTES']:# and is_dev_VM()):
+        logging.warning("Non-Dev attempt to delete all data")
         return Response(status=403)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
