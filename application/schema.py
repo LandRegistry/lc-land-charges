@@ -378,6 +378,18 @@ PARAMETER_SCHEMA = {
 }
 
 
+FEE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {"type": "string"},
+        "fee_factor": {"type": "number"},
+        "delivery": {"type": "string"}
+    },
+    "additionalProperties": False,
+    "required": ["type", "fee_factor", "delivery"]
+}
+
+
 SEARCH_SCHEMA = {
     "type": "object",
     "properties": {
@@ -386,6 +398,7 @@ SEARCH_SCHEMA = {
         "expiry_date": DATE_SCHEMA,
         "search_date": DATE_SCHEMA,
         "cert_no": {"type": "string"},
+        "fee_details": FEE_SCHEMA,
         "parameters": {
             "type": "object",
             "properties": {
