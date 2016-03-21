@@ -603,6 +603,11 @@ def is_dev_VM():
     return platform.node() == 'landregistry.box'
 
 
+@app.route('/delete_all_registrations', methods=['POST'])
+def delete_all_the_regs_post():
+    return delete_all_regs()
+
+
 @app.route('/registrations', methods=['DELETE'])
 def delete_all_regs():  # pragma: no cover
     if not app.config['ALLOW_DEV_ROUTES']:# and is_dev_VM()):
