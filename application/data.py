@@ -1076,16 +1076,18 @@ def get_registration_details_by_id(cursor, details_id):
 
     read_parties(cursor, data, details_id, legal_ref, lead_debtor_id)
 
-    cursor.execute("select key_number, application_reference, customer_name, customer_address FROM "
+    cursor.execute("select key_number, application_reference, customer_name, customer_address, "
+                   "customer_addr_type FROM "
                    "request WHERE id=%(rid)s", {'rid': request_id})
     rows = cursor.fetchall()
     if len(rows) > 0:
-        data['applicant'] = {
-            'name': rows[0]['customer_name'],
-            'address': rows[0]['customer_address'],
-            'key_number': rows[0]['key_number'],
-            'reference': rows[0]['application_reference']
-        }
+            data['applicant'] = {
+                'name': rows[0]['customer_name'],
+                'address': rows[0]['customer_address'],
+                'key_number': rows[0]['key_number'],
+                'reference': rows[0]['application_reference'],
+                'address_type': rows[0]['customer_addr_type'],
+            }
 
     # name, address, keyn, ref
     return data
@@ -1186,7 +1188,7 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
 
     read_parties(cursor, data, details_id, legal_ref, lead_debtor_id)
 
-    cursor.execute("select key_number, application_reference, customer_name, customer_address FROM "
+    cursor.execute("select key_number, application_reference, customer_name, customer_address, customer_addr_type FROM "
                    "request WHERE id=%(rid)s", {'rid': request_id})
     rows = cursor.fetchall()
     if len(rows) > 0:
@@ -1194,7 +1196,8 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
             'name': rows[0]['customer_name'],
             'address': rows[0]['customer_address'],
             'key_number': rows[0]['key_number'],
-            'reference': rows[0]['application_reference']
+            'reference': rows[0]['application_reference'],
+            'address_type': rows[0]['customer_addr_type'],
         }
 
     # name, address, keyn, ref
