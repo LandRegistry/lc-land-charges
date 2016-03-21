@@ -79,9 +79,8 @@ def before_request():
 
 @app.after_request
 def after_request(response):
-    # logging.info('END %s %s [%s] (%s) -- %s',
-    #              request.method, request.url, request.remote_addr, request.__hash__(),
-    #              response.status)
+    logging.info('END %s %s [%s] -- %s',
+                 request.method, request.url, request.remote_addr, response.status)
     return response
 
 
@@ -400,11 +399,12 @@ def create_search():
         return Response(status=415)
 
     data = request.get_json(force=True)
-    logging.debug('this is search data', json.dumps(data))
+    logging.debug('this is search data: %s', json.dumps(data))
     errors = validate(data, SEARCH_SCHEMA)
     if errors is not None:
         return Response(json.dumps(errors), status=400)
     logging.debug(data['parameters']['search_type'])
+
     if data['parameters']['search_type'] not in ['full', 'banks']:
         message = "Invalid search type supplied: {}".format(data['parameters']['search_type'])
         logging.error(format_message(message))

@@ -1,7 +1,7 @@
 import logging
 import datetime
 import json
-import re
+import time
 from application.search_key import create_search_keys
 
 
@@ -93,25 +93,6 @@ def store_search_result(cursor, request_id, details_id, name_id, data):
                    })
 
 
-# def complex_name_full_search(cursor, names, counties, search_item, cert_date):
-#     build_results = []
-#     # Do complex name search
-#     # Search against the variations of the complex name
-#     for name in names: #item['name']['complex_variations']:
-#         comp_results = (search_full_by_complex_name(cursor,
-#                                                     name['name'],
-#                                                     name['number'],
-#                                                     counties,
-#                                                     search_item['year_from'],
-#                                                     search_item['year_to'],
-#                                                     cert_date))
-#
-#         if len(comp_results) > 0:
-#             for ids in comp_results:
-#                 build_results.append(ids)
-#     return {'name_result': build_results, 'name_id': search_item['name_id']}
-
-
 # search banks
 # search full - all counties
 # search full - limited counties
@@ -121,7 +102,7 @@ def merge_lists(a, b):
 
 
 def perform_bankruptcy_search(cursor, name_type, keys, cert_date):
-    cursor.execute("SELECT r.id "
+    cursor.execute("SELECT r.id, r.date, rd.class_of_charge "
                    "FROM party_name n, register r, register_details rd "
                    "WHERE n.searchable_string = ANY(%(keys)s) "
                    "  AND r.debtor_reg_name_id = n.id "
@@ -133,7 +114,7 @@ def perform_bankruptcy_search(cursor, name_type, keys, cert_date):
                        "keys": keys, "date": cert_date, "nametype": name_type
                    })
     rows = cursor.fetchall()
-    result = [row['id'] for row in rows]
+    result = [{"id": row['id'], "date": row['date'], "class": row['class_of_charge']} for row in rows]
     return result
 
 
@@ -142,7 +123,8 @@ def perform_bankruptcy_search_complex_name(cursor, name_type, keys, number, cert
     # use SQL on number
     # merge results
     name_results = perform_bankruptcy_search(cursor, name_type, keys, cert_date)
-    cursor.execute("SELECT r.id "
+
+    cursor.execute("SELECT r.id, r.date, rd.class_of_charge "
                    "FROM party_name n, register r, register_details rd "
                    "WHERE n.complex_number = %(number)s "
                    "  AND r.debtor_reg_name_id = n.id "
@@ -154,13 +136,13 @@ def perform_bankruptcy_search_complex_name(cursor, name_type, keys, number, cert
                        "number": number, "date": cert_date, "nametype": name_type
                    })
     rows = cursor.fetchall()
-    result = [row['id'] for row in rows]
+    result = [{"id": row['id'], "date": row['date'], "class": row['class_of_charge']} for row in rows]
     return merge_lists(name_results, result)
 
 
 def perform_full_search_all_counties(cursor, name_type, keys, year_from, year_to, cert_date):
     logging.debug('Full search: %s %s', name_type, keys[0])
-    cursor.execute("SELECT r.id "
+    cursor.execute("SELECT r.id, r.date, rd.class_of_charge "
                    "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd "
                    "WHERE pn.searchable_string = ANY(%(keys)s) "
                    "  and pnr.party_name_id = pn.id and pnr.party_id=p.id "
@@ -184,11 +166,11 @@ def perform_full_search_all_counties(cursor, name_type, keys, year_from, year_to
                    })
     rows = cursor.fetchall()
     logging.debug("%d rows returned", len(rows))
-    return [row['id'] for row in rows]
+    return [{"id": row['id'], "date": row['date'], "class": row['class_of_charge']} for row in rows]
 
 
 def perform_full_search(cursor, name_type, keys, counties, year_from, year_to, cert_date):
-    cursor.execute("SELECT DISTINCT(r.id) "
+    cursor.execute("SELECT r.id, r.date, rd.class_of_charge "
                    "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd "
                    "FULL OUTER JOIN detl_county_rel dcr on rd.id = dcr.details_id "
                    "FULL OUTER JOIN county c on dcr.county_id = c.id "
@@ -221,12 +203,12 @@ def perform_full_search(cursor, name_type, keys, counties, year_from, year_to, c
                        'nametype': name_type
                    })
     rows = cursor.fetchall()
-    return [row['id'] for row in rows]
+    return [{"id": row['id'], "date": row['date'], "class": row['class_of_charge']} for row in rows]
 
 
 def perform_full_search_complex_name_all_counties(cursor, name_type, keys, number, year_from, year_to, cert_date):
     name_results = perform_full_search_all_counties(cursor, name_type, keys, year_from, year_to, cert_date)
-    cursor.execute("SELECT r.id "
+    cursor.execute("SELECT r.id, r.date, rd.class_of_charge "
                    "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd "
                    "WHERE pn.complex_number = %(number)s "
                    "  and pnr.party_name_id = pn.id and pnr.party_id=p.id "
@@ -249,13 +231,13 @@ def perform_full_search_complex_name_all_counties(cursor, name_type, keys, numbe
                        'date': cert_date, 'exdate': cert_date, 'nametype': name_type
                    })
     rows = cursor.fetchall()
-    result = [row['id'] for row in rows]
+    result = [{"id": row['id'], "date": row['date'], "class": row['class_of_charge']} for row in rows]
     return merge_lists(name_results, result)
 
 
 def perform_full_search_complex_name(cursor, name_type, keys, number, counties, year_from, year_to, cert_date):
     name_results = perform_full_search(cursor, name_type, keys, counties, year_from, year_to, cert_date)
-    cursor.execute("SELECT DISTINCT(r.id) "
+    cursor.execute("SELECT r.id, r.date, rd.class_of_charge "
                    "FROM party_name pn, register r, party_name_rel pnr, party p, register_details rd "
                    "FULL OUTER JOIN detl_county_rel dcr on rd.id = dcr.details_id "
                    "FULL OUTER JOIN county c on dcr.county_id = c.id "
@@ -288,8 +270,29 @@ def perform_full_search_complex_name(cursor, name_type, keys, number, counties, 
                        'nametype': name_type
                    })
     rows = cursor.fetchall()
-    result = [row['id'] for row in rows]
+    result = [{"id": row['id'], "date": row['date'], "class": row['class_of_charge']} for row in rows]
     return merge_lists(name_results, result)
+
+
+def process_search_result(result, cert_date):
+    # I can't face attempting to add this to the SQL so we'll filter it out here
+    # Eventually (i.e. within weeks of go-live) we'll write a program to hide/purge the expired
+    # entries as required.
+    processed = []
+    for item in result:
+        if item['class'] in ['PA', 'WO', 'PAB', 'WOB', 'DA']:
+            # item['date'] is date
+            # Rule is don't show if cert_date - 5 years 10 days is > item['date']
+            cdate = datetime.datetime.strptime(cert_date, "%Y-%m-%d")
+            cdate = datetime.datetime(cdate.year - 5, cdate.month, cdate.day)
+            cdate -= datetime.timedelta(days=10)
+
+            if cdate <= item['date']:
+                processed.append(item['id'])
+
+        else:
+            processed.append(item['id'])
+    return processed
 
 
 def perform_search(cursor, parameters, cert_date):
@@ -338,7 +341,7 @@ def perform_search(cursor, parameters, cert_date):
             else:
                 name_result = perform_bankruptcy_search(cursor, item['name_type'], keys, cert_date)
 
-        search_results.append({'name_result': name_result, 'name_id': item['name_id']})
+        search_results.append({'name_result': process_search_result(name_result, cert_date), 'name_id': item['name_id']})
     # search_results.append({'name_result': results_array, 'name_id': item['name_id']})
 
     return search_results
@@ -397,85 +400,3 @@ def get_search_ids_by_date(cursor, date):
     else:
         results = None
     return results
-
-
-# def get_searchable_string(name_string=None, company=None, local_auth=None, local_auth_area=None, other=None):
-#     name = ''
-#     if name_string is not None and name_string != ' ':
-#         name = get_abbrev_name(name_string)
-#     elif company is not None and company != ' ':
-#         name = get_abbrev_name(company)
-#     elif local_auth is not None and local_auth != ' ':
-#         loc_name = get_abbrev_name(local_auth)
-#         loc_area = get_abbrev_name(local_auth_area)
-#         name = get_abbrev_name(loc_name + " " + loc_area)
-#     elif other is not None and other != ' ':
-#         name = get_abbrev_name(other)
-#
-#     searchable_string = re.sub('[^A-Za-z0-9]+', '', name)
-#     return searchable_string.upper()
-#
-#
-# def get_abbrev_name(name):
-#     abbrev_list = []
-#     common_names = [
-#         'ASS', 'ASSOC', 'ASSOCS', 'ASSOCIATE', 'ASSOCIATED', 'ASSOCIATES', 'ASSOCIATION', 'ASSOCIATIONS',
-#         'LD', 'PUBLIC LIMITED COMPANY', 'CWMNI CYFYNGEDIG CYHOEDDUS', 'CWMNI CYF CYHOEDDUS', 'LTD', 'LIMITED',
-#         'CYFYNGEDIG', 'CYF', 'CCC', 'C C C', 'PLC', 'P L C',
-#         'SOC', 'SOCS', 'SOCY', 'SOCYS', 'SOCIETY', 'SOCIETYS', 'SOCIETIES',
-#         'ST', 'STREET', 'SAINT',
-#         'CO', 'COS', 'COY', 'COMP', 'COYS', 'COMPS', 'COMPANY', 'COMPANIES',
-#         'DR', 'DOC', 'DOCTOR',
-#         'BRO', 'BROS', 'BROTHER', 'BROTHERS',
-#         '&', 'AND',
-#         'BROKERS', 'BUILDERS', 'COLLEGES', 'COMMISSIONERS', 'CONSTRUCTIONS', 'CONTRACTORS', 'DECORATORS',
-#         'DEVELOPERS', 'DEVELOPMENTS',
-#         'ENTERPRISES', 'ESTATES', 'GARAGES', 'HOLDINGS', 'HOTELS', 'INVESTMENTS', 'MOTORS', 'PRODUCTIONS',
-#         'SCHOOLS', 'SONS', 'STORES', 'TRUSTS', 'WARDENS', 'CHARITIES', 'PROPERTIES', 'INDUSTRIES',
-#         'ST', 'STREET', 'SAINT'
-#     ]
-#
-#     replace_names = [
-#         'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS', 'ASS',
-#         'LD', 'LD', 'LD', 'LD', 'LD', 'LD',
-#         'LD', 'LD', 'LD', 'LD', 'LD', 'LD',
-#         'SOC', 'SOC', 'SOC', 'SOC', 'SOC', 'SOC', 'SOC',
-#         'ST', 'ST', 'ST',
-#         'CO', 'CO', 'CO', 'CO', 'CO', 'CO', 'CO', 'CO',
-#         'DR', 'DR', 'DR',
-#         'BRO', 'BRO', 'BRO', 'BRO',
-#         'AND', 'AND',
-#         'BROKER', 'BUILDER', 'COLLEGE', 'COMMISSIONER', 'CONSTRUCTION', 'CONTRACTOR', 'DECORATOR',
-#         'DEVELOPER', 'DEVELOPMENT',
-#         'ENTERPRISE', 'ESTATE', 'GARAGE', 'HOLDING', 'HOTEL', 'INVESTMENT', 'MOTOR', 'PRODUCTION',
-#         'SCHOOL', 'SON', 'STORE', 'TRUST', 'WARDEN', 'CHARITY', 'PROPERTY', 'INDUSTRY',
-#         'ST', 'ST', 'ST'
-#     ]
-#
-#     problem_names = [
-#         'PUBLIC LIMITED COMPANY', 'CWMNI CYFYNGEDIG CYHOEDDUS', 'CWMNI CYF CYHOEDDUS', 'C C C', 'P L C'
-#     ]
-#
-#     name = name.upper()
-#     for names in problem_names:
-#         if names in name:
-#             name = name.replace(names, 'LD')
-#
-#     for word in name.split():
-#         if word in common_names:
-#             x = common_names.index(word)
-#             curr_name = replace_names[x]
-#             abbrev_list.append(curr_name)
-#         else:
-#             abbrev_list.append(word)
-#
-#     abbrev_name = "".join(abbrev_list)
-#     return abbrev_name
-#
-#
-# def get_initials(names):
-#     initials_list = []
-#     for name in names.split(" "):
-#         initials_list.append(name[:1])
-#     initials = " ".join(initials_list)
-#     return initials

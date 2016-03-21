@@ -71,8 +71,8 @@ def setup_logging(config):
     err_handler.setFormatter(formatter)
     root_logger.addHandler(err_handler)
 
-    audit_handler = logging.FileHandler(config['AUDIT_LOG_FILENAME'])
-    # audit_handler = logging.StreamHandler(sys.stdout)
+    # audit_handler = logging.FileHandler(config['AUDIT_LOG_FILENAME'])
+    audit_handler = logging.StreamHandler(sys.stdout)
     audit_handler.addFilter(OutputFilter(False, True))
     audit_handler.setFormatter(formatter)
     root_logger.addHandler(audit_handler)

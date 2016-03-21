@@ -225,7 +225,7 @@ APPLICANT_SCHEMA = {
         "address": {"type": "string"},
         "address_type": {
             "type": "string",
-            "enum": ['RM', 'DX']
+            "enum": ['RM', 'DX', 'NA']
         },
         "key_number": {
             "type": "string",
@@ -236,7 +236,7 @@ APPLICANT_SCHEMA = {
         }
     },
     "required": [
-        "name", "address", "key_number", "reference"
+        "name", "address", "key_number", "reference", "address_type"
     ],
     "additionalProperties": False
 }
@@ -378,6 +378,18 @@ PARAMETER_SCHEMA = {
 }
 
 
+FEE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {"type": "string"},
+        "fee_factor": {"type": "number"},
+        "delivery": {"type": "string"}
+    },
+    "additionalProperties": False,
+    "required": ["type", "fee_factor", "delivery"]
+}
+
+
 SEARCH_SCHEMA = {
     "type": "object",
     "properties": {
@@ -385,6 +397,8 @@ SEARCH_SCHEMA = {
         "document_id": {"type": "integer"},
         "expiry_date": DATE_SCHEMA,
         "search_date": DATE_SCHEMA,
+        "cert_no": {"type": "string"},
+        "fee_details": FEE_SCHEMA,
         "parameters": {
             "type": "object",
             "properties": {
@@ -398,7 +412,8 @@ SEARCH_SCHEMA = {
             "required": ["search_type", "search_items"]
         }
     },
-    "required": ["customer", "parameters", "expiry_date", "search_date"]
+    "required": ["customer", "parameters", "expiry_date", "search_date", "cert_no"],
+    "additionalProperties": False
 }
 
 

@@ -163,6 +163,7 @@ def create_limited_name_key(company):
     # Pre-parse the various PLC combinations...
     company = re.sub("(\s|^)(public)\s(limited|ltd|ld)\s(company|co|cos|coy|coys|comp|comps|companies)(\s|$)", r"\1PLC\5", company, flags=re.IGNORECASE)
     company = re.sub("(\s|^)(cwmni|c)\s(cyf|cyfyngedig|c)\s(cyhoeddus|c)(\s|$)", r"\1PLC\5", company, flags=re.IGNORECASE)
+    company = re.sub("(\s|^)(C C C|P L C)(\s|$)", r"\1PLC\3", company, flags=re.IGNORECASE)
     company = remove_non_alphanumeric_spaces(company)
 
     name_array = company.upper().split(' ')
@@ -347,6 +348,6 @@ def create_search_keys(cursor, name_type, name):
         key, ind = get_other_key(name['other_name'])
         keys.append(key)
     else:
-        raise RuntimeError('Unknown name type: {}'.format(name['type']))
+        raise RuntimeError('Unknown name type: {}'.format(name_type))
 
     return keys
