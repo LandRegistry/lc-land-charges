@@ -79,9 +79,8 @@ def before_request():
 
 @app.after_request
 def after_request(response):
-    # logging.info('END %s %s [%s] (%s) -- %s',
-    #              request.method, request.url, request.remote_addr, request.__hash__(),
-    #              response.status)
+    logging.info('END %s %s [%s] -- %s',
+                 request.method, request.url, request.remote_addr, response.status)
     return response
 
 
