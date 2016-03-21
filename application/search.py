@@ -141,7 +141,7 @@ def perform_bankruptcy_search_complex_name(cursor, name_type, keys, number, cert
     # use perform_bankruptcy_search
     # use SQL on number
     # merge results
-    name_results = perform_bankruptcy_search(cursor, name_type, keys)
+    name_results = perform_bankruptcy_search(cursor, name_type, keys, cert_date)
     cursor.execute("SELECT r.id "
                    "FROM party_name n, register r, register_details rd "
                    "WHERE n.complex_number = %(number)s "
@@ -285,7 +285,7 @@ def perform_full_search_complex_name(cursor, name_type, keys, number, counties, 
                    {
                        'number': number, 'from_date': year_from, 'to_date': year_to,
                        'counties': counties, 'date': cert_date, 'exdate': cert_date,
-                       'name_type': name_type
+                       'nametype': name_type
                    })
     rows = cursor.fetchall()
     result = [row['id'] for row in rows]
@@ -319,7 +319,7 @@ def perform_search(cursor, parameters, cert_date):
         logging.debug('Search keys:')
         logging.debug(keys)
 
-        if item['name_type'] == 'Complex':
+        if item['name_type'] == 'Complex Name':
             cnumber = item['name']['complex_number']
 
             if parameters['search_type'] == 'full':

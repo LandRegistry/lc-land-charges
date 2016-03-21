@@ -340,7 +340,7 @@ def create_search_keys(cursor, name_type, name):
         key, ind = get_other_key(name['other_name'])
         keys.append(key)
 
-    elif name_type == 'Complex':
+    elif name_type == 'Complex Name':
         key, ind = get_other_key(name['complex_name'])
         keys.append(key)
     elif name_type == 'Coded Name':

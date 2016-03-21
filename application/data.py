@@ -557,7 +557,7 @@ def get_alteration_type(original_details, data):
         raise RuntimeError("Unknown alteration type")
 
 
-def insert_rectification(cursor, rect_reg_no, rect_reg_date, data, pab_amendment=None):
+def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_amendment=None):
     # This method is also used for Amendments as they perform the same action!
     logging.debug("Insert rectification called with: " + json.dumps(data))
 
