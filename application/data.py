@@ -1413,7 +1413,7 @@ def get_search_request_details(request_id):
     try:
         sql = " Select a.id as request_id, b.id as search_details_id, b.search_timestamp, b.type, b.counties, " \
               " a.key_number, a.application_type, a.application_reference, a.application_date, a.customer_name, " \
-              " a.customer_address, a.custromer_addr_type, a.transaction_fee, b.certificate_date, b.expiry_date " \
+              " a.customer_address, a.customer_addr_type, a.transaction_fee, b.certificate_date, b.expiry_date " \
               " from request a, search_details b " \
               " where a.id = %(request_id)s and a.id = b.request_id "
         cursor.execute(sql, {"request_id": request_id})
