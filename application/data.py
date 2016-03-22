@@ -1386,7 +1386,7 @@ def get_register_request_details(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         sql = " Select a.request_id, b.date as registration_date, b.registration_no, c.customer_name, " \
-              " c.customer_address, c.key_number, " \
+              " c.customer_address, c.key_number, c.customer_addr_type, c.transaction_fee, " \
               " c.application_type, c.application_reference, c.application_date " \
               " from register_details a, register b, request c " \
               " where a.request_id = %(request_id)s and a.id = b.details_id and a.request_id = c.id "
@@ -1398,12 +1398,11 @@ def get_register_request_details(request_id):
     registrations = []
     for row in rows:
         registration = {"request_id": row["request_id"], "registration_date": str(row["registration_date"]),
-                        "registration_no": row["registration_no"],
-                        'customer_name': row['customer_name'],
-                        'customer_address': row['customer_address'], 'key_number': row['key_number'],
+                        "registration_no": row["registration_no"], "transaction_fee": row["transaction_fee"],
                         'application_type': row['application_type'], 'application_date': str(row['application_date']),
-                        'application_reference': row['application_reference']
-                        }
+                        'applicant': {'name': row['customer_name'], 'address': row['customer_address'],
+                                      'key_number': row['key_number'], 'address_type': row['customer_addr_type'],
+                                      'reference': row['application_reference']}}
         registrations.append(registration)
     return registrations
 
@@ -1414,7 +1413,7 @@ def get_search_request_details(request_id):
     try:
         sql = " Select a.id as request_id, b.id as search_details_id, b.search_timestamp, b.type, b.counties, " \
               " a.key_number, a.application_type, a.application_reference, a.application_date, a.customer_name, " \
-              " a.customer_address, b.certificate_date, b.expiry_date " \
+              " a.customer_address, a.custromer_addr_type, a.transaction_fee, b.certificate_date, b.expiry_date " \
               " from request a, search_details b " \
               " where a.id = %(request_id)s and a.id = b.request_id "
         cursor.execute(sql, {"request_id": request_id})
@@ -1424,14 +1423,14 @@ def get_search_request_details(request_id):
     request = {}
 
     for row in rows:
-        request = {'request_id': row['request_id'], 'key_number': row['key_number'],
+        request = {'request_id': row['request_id'],
                    'certificate_date': str(row['certificate_date']), 'expiry_date': str(row['expiry_date']),
-                   'customer_name': row['customer_name'], 'customer_address': row['customer_address'],
-                   'application_reference': row['application_reference'],
-                   'application_date': str(row['application_date']),
-                   'search_details_id': row['search_details_id'],
+                   'application_date': str(row['application_date']), 'search_details_id': row['search_details_id'],
                    'search_timestamp': str(row['search_timestamp']), 'type': row['type'],
-                   'counties': row['counties'], 'search_details': []}
+                   'counties': row['counties'], 'search_details': [], 'transaction_fee': row['transaction_fee'],
+                   'applicant': {'name': row['customer_name'], 'address': row['customer_address'],
+                                 'key_number': row['key_number'], 'address_type': row['customer_addr_type'],
+                                 'reference': row['application_reference']}}
 
         if request['search_details_id'] is None:
             request = {'noresult': 'nosearchdetlid'}
