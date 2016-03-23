@@ -1860,7 +1860,7 @@ def get_additional_info_text(addl_info):
             #     result += ' ' + new_line
             #
             # else:
-            result += ' ' + line
+            result += '  ' + line
 
     return result.strip()
 
@@ -1895,16 +1895,15 @@ def get_additional_info(cursor, details):
 
     addl_info = []
     forward = True
+
     for index, entry in enumerate(register):
         this = register[index]
         prev = register[index + 1] if index < len(register) - 1 else None
         next = register[index - 1] if index > 0 else None
 
         if entry['details_id'] == details['details_id']:  # This is the record of interest
-            logging.debug('Switch')
+            logging.info('Switch')
             forward = False
-            if entry['entered_addl_info'] is not None and entry['entered_addl_info'] != '':
-                addl_info.insert(0, entry['entered_addl_info'])
 
             if entry['class_of_charge'] in ['PAB', 'WOB']:
                 addl_info.insert(0, get_court_additional_info(cursor, entry))
@@ -1922,6 +1921,9 @@ def get_additional_info(cursor, details):
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Renewal':
                     get_renewal_additional_info_prev(cursor, this, next, addl_info)
 
+                if entry['entered_addl_info'] is not None and entry['entered_addl_info'] != '':
+                    addl_info.insert(0, entry['entered_addl_info'])
+
             else:
                 logging.debug('FORWARD')
 
@@ -1938,6 +1940,11 @@ def get_additional_info(cursor, details):
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == 'Amendment':
                     addl_info.append(get_amend_additional_info_next(cursor, this, prev))
+
+    logging.info({
+        "array": addl_info,
+        "text": get_additional_info_text(addl_info)
+    })
 
     return get_additional_info_text(addl_info)
     # Convienient debug array:
