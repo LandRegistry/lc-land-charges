@@ -302,13 +302,15 @@ def insert_request(cursor, user_id, applicant, application_type, date, original_
     else:
         addr_type = ''
 
-    cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
+    app_time = datetime.datetime.now().strftime('%H:%M:%S')
+    logging.info("INSERT REQUEST AT " + app_time)
+    cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, application_time, " +
                    "ins_request_id, customer_name, customer_address, customer_addr_type, caseworker_uid) " +
-                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s, " +
+                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(app_time)s, %(ins_id)s, " +
                    "%(cust_name)s, %(cust_addr)s , %(cust_addr_type)s, %(user)s) RETURNING id",
                    {
                        "key": applicant['key_number'], "app_type": application_type, "app_ref": applicant['reference'],
-                       "app_date": date, "ins_id": ins_request_id, "cust_name": applicant['name'],
+                       "app_date": date, "app_time": app_time,  "ins_id": ins_request_id, "cust_name": applicant['name'],
                        "cust_addr": applicant['address'], "cust_addr_type": addr_type, 'user': user_id
                    })
     return cursor.fetchone()[0]
