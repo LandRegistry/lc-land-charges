@@ -738,6 +738,28 @@ def get_translated_county(county_name):
     return Response(json.dumps(counties), status=200, mimetype='application/json')
 
 
+# Route to allow the front-end to use LC data to validate county councils.
+@app.route("/county_council/<county_name>", methods=["GET"])
+def validate_county_council(county_name):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        cursor.execute("SELECT county_council FROM county_search_keys WHERE name=%(name)s", {'name': county_name.upper()})
+        rows = cursor.fetchall()
+
+        if len(rows) != 1:
+            return Response(status=404)
+
+        print(rows[0])
+        if rows[0]['county_council'] is not True:
+            return Response(status=404)
+
+        return Response(status=200)
+
+    finally:
+        complete(cursor)
+
+
+
 # Get details of a request for printing
 @app.route('/request_details/<request_id>', methods=["GET"])
 def get_request_details(request_id):

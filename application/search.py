@@ -30,13 +30,14 @@ def store_search_request(cursor, data):
     if 'counties' in data['parameters']:
         counties = data['parameters']['counties']
 
-    cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
+    app_time = datetime.datetime.now().strftime('%H:%M:%S')
+    cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, application_time, " +
                    "ins_request_id, customer_name, customer_address, customer_addr_type) " +
-                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s, "
+                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(app_time)s, %(ins_id)s, "
                    " %(name)s, %(addr)s , %(addr_type)s ) RETURNING id",
                    {
                        "key": key_number, "app_type": "SEARCH", "app_ref": reference,
-                       "app_date": date, "ins_id": ins_request_id,
+                       "app_date": date, "app_time": app_time, "ins_id": ins_request_id,
                        "name": cust_name, "addr": cust_address, "addr_type": cust_address_type
                    })
     request_id = cursor.fetchone()[0]

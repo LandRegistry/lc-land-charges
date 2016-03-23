@@ -302,13 +302,15 @@ def insert_request(cursor, user_id, applicant, application_type, date, original_
     else:
         addr_type = ''
 
-    cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, " +
+    app_time = datetime.datetime.now().strftime('%H:%M:%S')
+    logging.info("INSERT REQUEST AT " + app_time)
+    cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, application_time, " +
                    "ins_request_id, customer_name, customer_address, customer_addr_type, caseworker_uid) " +
-                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(ins_id)s, " +
+                   "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(app_time)s, %(ins_id)s, " +
                    "%(cust_name)s, %(cust_addr)s , %(cust_addr_type)s, %(user)s) RETURNING id",
                    {
                        "key": applicant['key_number'], "app_type": application_type, "app_ref": applicant['reference'],
-                       "app_date": date, "ins_id": ins_request_id, "cust_name": applicant['name'],
+                       "app_date": date, "app_time": app_time,  "ins_id": ins_request_id, "cust_name": applicant['name'],
                        "cust_addr": applicant['address'], "cust_addr_type": addr_type, 'user': user_id
                    })
     return cursor.fetchone()[0]
@@ -1413,7 +1415,8 @@ def get_search_request_details(request_id):
     try:
         sql = " Select a.id as request_id, b.id as search_details_id, b.search_timestamp, b.type, b.counties, " \
               " a.key_number, a.application_type, a.application_reference, a.application_date, a.customer_name, " \
-              " a.customer_address, a.customer_addr_type, a.transaction_fee, b.certificate_date, b.expiry_date " \
+              " a.customer_address, a.customer_addr_type, a.transaction_fee, b.certificate_date, b.expiry_date, " \
+              " b.certificate_no " \
               " from request a, search_details b " \
               " where a.id = %(request_id)s and a.id = b.request_id "
         cursor.execute(sql, {"request_id": request_id})
@@ -1428,6 +1431,7 @@ def get_search_request_details(request_id):
                    'application_date': str(row['application_date']), 'search_details_id': row['search_details_id'],
                    'search_timestamp': str(row['search_timestamp']), 'type': row['type'],
                    'counties': row['counties'], 'search_details': [], 'transaction_fee': row['transaction_fee'],
+                   'cert_no': row['certificate_no'],
                    'applicant': {'name': row['customer_name'], 'address': row['customer_address'],
                                  'key_number': row['key_number'], 'address_type': row['customer_addr_type'],
                                  'reference': row['application_reference']}}
