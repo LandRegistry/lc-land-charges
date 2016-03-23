@@ -368,7 +368,7 @@ def court_ref_existence_check(ref):
         cursor.execute("SELECT registration_no, date FROM register r, register_details rd " +
                        "WHERE UPPER(rd.legal_body_ref)=%(body_ref)s " +
                        "AND rd.id=r.details_id AND r.reveal='t' AND rd.cancelled_by is NULL " +
-                       "AND UPPER(rd.amendment_type)!='CANCELLATION'",
+                       "AND (UPPER(rd.amendment_type)!='CANCELLATION' or rd.amendment_type is NULL) ",
                        {"body_ref": ref.upper()})
         rows = cursor.fetchall()
         results = []
