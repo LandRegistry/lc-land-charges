@@ -587,12 +587,12 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
     elif alter_type == 2:
         new_names, new_details_id = insert_details(cursor, request_id, data, date_today, original_details_id)
         # if data["update_registration"]["type"] == "Renewal":
-        update_previous_details(cursor, new_details_id, original_details_id)  # set cancelled_by but leave reveal
+        update_previous_details(cursor, request_id, original_details_id)  # set cancelled_by but leave reveal
 
     elif alter_type == 3:
         mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
         new_names, new_details_id = insert_details(cursor, request_id, data, date_today, original_details_id)
-        update_previous_details(cursor, new_details_id, original_details_id)
+        update_previous_details(cursor, request_id, original_details_id)
 
     elif alter_type == 4:
         # mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
@@ -1319,7 +1319,7 @@ def insert_cancellation(data, user_id):
         # update_registration contains part_cancelled and plan_attached data
         detl_data['update_registration'] = data['update_registration']
         reg_nos, canc_details_id = insert_record(cursor, detl_data, canc_request_id, canc_date, original_details_id)
-        update_previous_details(cursor, canc_details_id, original_details_id)
+        update_previous_details(cursor, canc_request_id, original_details_id)
         # if full cancellation mark all rows as no reveal
         if data['update_registration']['type'] == "Cancellation":
             for reg in original_regs:
