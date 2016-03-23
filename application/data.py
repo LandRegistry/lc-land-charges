@@ -1005,9 +1005,10 @@ def get_registration_details_by_id(cursor, details_id):
     lead_county = rows[0]['county_id']
     lead_debtor_id = rows[0]['debtor_reg_name_id']
     request_id = rows[0]['request_id']
-    # add_info = ''
-    # if rows[0]['additional_info'] is not None:
-    #     add_info = rows[0]['additional_info']
+
+    add_info = ''
+    if rows[0]['additional_info'] is not None:
+        add_info = rows[0]['additional_info']
 
     data = {
         'registration': {
@@ -1019,6 +1020,7 @@ def get_registration_details_by_id(cursor, details_id):
         'class_of_charge': rows[0]['class_of_charge'],
         'status': 'current',
         'revealed': rows[0]['reveal'],
+        'entered_addl_info': add_info
         # 'additional_information': add_info
     }
 
@@ -1117,9 +1119,9 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
     lead_county = rows[0]['county_id']
     lead_debtor_id = rows[0]['debtor_reg_name_id']
     request_id = rows[0]['request_id']
-    # add_info = ''
-    # if rows[0]['additional_info'] is not None:
-    #     add_info = rows[0]['additional_info']
+    add_info = ''
+    if rows[0]['additional_info'] is not None:
+        add_info = rows[0]['additional_info']
 
     data = {
         'registration': {
@@ -1131,7 +1133,7 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
         'class_of_charge': rows[0]['class_of_charge'],
         'status': 'current',
         'revealed': rows[0]['reveal'],
-        # 'additional_information': add_info
+        'entered_addl_info': add_info
     }
 
     if data['class_of_charge'] not in ['PAB', 'WOB']:
@@ -1901,6 +1903,9 @@ def get_additional_info(cursor, details):
         if entry['details_id'] == details['details_id']:  # This is the record of interest
             logging.debug('Switch')
             forward = False
+            if entry['entered_addl_info'] is not None and entry['entered_addl_info'] != '':
+                addl_info.insert(0, entry['entered_addl_info'])
+
             if entry['class_of_charge'] in ['PAB', 'WOB']:
                 addl_info.insert(0, get_court_additional_info(cursor, entry))
 
