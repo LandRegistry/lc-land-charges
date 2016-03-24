@@ -770,8 +770,9 @@ def get_request_details(request_id):
             data = get_search_request_details(request_id)
         else:  # not a search - reg register details
             data = get_register_request_details(request_id)
-            details = get_registration_details(cursor, data[0]["registration_no"], data[0]["registration_date"])
-            data[0]['details'] = details
+            for row in data:  # Each AKA registration needs populating
+                details = get_registration_details(cursor, row["registration_no"], row["registration_date"])
+                row['details'] = details
     finally:
         logging.audit(format_message("Retrieve request details for ID: %s"), request_id)
         complete(cursor)
