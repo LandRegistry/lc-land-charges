@@ -25,28 +25,6 @@ COMMON_WORDS = {
     'DR': ['DR', 'DOC', 'DOCTOR'],
     'BRO': ['BRO', 'BROS', 'BROTHER', 'BROTHERS'],
     'AND': ['&', 'AND'],
-    # 'BROKER': ['BROKERS'],
-    # 'BUILDER': ['BUILDERS'],
-    # 'COLLEGE': ['COLLEGES'],
-    # 'COMMISSIONER': ['COMMISSIONERS'],
-    # 'CONSTRUCTION': ['CONSTRUCTIONS'],
-    # 'CONTRACTOR': ['CONTRACTORS'],
-    # 'DECORATOR': ['DECORATORS'],
-    # 'DEVELOPER': ['DEVELOPERS'],
-    # 'DEVELOPMENT': ['DEVELOPMENTS'],
-    # 'ENTERPRISE': ['ENTERPRISES'],
-    # 'ESTATE': ['ESTATES'],
-    # 'GARAGE': ['GARAGES'],
-    # 'HOLDING': ['HOLDINGS'],
-    # 'HOTEL': ['HOTELS'],
-    # 'INVESTMENT': ['INVESTMENTS'],
-    # 'MOTOR': ['MOTORS'],
-    # 'PRODUCTION': ['PRODUCTIONS'],
-    # 'SCHOOL': ['SCHOOLS'],
-    # 'SON': ['SONS'],
-    # 'STORE': ['STORES'],
-    # 'TRUST': ['TRUSTS'],
-    # 'WARDEN': ['WARDENS'],
     'CHARITY': ['CHARITIES'],
     'PROPERTY': ['PROPERTIES'],
     'INDUSTRY': ['INDUSTRIES']
@@ -89,22 +67,6 @@ LA_NON_KEY_WORDS = ['AND', '&', 'AT', 'BY', 'CITY', 'CUM', 'DE', 'DU', 'EN', 'IN
                     'NEXT', 'OF', 'ON', 'OVER', 'OUT', 'SEA', 'THE', 'U', 'UNDER', 'UPON', 'WITH']
 
 B_INDICATORS = ['BOARD OF']
-
-
-
-# TODO: remove this once we pass a cursor in
-def connect(cursor_factory=None):
-    connection = psycopg2.connect("dbname='{}' user='{}' host='{}' password='{}'".format(
-        app.config['DATABASE_NAME'], app.config['DATABASE_USER'], app.config['DATABASE_HOST'],
-        app.config['DATABASE_PASSWORD']))
-    return connection.cursor(cursor_factory=cursor_factory)
-
-
-def complete(cursor):
-    cursor.connection.commit()
-    cursor.close()
-    cursor.connection.close()
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 def remove_non_alphanumeric(name_string):
@@ -246,7 +208,6 @@ def is_class_b(name):
 
 def get_other_type_a_key(name):
     return remove_non_alphanumeric(name.upper())
-    # TODO: in synchroniser we'll need the punctuation bytes too...
 
 
 def get_other_type_b_key(name):

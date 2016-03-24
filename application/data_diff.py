@@ -31,23 +31,22 @@ def names_match(a, b):
     if a['type'] != b['type']:
         return False
 
-    # TODO: Consider case sensitivity implications
     if a['type'] in ['County Council', 'Parish Council', 'Rural Council', 'Other Council']:
-        return a['local']['area'] == b['local']['area'] and a['local']['name'] == b['local']['name']
+        return a['local']['area'].upper() == b['local']['area'].upper() and a['local']['name'].upper() == b['local']['name'].upper()
     elif a['type'] in ['Development Corporation', 'Other']:
-        return a['other'] == b['other']
+        return a['other'].upper() == b['other'].upper()
     elif a['type'] == 'Limited Company':
-        return a['company'] == b['company']
+        return a['company'].upper() == b['company'].upper()
     elif a['type'] == 'Complex Name':
-        return a['complex']['name'] == b['complex']['name'] and a['complex']['number'] == a['complex']['number']
+        return a['complex']['name'].upper() == b['complex']['name'].upper() and a['complex']['number'] == a['complex']['number']
     elif a['type'] == 'Private Individual':
         if len(a['private']['forenames']) != len(b['private']['forenames']):
             return False
 
-        if a['private']['surname'] != b['private']['surname']:
+        if a['private']['surname'].upper() != b['private']['surname'].upper():
             return False
 
-        return ' '.join(a['private']['forenames']) == ' '.join(b['private']['forenames'])
+        return ' '.join(a['private']['forenames']).upper() == ' '.join(b['private']['forenames']).upper()
 
     else:
         raise RuntimeError("Unknown name type: {}".format(a['type']))
@@ -161,7 +160,7 @@ def get_rectification_type(original_data, new_data):
     names_are_the_same = names_match(original_data['parties'][0]['names'][0],
                                      new_data['parties'][0]['names'][0])
 
-    # TODO: we assume type-3 only possible for Private Individuals here... this is being checked
+    # Type 3 only applies to private individuals
     if not names_are_the_same:
         if new_data['parties'][0]['names'][0]['type'] == 'Private Individual':
             if is_name_change_type3(original_data['parties'][0]['names'][0]['private'],
