@@ -1861,7 +1861,7 @@ def get_migration_info(cursor, reg_no, date):
     if len(rows) == 0:
         return None
 
-    return json.loads(rows[0]['extra_data'])
+    return rows[0]['extra_data']
 
 
 def get_additional_info(cursor, details):
