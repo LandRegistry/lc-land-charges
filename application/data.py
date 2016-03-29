@@ -1310,11 +1310,10 @@ def insert_cancellation(data, user_id):
         if data['update_registration']['type'] == "Cancellation":
             for reg in original_regs:
                 mark_as_no_reveal(cursor, reg['number'], reg['date'])
-        elif data['update_registration']['type'] == "Part Cancellation":
-            # In the part cancellation world, the PC itself is not revealed, but the original is.
-            # Addtional information will indicate the part-cancellation
-            for reg in reg_nos:  # TODO: this is a normal PC, not a C4/D2 style one
-                mark_as_no_reveal(cursor, reg['number'], reg['date'])
+
+        # Mark all cancellation registrations as no reveal.
+        for reg in reg_nos:  # TODO: this is a normal PC, not a C4/D2 style one
+            mark_as_no_reveal(cursor, reg['number'], reg['date'])
 
         logging.audit(format_message("Cancelled entry: %s"), json.dumps(reg_nos))
         complete(cursor)
