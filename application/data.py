@@ -1860,14 +1860,17 @@ def get_migration_info(cursor, reg_no, date):
     if len(rows) == 0:
         return None
 
-    return json.loads(rows[0]['extra_data'])
+    return rows[0]['extra_data']
 
 
 def get_additional_info(cursor, details):
     # TODO: get addl info for migrated records
     migrated = get_migration_info(cursor, details['registration']['number'], details['registration']['date'])
     if migrated is not None:
-        return migrated['amend_info']
+        if 'amend_info' in migrated:
+            return migrated['amend_info']
+        else:
+            return ''
 
     # details is being passed in...
     head_details_id = get_head_of_chain(cursor, details['registration']['number'], details['registration']['date'])
