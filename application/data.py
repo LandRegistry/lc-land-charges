@@ -368,6 +368,8 @@ def insert_details(cursor, request_id, data, date, amends_id):
         if party['type'] == 'Debtor':
             debtor_id = party_id
             debtor = party
+
+        if 'addresses' in party:
             for address in party['addresses']:
                 insert_address(cursor, address, party_id)
 
