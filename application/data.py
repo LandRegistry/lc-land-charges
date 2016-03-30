@@ -1986,3 +1986,18 @@ def get_multi_registrations(cursor, registration_date, registration_no):
             'class_of_charge': row['class_of_charge']
         })
     return results
+
+
+def get_county(cursor, reg_no, reg_date):
+    sql = "select max(reg_sequence_no) as seq_no from register where registration_no=%(reg)s AND date=%(date)s"
+    cursor.execute(sql, {"reg": reg_no, "date": reg_date})
+    row = cursor.fetchone()
+    seq_no = row['seq_no']
+    sql = "select a.name from county a, register b where registration_no=%(reg)s AND date=%(date)s AND reg_sequence_no=%(seq_no)s " \
+          "and b.county_id = a.id;"
+    cursor.execute(sql, {"reg": reg_no, "date": reg_date, "seq_no": seq_no})
+    row = cursor.fetchone()
+    county = row['name']
+    logging.debug("county for %s - %s is %s", reg_no, reg_date, county)
+    return [county]
+

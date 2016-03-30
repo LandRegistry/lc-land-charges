@@ -14,7 +14,7 @@ from application.data import connect, get_registration_details, complete, \
     get_registration, insert_cancellation,  \
     insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
     get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history, \
-    get_additional_info, get_multi_registrations, insert_renewal
+    get_additional_info, get_multi_registrations, insert_renewal, get_county
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches, \
     get_search_by_request_id, get_search_ids_by_date
@@ -759,7 +759,6 @@ def validate_county_council(county_name):
         complete(cursor)
 
 
-
 # Get details of a request for printing
 @app.route('/request_details/<request_id>', methods=["GET"])
 def get_request_details(request_id):
@@ -773,6 +772,9 @@ def get_request_details(request_id):
             for row in data:  # Each AKA registration needs populating
                 details = get_registration_details(cursor, row["registration_no"], row["registration_date"])
                 if details is not None:
+                    if len(details['particulars']['counties']) > 1:
+                        county = get_county(cursor, row['registration_no'], row['registration_date'])
+                        details['particulars']['counties'] = county
                     addl_info = get_additional_info(cursor, details)
                     if addl_info is not None:
                         details['additional_information'] = addl_info
