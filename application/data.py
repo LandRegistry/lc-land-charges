@@ -4,7 +4,7 @@ import json
 import datetime
 import logging
 import re
-from application.data_diff import get_rectification_type, eo_name_string, names_match, all_names_match
+from application.data_diff import get_rectification_type, eo_name_string, names_match, all_names_match, party_a_is_subset_of_b
 from application.search_key import create_registration_key
 from application.logformat import format_message
 #from application.additional_info import get_additional_info
@@ -205,6 +205,12 @@ def mark_as_no_reveal(cursor, reg_no, date):
     })
 
 
+def mark_as_no_reveal_by_id(cursor, register_id):
+    cursor.execute("UPDATE register SET reveal=%(rev)s WHERE id = %(id)s ", {
+        "rev": False, "id": register_id
+    })
+
+
 def insert_register_details(cursor, request_id, data, date, amends):
     additional_info = data['additional_information'] if 'additional_information' in data else None
     priority_notice = None
@@ -310,7 +316,8 @@ def insert_request(cursor, user_id, applicant, application_type, date, original_
                    "%(cust_name)s, %(cust_addr)s , %(cust_addr_type)s, %(user)s) RETURNING id",
                    {
                        "key": applicant['key_number'], "app_type": application_type, "app_ref": applicant['reference'],
-                       "app_date": date, "app_time": app_time,  "ins_id": ins_request_id, "cust_name": applicant['name'],
+                       "app_date": date, "app_time": app_time,  "ins_id": ins_request_id,
+                       "cust_name": applicant['name'],
                        "cust_addr": applicant['address'], "cust_addr_type": addr_type, 'user': user_id
                    })
     return cursor.fetchone()[0]
@@ -568,6 +575,10 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
     original_details = get_registration_details(cursor, rect_reg_no, rect_reg_date)
     original_details_id = get_register_details_id(cursor, rect_reg_no, rect_reg_date)
     original_regs = get_all_registration_nos(cursor, original_details_id)
+
+    for reg in original_regs:
+        reg['details'] = get_registration_details(cursor, reg['number'], reg['date'])
+
     alter_type = get_alteration_type(original_details, data)
 
     date_today = datetime.datetime.now().strftime('%Y-%m-%d')
@@ -645,7 +656,21 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
                 new_counties = insert_counties(cursor, new_details_id, data['particulars']['counties'])
                 new_reg_nos = insert_landcharge_regn(cursor, new_details_id, new_names, new_counties, date_today, None)
         else:
-            new_reg_nos = insert_bankruptcy_regn(cursor, new_details_id, new_names, date_today, None)
+            # Defect # 99 : adding a name on a banks amendment created new reg details for all names.
+            #               Unchanged names should retain their registration number & date
+            new_reg_nos = []
+            for name in new_names:
+                oreg = None
+                for reg in original_regs:
+                    if names_match(reg['details']['parties'][0]['names'][0], name['name']):
+                        oreg = reg
+                        break
+
+                if oreg is not None:
+                    new_reg_nos += insert_bankruptcy_regn(cursor, new_details_id, [name], oreg['date'], oreg['number'])
+                else:
+                    new_reg_nos += insert_bankruptcy_regn(cursor, new_details_id, [name], date_today, None)
+
         reg_nos = new_reg_nos
 
     if pseudo_details_id is not None:
@@ -672,7 +697,8 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
             pab_details_id = get_register_details_id(cursor, pab_reg_no, pab_date)
             pab = get_registration_details_by_id(cursor, pab_details_id)
 
-            if all_names_match(pab['parties'][0], data['parties'][0]):
+            if party_a_is_subset_of_b(pab['parties'][0], data['parties'][0]):
+            # if all_names_match(pab['parties'][0], data['parties'][0]):
                 mark_as_no_reveal_by_details(cursor, pab_details_id)
 
             update_previous_details(cursor, request_id, pab_details_id)
@@ -1292,6 +1318,50 @@ def get_head_of_chain(cursor, reg_no, date):
         next_id = rows[0]['id']
 
 
+def get_request_id(cursor, details_id):
+    sql = "SELECT request_id FROM register_details WHERE id = %(id)s"
+    params = {"id": details_id}
+    cursor.execute(sql, params)
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        return None
+    elif len(rows) > 1:
+        raise RuntimeError("Too many rows retrieved")
+    else:
+        return rows[0]['request_id']
+
+
+def supersede_register(cursor, registration_no, registration_date, original_details_id, new_details_id):
+    # get original row
+    sql = " select * from register where registration_no = %(registration_no)s and date =%(date)s and " \
+          " details_id = %(details_id)s " \
+          " order by reg_sequence_no desc FETCH FIRST 1 ROW ONLY"
+    cursor.execute(sql,
+                   {
+                       "registration_no": registration_no,
+                       "date": registration_date,
+                       "details_id": original_details_id
+                   })
+    rows = cursor.fetchall()
+    orig_register_id = rows[0]["id"]
+    debtor_reg_name_id = rows[0]["debtor_reg_name_id"]
+    county_id = rows[0]["county_id"]
+    seq_no = rows[0]["reg_sequence_no"]
+    seq_no += 1
+    # create a new row and associate it with the new details id.
+    sql = "insert into register(registration_no, debtor_reg_name_id, details_id, date,  county_id, reveal, " \
+          " reg_sequence_no) values (%(registration_no)s, %(debtor_reg_name_id)s, %(details_id)s, %(date)s, " \
+          " %(county_id)s, %(reveal)s, %(reg_sequence_no)s)"
+    cursor.execute(sql, {"registration_no": registration_no, "debtor_reg_name_id": debtor_reg_name_id,
+                         "details_id": new_details_id, "date": registration_date, "county_id": county_id,
+                         "reveal": False,
+                         "reg_sequence_no": seq_no
+                         })
+    # mark the superseded row as no_reveal
+    mark_as_no_reveal_by_id(cursor, orig_register_id)
+    return rows[0]
+
+
 def insert_cancellation(data, user_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
@@ -1307,20 +1377,47 @@ def insert_cancellation(data, user_id):
         canc_request_id = \
             insert_request(cursor, user_id, data['applicant'], data['update_registration']['type'], canc_date)
         detl_data = get_registration_details(cursor, orig_registration_no, orig_date, orig_class_of_charge)
+        # On full cancellation if there is more than 1 registration for the original register_details
+        # we need to create a new "register_details" row and associate the register row of the register being cancelled
+        # with the new details row this is to avoid all linked (i.e. multi count or multi AKA) registers being
+        # cancelled in one go
+        if len(original_regs) > 1:
+            original_request_id = get_request_id(cursor, original_details_id)
+            names, new_details_id = insert_details(cursor, original_request_id, detl_data, orig_date, None)
+            if detl_data['class_of_charge']in ['PAB', 'WOB']:
+                # set the name so only 1 register is cancelled.
+                detl_data['parties'][0]['names'] = [detl_data['parties'][0]['names'][0]]
+            else:
+                # for a LC the whole list of counties from the original request is pulled back
+                # we just need the one specifically linked to the entered reg number
+                if detl_data['particulars']['counties']:
+                    detl_data['particulars']['counties'] = get_county(cursor, orig_registration_no, orig_date)
+                insert_counties(cursor, new_details_id, detl_data['particulars']['counties'])
+            # add a new register row for the appn being cancelled with the next sequence number
+            if data['update_registration']['type'] == "Cancellation":
+                supersede_register(cursor, orig_registration_no, orig_date, original_details_id, new_details_id)
+                original_details_id = new_details_id
         # update_registration contains part_cancelled and plan_attached data
         detl_data['update_registration'] = data['update_registration']
         reg_nos, canc_details_id = insert_record(cursor, detl_data, canc_request_id, canc_date, original_details_id)
         # if full cancellation mark all rows as no reveal
         if data['update_registration']['type'] == "Cancellation":
-            # only set cancelled_by on full cancellation
+            # Only set cancelled_by on full cancellation
             update_previous_details(cursor, canc_request_id, original_details_id)
-            for reg in original_regs:
-                mark_as_no_reveal(cursor, reg['number'], reg['date'])
-
+            # Mark all entries on the orig reg as no reveal
+            # check this is a normal register, not a C4/D2 style one
+            if orig_class_of_charge is not None:
+                multi_reg = get_multi_registrations(cursor, orig_date, orig_registration_no)
+                print("multi reg ", multi_reg)
+                for m_regs in multi_reg:
+                    for m_reg in m_regs["data"]:
+                        if m_reg["class_of_charge"] == orig_class_of_charge:
+                            mark_as_no_reveal_by_id(cursor, m_reg["register_id"])
+            else:
+                mark_as_no_reveal(cursor, orig_registration_no, orig_date)
         # Mark all cancellation registrations as no reveal.
-        for reg in reg_nos:  # TODO: this is a normal PC, not a C4/D2 style one
+        for reg in reg_nos:
             mark_as_no_reveal(cursor, reg['number'], reg['date'])
-
         logging.audit(format_message("Cancelled entry: %s"), json.dumps(reg_nos))
         complete(cursor)
         logging.info(format_message("Cancellation committed"))
@@ -1955,7 +2052,8 @@ def get_additional_info(cursor, details):
 def get_multi_registrations(cursor, registration_date, registration_no):
     # when multiple registrations exist for the same reg no and date return the relevant data
     cursor.execute("select r.registration_no, r.date, d.class_of_charge, d.amends, d.cancelled_by, d.request_id, "
-                   "d.amendment_type from register r, register_details d where r.details_id = d.id and "
+                   "d.amendment_type, r.id as register_id "
+                   " from register r, register_details d where r.details_id = d.id and "
                    "r.date=%(date)s and r.registration_no=%(registration_no)s and cancelled_by is null ",
                    {'date': registration_date, 'registration_no': registration_no})
     rows = cursor.fetchall()
@@ -1986,7 +2084,8 @@ def get_multi_registrations(cursor, registration_date, registration_no):
         item['data'].append({
             'number': row['registration_no'],
             'date': row['date'].strftime('%Y-%m-%d'),
-            'class_of_charge': row['class_of_charge']
+            'class_of_charge': row['class_of_charge'],
+            'register_id': row["register_id"]
         })
     return results
 

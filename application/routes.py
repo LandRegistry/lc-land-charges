@@ -759,6 +759,7 @@ def validate_county_council(county_name):
         complete(cursor)
 
 
+
 # Get details of a request for printing
 @app.route('/request_details/<request_id>', methods=["GET"])
 def get_request_details(request_id):

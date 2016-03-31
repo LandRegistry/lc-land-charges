@@ -52,6 +52,22 @@ def names_match(a, b):
         raise RuntimeError("Unknown name type: {}".format(a['type']))
 
 
+def party_a_is_subset_of_b(party_a, party_b):
+    # Return true if all names in a are in b, somewhere
+
+    for index, name in enumerate(party_a['names']):
+        found_in_b = False
+        for name_b in party_b['names']:
+            if names_match(name, name_b):
+                found_in_b = True
+                break
+
+        if not found_in_b:
+            return False
+
+    return True
+
+
 def all_names_match(party_a, party_b):
     if len(party_a['names']) != len(party_b['names']):
         return False
