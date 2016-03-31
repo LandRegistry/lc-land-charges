@@ -51,12 +51,16 @@ lc_api = RestAPI.new($LAND_CHARGES_URI)
 pab_reg = register(pab_1)
 wob_reg = register(wob_1)
 
+puts `synchronise 2016-01-01 2>&1`
+puts "==================================="
 amend_data = '{"pab_amendment": {"reg_no": "' + pab_reg['number'].to_s + '", "date": "' + pab_reg['date'] + '"},' + amendment_add_name
 
 amend = lc_api.put("/registrations/#{wob_reg['date']}/#{wob_reg['number']}", amend_data)
 amd_no = amend['new_registrations'][0]['number']
 amd_date = amend['new_registrations'][0]['date']
 
+
+puts `synchronise 2016-03-31 2>&1`
 # furth_amend = lc_api.put("/registrations/#{amd_date}/#{amd_no}", furth_amendment)
 # puts furth_amend
 
