@@ -1980,11 +1980,16 @@ def get_additional_info(cursor, details):
 
     # details is being passed in...
     head_details_id = get_head_of_chain(cursor, details['registration']['number'], details['registration']['date'])
+    logging.debug('Head is ' + str(head_details_id))
     history = get_registration_history_from_details(cursor, head_details_id)
+    logging.debug(len(history))
+    logging.debug(history)
 
     register = []
     for record in history:
         register.append(get_registration_details_by_id(cursor, record['id']))
+
+    logging.debug(len(register))
 
     addl_info = []
     forward = True
@@ -1993,6 +1998,8 @@ def get_additional_info(cursor, details):
         this = register[index]
         prev = register[index + 1] if index < len(register) - 1 else None
         next = register[index - 1] if index > 0 else None
+        logging.info('------->')
+        logging.debug(this)
 
         if entry['details_id'] == details['details_id']:  # This is the record of interest
             logging.info('Switch')
