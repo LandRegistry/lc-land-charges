@@ -4,7 +4,7 @@ import json
 import datetime
 import logging
 import re
-from application.data_diff import get_rectification_type, eo_name_string, names_match, all_names_match
+from application.data_diff import get_rectification_type, eo_name_string, names_match, all_names_match, party_a_is_subset_of_b
 from application.search_key import create_registration_key
 from application.logformat import format_message
 #from application.additional_info import get_additional_info
@@ -203,6 +203,7 @@ def mark_as_no_reveal(cursor, reg_no, date):
     cursor.execute("UPDATE register SET reveal=%(rev)s WHERE registration_no=%(regno)s AND date=%(date)s", {
         "rev": False, "regno": reg_no, "date": date
     })
+
 
 def mark_as_no_reveal_by_id(cursor, register_id):
     cursor.execute("UPDATE register SET reveal=%(rev)s WHERE id = %(id)s ", {
@@ -574,6 +575,10 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
     original_details = get_registration_details(cursor, rect_reg_no, rect_reg_date)
     original_details_id = get_register_details_id(cursor, rect_reg_no, rect_reg_date)
     original_regs = get_all_registration_nos(cursor, original_details_id)
+
+    for reg in original_regs:
+        reg['details'] = get_registration_details(cursor, reg['number'], reg['date'])
+
     alter_type = get_alteration_type(original_details, data)
 
     date_today = datetime.datetime.now().strftime('%Y-%m-%d')
@@ -651,7 +656,21 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
                 new_counties = insert_counties(cursor, new_details_id, data['particulars']['counties'])
                 new_reg_nos = insert_landcharge_regn(cursor, new_details_id, new_names, new_counties, date_today, None)
         else:
-            new_reg_nos = insert_bankruptcy_regn(cursor, new_details_id, new_names, date_today, None)
+            # Defect # 99 : adding a name on a banks amendment created new reg details for all names.
+            #               Unchanged names should retain their registration number & date
+            new_reg_nos = []
+            for name in new_names:
+                oreg = None
+                for reg in original_regs:
+                    if names_match(reg['details']['parties'][0]['names'][0], name['name']):
+                        oreg = reg
+                        break
+
+                if oreg is not None:
+                    new_reg_nos += insert_bankruptcy_regn(cursor, new_details_id, [name], oreg['date'], oreg['number'])
+                else:
+                    new_reg_nos += insert_bankruptcy_regn(cursor, new_details_id, [name], date_today, None)
+
         reg_nos = new_reg_nos
 
     if pseudo_details_id is not None:
@@ -678,7 +697,8 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
             pab_details_id = get_register_details_id(cursor, pab_reg_no, pab_date)
             pab = get_registration_details_by_id(cursor, pab_details_id)
 
-            if all_names_match(pab['parties'][0], data['parties'][0]):
+            if party_a_is_subset_of_b(pab['parties'][0], data['parties'][0]):
+            # if all_names_match(pab['parties'][0], data['parties'][0]):
                 mark_as_no_reveal_by_details(cursor, pab_details_id)
 
             update_previous_details(cursor, request_id, pab_details_id)
