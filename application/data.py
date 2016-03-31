@@ -1289,7 +1289,7 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
 #     return canc_details_id, canc_request_id
 
 
-def get_head_of_chain(cursor, reg_no, date):
+def get_head_of_chain(cursor, reg_no, date, follow_part_cans = False):
     # reg_no/date could be anywhere in the 'chain', though typically would be the start
     # as cancelled_by is a request_id, navigate by request_ids until we find the uncancelled
     # head entry
@@ -1305,8 +1305,13 @@ def get_head_of_chain(cursor, reg_no, date):
 
     next_id = detail_id
     while True:
-        cursor.execute("SELECT id FROM register_details WHERE amends = %(id)s "
-                       " and amendment_type <> 'Part Cancellation' ", {"id": next_id})
+        # This is nasty, but the part cans exclusion was added to fix one bug, but in turn has broken
+        # additional information generation
+        if follow_part_cans:
+            cursor.execute('SELECT id FROM register_details WHERE amends = %(id)s', {"id": next_id})
+        else:
+            cursor.execute("SELECT id FROM register_details WHERE amends = %(id)s "
+                           " and amendment_type <> 'Part Cancellation' ", {"id": next_id})
         rows = cursor.fetchall()
 
         if len(rows) == 0:
@@ -1979,7 +1984,7 @@ def get_additional_info(cursor, details):
             return ''
 
     # details is being passed in...
-    head_details_id = get_head_of_chain(cursor, details['registration']['number'], details['registration']['date'])
+    head_details_id = get_head_of_chain(cursor, details['registration']['number'], details['registration']['date'], True)
     logging.debug('Head is ' + str(head_details_id))
     history = get_registration_history_from_details(cursor, head_details_id)
     logging.debug(len(history))
