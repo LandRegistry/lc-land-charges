@@ -1871,6 +1871,9 @@ def get_migration_info(cursor, reg_no, date):
 
 def get_additional_info(cursor, details):
     # TODO: get addl info for migrated records
+    if not details['revealed']:
+        return ''
+
     migrated = get_migration_info(cursor, details['registration']['number'], details['registration']['date'])
     if migrated is not None:
         if 'amend_info' in migrated:
