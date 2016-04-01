@@ -109,7 +109,8 @@ def perform_bankruptcy_search(cursor, name_type, keys, cert_date):
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND r.date <= %(date)s"
-                   "  AND r.reveal='t'"
+                   "  AND (r.expired_on is NULL OR %(date)s < r.expired_on)"
+                   #"  AND r.reveal='t'"
                    "  AND rd.class_of_charge in ('PAB', 'WOB', 'PA', 'WO', 'DA') "
                    "  AND n.name_type_ind = %(nametype)s", {
                        "keys": keys, "date": cert_date, "nametype": name_type
@@ -131,7 +132,8 @@ def perform_bankruptcy_search_complex_name(cursor, name_type, keys, number, cert
                    "  AND r.debtor_reg_name_id = n.id "
                    "  AND r.details_id = rd.id "
                    "  AND r.date <= %(date)s"
-                   "  AND r.reveal='t'"
+                   "  AND (r.expired_on is NULL OR %(date)s < r.expired_on)"
+                   #"  AND r.reveal='t'"
                    "  AND rd.class_of_charge in ('PAB', 'WOB', 'PA', 'WO', 'DA') "
                    "  AND n.name_type_ind = 'Complex Name' ", {
                        "number": number, "date": cert_date, "nametype": name_type
@@ -160,7 +162,9 @@ def perform_full_search_all_counties(cursor, name_type, keys, year_from, year_to
                    "     extract(year from r.date) between %(from_date)s and %(to_date)s "
                    "     or rd.class_of_charge in ('PA', 'WO', 'DA', 'PAB', 'WOB')"
                    "  ) "
-                   "  and r.date <= %(date)s and r.reveal='t'",
+                   "  and r.date <= %(date)s "
+                   "  AND (r.expired_on is NULL OR %(date)s < r.expired_on)",
+                   #"   and r.reveal='t'",
                    {
                        'keys': keys, 'from_date': year_from, 'to_date': year_to,
                        'date': cert_date, 'exdate': cert_date, 'nametype': name_type
@@ -197,7 +201,9 @@ def perform_full_search(cursor, name_type, keys, counties, year_from, year_to, c
                    "          ) "
                    "      ) "
                    "  ) "
-                   "and r.date <= %(date)s and r.reveal='t'",
+                   " and r.date <= %(date)s "
+                   "  AND (r.expired_on is NULL OR %(date)s < r.expired_on)",
+                   #" and r.reveal='t'",
                    {
                        'keys': keys, 'from_date': year_from, 'to_date': year_to,
                        'counties': counties, 'date': cert_date, 'exdate': cert_date,
@@ -226,7 +232,9 @@ def perform_full_search_complex_name_all_counties(cursor, name_type, keys, numbe
                    "     extract(year from r.date) between %(from_date)s and %(to_date)s "
                    "     or rd.class_of_charge in ('PA', 'WO', 'DA', 'PAB', 'WOB')"
                    "  ) "
-                   "  and r.date <= %(date)s and r.reveal='t'",
+                   "  and r.date <= %(date)s "
+                   "  AND (r.expired_on is NULL OR %(date)s < r.expired_on)",
+                   #"  and r.reveal='t'",
                    {
                        'number': number, 'from_date': year_from, 'to_date': year_to,
                        'date': cert_date, 'exdate': cert_date, 'nametype': name_type
@@ -264,7 +272,9 @@ def perform_full_search_complex_name(cursor, name_type, keys, number, counties, 
                    "          ) "
                    "      ) "
                    "  ) "
-                   "and r.date <= %(date)s and r.reveal='t'",
+                   "and r.date <= %(date)s "
+                   "  AND (r.expired_on is NULL OR %(date)s < r.expired_on)",
+                   #"and r.reveal='t'",
                    {
                        'number': number, 'from_date': year_from, 'to_date': year_to,
                        'counties': counties, 'date': cert_date, 'exdate': cert_date,
@@ -275,25 +285,11 @@ def perform_full_search_complex_name(cursor, name_type, keys, number, counties, 
     return merge_lists(name_results, result)
 
 
-def process_search_result(result, cert_date):
-    # I can't face attempting to add this to the SQL so we'll filter it out here
-    # Eventually (i.e. within weeks of go-live) we'll write a program to hide/purge the expired
-    # entries as required.
-    processed = []
+def process_search_result(result):
+    res = []
     for item in result:
-        if item['class'] in ['PA', 'WO', 'PAB', 'WOB', 'DA']:
-            # item['date'] is date
-            # Rule is don't show if cert_date - 5 years 10 days is > item['date']
-            cdate = datetime.datetime.strptime(cert_date, "%Y-%m-%d")
-            cdate = datetime.datetime(cdate.year - 5, cdate.month, cdate.day)
-            cdate -= datetime.timedelta(days=10)
-
-            if cdate <= item['date']:
-                processed.append(item['id'])
-
-        else:
-            processed.append(item['id'])
-    return processed
+        res.append(item['id'])
+    return res
 
 
 def perform_search(cursor, parameters, cert_date):
@@ -342,7 +338,7 @@ def perform_search(cursor, parameters, cert_date):
             else:
                 name_result = perform_bankruptcy_search(cursor, item['name_type'], keys, cert_date)
 
-        search_results.append({'name_result': process_search_result(name_result, cert_date), 'name_id': item['name_id']})
+        search_results.append({'name_result': process_search_result(name_result), 'name_id': item['name_id']})
     # search_results.append({'name_result': results_array, 'name_id': item['name_id']})
 
     return search_results
