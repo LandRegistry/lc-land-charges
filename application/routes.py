@@ -367,7 +367,9 @@ def court_ref_existence_check(ref):
         logging.audit(format_message("Retrieve details by court: %s"), ref)
         cursor.execute("SELECT registration_no, date FROM register r, register_details rd " +
                        "WHERE UPPER(rd.legal_body_ref)=%(body_ref)s " +
-                       "AND rd.id=r.details_id AND r.expired_on IS NULL AND rd.cancelled_by is NULL " +
+                       "AND rd.id=r.details_id "
+                       "AND (r.expired_on is NULL OR r.expired_on > current_date) "
+                       "AND rd.cancelled_by is NULL " +
                        "AND (UPPER(rd.amendment_type)!='CANCELLATION' or rd.amendment_type is NULL) ",
                        {"body_ref": ref.upper()})
         rows = cursor.fetchall()
