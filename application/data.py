@@ -1452,6 +1452,11 @@ def get_registration_details_from_register_id(register_id):
     data = []
     for res in results:
         res_data = get_registration_details(cursor, res['number'], res['date'])
+        if 'particulars' in res_data:
+            if 'counties' in res_data['particulars']:
+                if len(res_data['particulars']['counties']) > 1:
+                    county = get_county(cursor, res['number'], res['date'])
+                    res_data['particulars']['counties'] = county
         data.append(res_data)
     complete(cursor)
     return data
