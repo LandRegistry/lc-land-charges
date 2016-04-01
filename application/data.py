@@ -1721,7 +1721,8 @@ def get_court_additional_info(cursor, details):
             debtor = party
 
     if debtor is None:
-        raise RuntimeError('Debtor not found')
+        # This can happen on placeholder regs
+        return ''
 
     caseref = party['case_reference'].upper()
     m = re.match("^(.+) (\d+ OF \d{4})$", caseref)
@@ -1833,10 +1834,6 @@ def get_migration_info(cursor, reg_no, date):
 
 
 def get_additional_info(cursor, details):
-    # TODO: get addl info for migrated records
-    if details['expired_date'] is not None:
-        return ''
-
     migrated = get_migration_info(cursor, details['registration']['number'], details['registration']['date'])
     if migrated is not None:
         if 'amend_info' in migrated:
