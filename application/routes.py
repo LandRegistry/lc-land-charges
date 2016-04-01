@@ -958,7 +958,7 @@ def last_search():
 @app.route('/request_type/<request_id>', methods=["GET"])
 def get_request_type(request_id):
     if not request_id:
-        return "none"
+        return None
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # get all rows for this request id, if none contain results then search type is 'search_nr'
     try:
@@ -968,14 +968,13 @@ def get_request_type(request_id):
     finally:
         logging.audit(format_message("Retrieve request type for request: %s"), request_id)
         complete(cursor)
-
     data = ""
     if rows:
         for row in rows:
             data = row['application_type']
     else:
         logging.error("could not find request " + request_id)
-        return "none"
+        return None
     return data
 
 

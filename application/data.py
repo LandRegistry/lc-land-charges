@@ -1468,7 +1468,7 @@ def get_k22_request_id(registration_no, registration_date):
     cursor.execute(sql, {"registration_no": registration_no, "registration_date": registration_date})
     rows = cursor.fetchall()
     complete(cursor)
-    req_id = 'none'
+    req_id = None
     for row in rows:
         req_id = row['request_id']
 
