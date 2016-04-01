@@ -702,8 +702,11 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
             pab = get_registration_details_by_id(cursor, pab_details_id)
 
             if party_a_is_subset_of_b(pab['parties'][0], data['parties'][0]):
-            # if all_names_match(pab['parties'][0], data['parties'][0]):
                 mark_as_no_reveal_by_details(cursor, pab_details_id)
+            else:
+                # Oh, if the PAB stays revealed, we must extend it's life...
+                pab_ex_date = calc_five_year_expiry(rect_reg_date)
+                mark_as_no_reveal_by_details(cursor, pab_details_id, pab_ex_date)
 
             update_previous_details(cursor, request_id, pab_details_id)
 
