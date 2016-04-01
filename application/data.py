@@ -1727,12 +1727,15 @@ def get_court_additional_info(cursor, details):
         # This can happen on placeholder regs
         return ''
 
-    caseref = party['case_reference'].upper()
-    m = re.match("^(.+) (\d+ OF \d{4})$", caseref)
-    if m:
-        caseref = "{} NO {}".format(m.group(1), m.group(2))
+    if debtor['case_reference'] is None:
+        caseref = ''
     else:
-        caseref = 'ADJUDICATOR REF ' + caseref
+        caseref = debtor['case_reference'].upper()
+        m = re.match("^(.+) (\d+ OF \d{4})$", caseref)
+        if m:
+            caseref = "{} NO {}".format(m.group(1), m.group(2))
+        else:
+            caseref = 'ADJUDICATOR REF ' + caseref
 
     return caseref
 
