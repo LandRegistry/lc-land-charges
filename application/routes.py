@@ -773,9 +773,11 @@ def get_request_details(request_id):
             for row in data:  # Each AKA registration needs populating
                 details = get_registration_details(cursor, row["registration_no"], row["registration_date"])
                 if details is not None:
-                    if len(details['particulars']['counties']) > 1:
-                        county = get_county(cursor, row['registration_no'], row['registration_date'])
-                        details['particulars']['counties'] = county
+                    if 'particulars' in details:
+                        if 'counties' in details['particulars']:
+                            if len(details['particulars']['counties']) > 1:
+                                county = get_county(cursor, row['registration_no'], row['registration_date'])
+                                details['particulars']['counties'] = county
                     addl_info = get_additional_info(cursor, details)
                     if addl_info is not None:
                         details['additional_information'] = addl_info
