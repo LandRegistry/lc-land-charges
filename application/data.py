@@ -1228,11 +1228,14 @@ def insert_cancellation(data, user_id):
         else:
             orig_class_of_charge = None
         original_details_id = get_register_details_id(cursor, orig_registration_no, orig_date, orig_class_of_charge)
+        latest_details_id = get_head_of_chain(cursor, orig_registration_no, orig_date, True)
+
         original_regs = get_all_registration_nos(cursor, original_details_id)
         canc_date = datetime.datetime.now().strftime('%Y-%m-%d')
         canc_request_id = \
             insert_request(cursor, user_id, data['applicant'], data['update_registration']['type'], canc_date)
         detl_data = get_registration_details(cursor, orig_registration_no, orig_date, orig_class_of_charge)
+
         # On full cancellation if there is more than 1 registration for the original register_details
         # we need to create a new "register_details" row and associate the register row of the register being cancelled
         # with the new details row this is to avoid all linked (i.e. multi count or multi AKA) registers being
@@ -1255,7 +1258,8 @@ def insert_cancellation(data, user_id):
                 original_details_id = new_details_id
         # update_registration contains part_cancelled and plan_attached data
         detl_data['update_registration'] = data['update_registration']
-        reg_nos, canc_details_id = insert_record(cursor, detl_data, canc_request_id, canc_date, original_details_id)
+        reg_nos, canc_details_id = insert_record(cursor, detl_data, canc_request_id, canc_date, latest_details_id)
+                                                 #original_details_id)
 
         # if full cancellation mark all rows as no reveal
         if data['update_registration']['type'] == "Cancellation":
