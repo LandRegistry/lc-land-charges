@@ -1877,6 +1877,9 @@ def get_additional_info(cursor, details):
         logging.info('------->')
         logging.debug(this)
 
+        if entry['entered_addl_info'] is not None and entry['entered_addl_info'] != '':
+            addl_info.insert(0, entry['entered_addl_info'].upper())
+
         if entry['details_id'] == details['details_id']:  # This is the record of interest
             logging.info('Switch')
             forward = False
@@ -1898,11 +1901,13 @@ def get_additional_info(cursor, details):
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Renewal':
                     get_renewal_additional_info_prev(cursor, this, next, addl_info)
 
-                if entry['entered_addl_info'] is not None and entry['entered_addl_info'] != '':
-                    addl_info.insert(0, entry['entered_addl_info'])
+                # if entry['entered_addl_info'] is not None and entry['entered_addl_info'] != '':
+                #     addl_info.insert(0, entry['entered_addl_info'])
 
             else:
                 logging.debug('FORWARD')
+
+
 
                 if this is not None and 'amends_registration' in this and this['amends_registration']['type'] == \
                         'Rectification':
