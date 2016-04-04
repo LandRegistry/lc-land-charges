@@ -338,6 +338,13 @@ def cancel_registration():
         logging.info(format_message('Queue suppressed'))
         suppress = True
     json_data = json.loads(request.data.decode('utf-8'))
+
+    if 'dev_date' in request.args and app.config['ALLOW_DEV_ROUTES']:
+        logging.warning(format_message('Overriding date'))
+        json_data['dev_registration'] = {
+            'date': request.args['dev_date']
+        }
+
     logging.debug("Received: %s", json_data)
     reg = json_data['registration']
     logging.debug("Reg: %s", reg)

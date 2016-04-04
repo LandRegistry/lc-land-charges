@@ -587,6 +587,9 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
     alter_type = get_alteration_type(original_details, data)
 
     date_today = datetime.datetime.now().strftime('%Y-%m-%d')
+    if 'dev_registration' in data:
+        date_today = data['dev_registration']['date']
+
     request_id = insert_request(cursor, user_id, data['applicant'], data['update_registration']['type'], rect_reg_date)
 
     new_details_id = None
@@ -1155,11 +1158,13 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
           "rd.amend_info_details, rd.amend_info_details_orig, r.reg_sequence_no, rd.priority_notice_no " \
           "from register r, register_details rd " \
           "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id " \
-          "AND (r.expired_on is NULL OR r.expired_on > current_date)"
+          #"AND (r.expired_on is NULL OR r.expired_on > current_date)"
 
     if class_of_charge is not None:
         sql += " and rd.class_of_charge = %(class_of_charge)s "
         params["class_of_charge"] = class_of_charge
+
+    sql += "ORDER BY r.reg_sequence_no FETCH FIRST ROW ONLY"  # put this back temporarily
 
     cursor.execute(sql, params)
     rows = cursor.fetchall()
@@ -1261,6 +1266,9 @@ def insert_cancellation(data, user_id):
 
         original_regs = get_all_registration_nos(cursor, original_details_id)
         canc_date = datetime.datetime.now().strftime('%Y-%m-%d')
+        if 'dev_registration' in data:
+            canc_date = data['dev_registration']['date']
+
         canc_request_id = \
             insert_request(cursor, user_id, data['applicant'], data['update_registration']['type'], canc_date)
         detl_data = get_registration_details(cursor, orig_registration_no, orig_date, orig_class_of_charge)
