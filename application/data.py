@@ -1213,7 +1213,7 @@ def supersede_register(cursor, registration_no, registration_date, original_deta
           " %(county_id)s, %(exp)s, %(reg_sequence_no)s)"
     cursor.execute(sql, {"registration_no": registration_no, "debtor_reg_name_id": debtor_reg_name_id,
                          "details_id": new_details_id, "date": registration_date, "county_id": county_id,
-                         "exp": None,
+                         "exp": datetime.datetime.now().strftime('%Y-%m-%d'),
                          "reg_sequence_no": seq_no
                          })
     # mark the superseded row as no_reveal
@@ -1246,6 +1246,8 @@ def insert_cancellation(data, user_id):
         if len(original_regs) > 1:
             original_request_id = get_request_id(cursor, original_details_id)
             names, new_details_id = insert_details(cursor, original_request_id, detl_data, orig_date, None)
+
+            latest_details_id = new_details_id
             if detl_data['class_of_charge']in ['PAB', 'WOB']:
                 # set the name so only 1 register is cancelled.
                 detl_data['parties'][0]['names'] = [detl_data['parties'][0]['names'][0]]
@@ -1255,6 +1257,7 @@ def insert_cancellation(data, user_id):
                 if detl_data['particulars']['counties']:
                     detl_data['particulars']['counties'] = get_county(cursor, orig_registration_no, orig_date)
                 insert_counties(cursor, new_details_id, detl_data['particulars']['counties'])
+
             # add a new register row for the appn being cancelled with the next sequence number
             if data['update_registration']['type'] == "Cancellation":
                 supersede_register(cursor, orig_registration_no, orig_date, original_details_id, new_details_id)
@@ -1268,8 +1271,8 @@ def insert_cancellation(data, user_id):
         if data['update_registration']['type'] == "Cancellation":
             # Only set cancelled_by on full cancellation
             update_previous_details(cursor, canc_request_id, original_details_id)
-            for reg in original_regs:
-                mark_as_no_reveal(cursor, reg['number'], reg['date'])
+            #for reg in original_regs:
+            #    mark_as_no_reveal(cursor, reg['number'], reg['date'])
 
             # Mark all entries on the orig reg as no reveal
             # check this is a normal register, not a C4/D2 style one
