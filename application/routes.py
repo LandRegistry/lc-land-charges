@@ -14,7 +14,7 @@ from application.data import connect, get_registration_details, complete, \
     get_registration, insert_cancellation,  \
     insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
     get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history, \
-    get_additional_info, get_multi_registrations, insert_renewal, get_county
+    get_additional_info, get_multi_registrations, insert_renewal, get_county, get_applicant_detl
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches, \
     get_search_by_request_id, get_search_ids_by_date
@@ -70,7 +70,7 @@ def error_handler(err):
 
 @app.before_request
 def before_request():
-    #logging.info(format_message("BEGIN %s %s [%s]"),
+    # logging.info(format_message("BEGIN %s %s [%s]"),
     #             request.method, request.url, request.remote_addr)
 
     pass
@@ -164,7 +164,7 @@ def registration_history(date, reg_no):
 
 @app.route('/registrations', methods=['POST'])
 def register():
-    #logging.log(25, format_message('Registration submitted'))
+    # logging.log(25, format_message('Registration submitted'))
 
     logging.info(format_message("Received registration data: %s"), request.data.decode('utf-8'))
     suppress = False
@@ -211,7 +211,7 @@ def register():
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     # pylint: disable=unused-variable
     try:
-        #logging.audit(format_message("Submit new entries"))
+        # logging.audit(format_message("Submit new entries"))
 
         new_regns, details_id, request_id = insert_new_registration(cursor, get_username(), json_data)
         complete(cursor)
@@ -612,7 +612,7 @@ def delete_all_the_regs_post():
 
 @app.route('/registrations', methods=['DELETE'])
 def delete_all_regs():  # pragma: no cover
-    if not app.config['ALLOW_DEV_ROUTES']:# and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']:  # and is_dev_VM()):
         logging.warning("Non-Dev attempt to delete all data")
         return Response(status=403)
 
@@ -650,7 +650,7 @@ def delete_all_regs():  # pragma: no cover
 # the synchroniser's queue!
 @app.route('/synchronise', methods=["POST"])
 def synchronise():  # pragma: no cover
-    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']:  # and is_dev_VM()):
         return Response(status=403)
 
     if request.headers['Content-Type'] != "application/json":
@@ -664,7 +664,7 @@ def synchronise():  # pragma: no cover
 
 @app.route('/counties', methods=['POST'])
 def load_counties():  # pragma: no cover
-    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']:  # and is_dev_VM()):
         return Response(status=403)
 
     if request.headers['Content-Type'] != "application/json":
@@ -744,7 +744,8 @@ def get_translated_county(county_name):
 def validate_county_council(county_name):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        cursor.execute("SELECT county_council FROM county_search_keys WHERE name=%(name)s", {'name': county_name.upper()})
+        cursor.execute("SELECT county_council FROM county_search_keys WHERE name=%(name)s",
+                       {'name': county_name.upper()})
         rows = cursor.fetchall()
 
         if len(rows) != 1:
@@ -758,7 +759,6 @@ def validate_county_council(county_name):
 
     finally:
         complete(cursor)
-
 
 
 # Get details of a request for printing
@@ -895,7 +895,7 @@ def get_search_request_ids():
 # count is the amount of ids to return
 @app.route('/request_ids/<count>', methods=["GET"])
 def get_request_ids(count):
-    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']:  # and is_dev_VM()):
         return Response(status=403)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -936,7 +936,7 @@ def get_search_type(request_id):
 # test route
 @app.route('/last_search', methods=["GET"])
 def last_search():
-    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']:  # and is_dev_VM()):
         return Response(status=403)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -990,7 +990,7 @@ def update_request_fee(request_id, transaction_fee):
 
 @app.route('/area_variants', methods=['PUT'])
 def set_area_variants():
-    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']:  # and is_dev_VM()):
         return Response(status=403)
 
     data = json.loads(request.data.decode('utf-8'))
@@ -1007,7 +1007,7 @@ def set_area_variants():
 
 @app.route('/area_variants', methods=['DELETE'])
 def clear_area_variants():
-    if not app.config['ALLOW_DEV_ROUTES']: # and is_dev_VM()):
+    if not app.config['ALLOW_DEV_ROUTES']:  # and is_dev_VM()):
         return Response(status=403)
 
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
@@ -1028,3 +1028,13 @@ def multi_reg_check(registration_date, registration_no):
         return Response(None, status=200, mimetype='application/json')
     else:
         return Response(json.dumps(details), status=200, mimetype='application/json')
+
+
+@app.route('/applicant/<request_id>')
+def get_applicant(request_id):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        applicant = get_applicant_detl(cursor, request_id)
+    finally:
+        complete(cursor)
+    return Response(json.dumps(applicant), status=200, mimetype='application/json')
