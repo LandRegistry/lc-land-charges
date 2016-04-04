@@ -1047,6 +1047,12 @@ def get_details_from_rows(cursor, rows):
             data['particulars']['priority_notice'] = rows[0]['priority_notice_no']
 
     register_id = rows[0]['register_id']
+    data['register_id'] = rows[0]['register_id']
+    if len(rows) > 1:
+        data['alternate_register_ids'] = []
+        for row in rows[1:]:
+            data['alternate_register_ids'].append(row['register_id'])
+
     legal_ref = rows[0]['legal_body_ref']
     if rows[0]['amends'] is not None:
         data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
@@ -1122,6 +1128,24 @@ def get_registration_details_by_id(cursor, details_id):
     return get_details_from_rows(cursor, rows)
 
 
+def get_registration_details_by_register_id(cursor, register_id):
+
+    sql = "SELECT r.registration_no, r.date, r.expired_on, rd.class_of_charge, rd.id, r.id as register_id, " \
+          "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, rd.district, " \
+          "rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type, rd.priority_notice_ind, " \
+          "rd.prio_notice_expires, rd.request_id, rd.amend_info_type, " \
+          "rd.amend_info_details, rd.amend_info_details_orig, r.reg_sequence_no, rd.priority_notice_no " \
+          "from register r, register_details rd " \
+          "where r.id=%(regid)s and r.details_id = rd.id "
+
+    cursor.execute(sql, {'regid': register_id})
+    rows = cursor.fetchall()
+    if len(rows) == 0:
+        return None
+
+    return get_details_from_rows(cursor, rows)
+
+
 def get_registration_details(cursor, reg_no, date, class_of_charge=None):
     params = {'reg_no': reg_no, 'date': date}
     sql = "SELECT r.registration_no, r.date, r.expired_on, rd.class_of_charge, rd.id, r.id as register_id, " \
@@ -1130,11 +1154,13 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
           "rd.prio_notice_expires, rd.request_id, rd.amend_info_type, " \
           "rd.amend_info_details, rd.amend_info_details_orig, r.reg_sequence_no, rd.priority_notice_no " \
           "from register r, register_details rd " \
-          "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id "
+          "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id " \
+          "AND (r.expired_on is NULL OR r.expired_on > current_date)"
+
     if class_of_charge is not None:
         sql += " and rd.class_of_charge = %(class_of_charge)s "
         params["class_of_charge"] = class_of_charge
-    sql += " ORDER BY r.reg_sequence_no DESC FETCH FIRST 1 ROW ONLY "
+
     cursor.execute(sql, params)
     rows = cursor.fetchall()
     if len(rows) == 0:
