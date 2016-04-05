@@ -104,13 +104,14 @@ def merge_lists(a, b):
 
 def perform_bankruptcy_search(cursor, name_type, keys, cert_date):
     cursor.execute("SELECT r.id, r.date, rd.class_of_charge "
-                   "FROM party_name n, register r, register_details rd "
+                   "FROM party_name n, register r, register_details rd, party p, party_name_rel pnr "
                    "WHERE n.searchable_string = ANY(%(keys)s) "
-                   "  AND r.debtor_reg_name_id = n.id "
+                   "  AND n.id = pnr.party_name_id "
+                   "  AND pnr.party_id = p.id "
+                   "  AND p.register_detl_id = rd.id "
                    "  AND r.details_id = rd.id "
-                   "  AND r.date <= %(date)s"
-                   "  AND (r.expired_on is NULL OR %(date)s < r.expired_on)"
-                   #"  AND r.reveal='t'"
+                   "  AND r.date <= %(date)s "
+                   "  AND (r.expired_on is NULL OR %(date)s < r.expired_on) "
                    "  AND rd.class_of_charge in ('PAB', 'WOB', 'PA', 'WO', 'DA') "
                    "  AND n.name_type_ind = %(nametype)s", {
                        "keys": keys, "date": cert_date, "nametype": name_type
@@ -129,7 +130,9 @@ def perform_bankruptcy_search_complex_name(cursor, name_type, keys, number, cert
     cursor.execute("SELECT r.id, r.date, rd.class_of_charge "
                    "FROM party_name n, register r, register_details rd "
                    "WHERE n.complex_number = %(number)s "
-                   "  AND r.debtor_reg_name_id = n.id "
+                   "  AND n.id = pnr.party_name_id "
+                   "  AND pnr.party_id = p.id "
+                   "  AND p.register_detl_id = rd.id "
                    "  AND r.details_id = rd.id "
                    "  AND r.date <= %(date)s"
                    "  AND (r.expired_on is NULL OR %(date)s < r.expired_on)"
