@@ -1109,6 +1109,16 @@ def get_details_from_rows(cursor, rows):
                 'address_type': rows[0]['customer_addr_type'],
             }
 
+    cursor.execute("SELECT extra_data, original_regn_no FROM migration_status WHERE register_id=%(id)s", {
+        "id": register_id
+    })
+    rows = cursor.fetchall()
+    if len(rows) > 0:
+        data['migrated'] = {
+            'original_number': rows[0]['original_regn_no'],
+            'extra_data': rows[0]['extra_data']
+        }
+
     # name, address, keyn, ref
     return data
 
