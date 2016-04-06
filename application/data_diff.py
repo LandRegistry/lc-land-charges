@@ -165,12 +165,6 @@ def get_rectification_type(original_data, new_data):
             if orig_names not in new_names:
                 return 2
 
-        # if ((len(orig_names) == len(new_names)) and
-        #        (all(i in new_names for i in orig_names))):
-        #    return 1
-        # else:
-        #    return 2
-
         return 3
 
     names_are_the_same = names_match(original_data['parties'][0]['names'][0],

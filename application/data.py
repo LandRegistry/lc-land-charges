@@ -552,7 +552,7 @@ def get_alteration_type(original_details, data):
     # are added for this system. Apologies for just giving these numbers. They are:
     # 1: Alters an existing registration entry; implemented by creating a second version, plus chaining a
     # pseudo-entry to hold the details of the rectification. Only the 'second version' is revealed [Rectifications only]
-    # 2: Adds a new registration and keeps the original around [Rectifications and renewals]
+    # 2: Adds a new registration and keeps the original around [Rectifications, amends and renewals]
     # 3: Adds a new registration and 'removes' (as in set no-reveal) the original [Rectifications and Amendments]
     # 4: Alters an existing registration entry; implemented by creating a second version. Only the 'second
     #       version' is revealed [Corrections]
@@ -563,7 +563,7 @@ def get_alteration_type(original_details, data):
     elif data['update_registration']['type'] == 'Renewal':
         return 2
     elif data['update_registration']['type'] == 'Amendment':
-        return get_rectification_type(original_details, data)  # will be 1 or 3
+        return get_rectification_type(original_details, data)  # amendments are back to 2 or 3!
     elif data['update_registration']['type'] == 'Correction':
         return 4
     elif data['update_registration']['type'] == 'Part Cancellation':
@@ -649,6 +649,7 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
                 else:
                     upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'name': name['name']})
 
+
     if new_details_id is not None:
         logging.debug('New details...')
         if data['class_of_charge'] not in ['PAB', 'WOB']:
@@ -666,20 +667,23 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
                 new_reg_nos = insert_landcharge_regn(cursor, new_details_id, data['class_of_charge'], new_names,
                                                      new_counties, date_today, None)
         else:
-            # Defect # 99 : adding a name on a banks amendment created new reg details for all names.
-            #               Unchanged names should retain their registration number & date
-            new_reg_nos = []
+            new_reg_nos = insert_bankruptcy_regn(cursor, new_details_id, new_names, date_today, None)
+            new_ex_date = calc_five_year_expiry(date_today)
+            for regn in original_regs:
+                logging.debug('Expire ' + str(regn['number']) + ' on ' + str(new_ex_date))
+                mark_as_no_reveal(cursor, regn['number'], regn['date'], new_ex_date)
+
             for name in new_names:
                 oreg = None
-                for reg in original_regs:
-                    if names_match(reg['details']['parties'][0]['names'][0], name['name']):
-                        oreg = reg
+                for regn in original_regs:
+                    if names_match(regn['details']['parties'][0]['names'][0], name['name']):
+                        oreg = regn
                         break
 
                 if oreg is not None:
-                    new_reg_nos += insert_bankruptcy_regn(cursor, new_details_id, [name], oreg['date'], oreg['number'])
-                else:
-                    new_reg_nos += insert_bankruptcy_regn(cursor, new_details_id, [name], date_today, None)
+                    # The name is the same as it's predecessor
+                    logging.debug('EXPIRE ' + str(oreg['number']))
+                    mark_as_no_reveal(cursor, oreg['number'], oreg['date'])
 
         reg_nos = new_reg_nos
 
