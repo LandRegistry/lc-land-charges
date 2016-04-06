@@ -1,0 +1,40 @@
+{
+	"parties": [{
+		"type": "Debtor",
+		"names":[ {
+			"type": "Complex Name",
+			"complex": {
+				"name": "King Stark",
+				"number": 1002234
+			}
+		} ],
+		"addresses": [ {
+			"type": "Residence",
+			"address_lines": [
+				"1 The Street",
+				"The Town"
+			],
+			"county": "Devon",
+			"postcode": "AA1 1AA"
+		} ],
+		"occupation": "Civil Servant",
+		"trading_name": "Bob",
+		"residence_withheld": false,
+		"case_reference": "123 of 2016",
+		"date_of_birth": "1980-01-01"
+	}, {
+		"type": "Court",
+		"names": [ {
+			"type": "Other",
+			"other": "Devon County Court"
+		} ]
+	}],
+	"class_of_charge": "PAB",
+	"applicant": {
+		"name": "Some Court",
+		"address": "11 Court Road, Court Town",
+		"key_number": "7654321",
+		"reference": "ARGL1234567"
+	},
+	"additional_information": ""
+}

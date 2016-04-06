@@ -1,0 +1,22 @@
+{
+	"application_type": "PA(B)",
+	"application_ref": "TELFORD COUNTY COURT NO 128 OF 2016",
+	"date": "2015-06-01",
+	"debtor_name": {
+		"forenames": [ "Bob", "Oscar", "Francis" ],
+		"surname": "Howard"
+	},
+	"occupation": "",
+	"residence": [
+		{ "text": "82 HAILEE BURG CHEMBOROUGH EAST TAMARA IP81 2CM NORTHAMPTONSHIRE" },
+		{ "text": "59 FOSTER ROAD FESTHAVEN SPINTOWN GJ87 2NH DORSET" }
+	],
+	"migration_data": {
+		"registration_no": "28761",
+		"extra": {
+			"occupation": "(N/A) AKA ROBERT HOWARD CIVIL SERVANT",
+			"of_note": "extra can contain anything. It's stored as JSON"
+		}
+	},
+    "key_number": "1234567"
+}
