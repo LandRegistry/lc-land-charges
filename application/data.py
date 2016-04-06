@@ -1307,8 +1307,6 @@ def insert_cancellation(data, user_id):
 
         # if full cancellation mark all rows as no reveal
         if data['update_registration']['type'] == "Cancellation":
-            # Only set cancelled_by on full cancellation
-            update_previous_details(cursor, canc_request_id, original_details_id)
             #for reg in original_regs:
             #    mark_as_no_reveal(cursor, reg['number'], reg['date'])
 
@@ -1324,6 +1322,8 @@ def insert_cancellation(data, user_id):
                             mark_as_no_reveal_by_id(cursor, m_reg["register_id"])
             else:
                 mark_as_no_reveal(cursor, orig_registration_no, orig_date)
+            # Only set cancelled_by on full cancellation
+            update_previous_details(cursor, canc_request_id, original_details_id)
         # Mark all cancellation registrations as no reveal.
         for reg in reg_nos:
             mark_as_no_reveal(cursor, reg['number'], reg['date'])
