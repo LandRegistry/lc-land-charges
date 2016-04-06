@@ -1478,7 +1478,10 @@ def get_search_details(search_details_id):
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
 
         for res_id in row['result']:
-            results.append(get_registration_details_from_register_id(res_id))
+            details = get_registration_details_from_register_id(res_id)
+
+            results.append(details)
+
         name_data['results'] = results
         sn_data.append(name_data)
         complete(cursor)
@@ -1506,6 +1509,9 @@ def get_registration_details_from_register_id(register_id):
                 if len(res_data['particulars']['counties']) > 1:
                     county = get_county(cursor, res['number'], res['date'])
                     res_data['particulars']['counties'] = county
+        addl_info = get_additional_info(cursor, res_data)
+        if addl_info is not None:
+            res_data['additional_information'] = addl_info
         data.append(res_data)
     complete(cursor)
     return data
