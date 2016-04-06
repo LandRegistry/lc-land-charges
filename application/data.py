@@ -1161,14 +1161,13 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
           "rd.prio_notice_expires, rd.request_id, rd.amend_info_type, " \
           "rd.amend_info_details, rd.amend_info_details_orig, r.reg_sequence_no, rd.priority_notice_no " \
           "from register r, register_details rd " \
-          "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id " \
-          #"AND (r.expired_on is NULL OR r.expired_on > current_date)"
+          "where r.registration_no=%(reg_no)s and r.date=%(date)s and r.details_id = rd.id " 
 
     if class_of_charge is not None:
         sql += " and rd.class_of_charge = %(class_of_charge)s "
         params["class_of_charge"] = class_of_charge
 
-    sql += "ORDER BY r.reg_sequence_no FETCH FIRST ROW ONLY"  # put this back temporarily
+    sql += "ORDER BY r.reg_sequence_no DESC FETCH FIRST ROW ONLY"  # put this back temporarily
 
     cursor.execute(sql, params)
     rows = cursor.fetchall()
