@@ -127,8 +127,8 @@ def get_rectification_type(original_data, new_data):
     # Type 3: change of details effecting search results where only the new must be revealed
     # Note: type 1 and 3 have the same effect under the hood, so we only need to determine 2 from 1/3
     # But: we'll distinguish 1 from 3 in case there's some significance later on
-    logging.debug(original_data)
-    logging.debug(new_data)
+    # logging.debug(original_data)
+    # logging.debug(new_data)
 
     # {'amended_by': {'number': 1000, 'date': '2016-02-08 00:00:00', 'type': None}, 'registration':
     # {'number': 1003, 'date': '2014-08-01'}, 'particulars': {'description': '1 The Lane, Some Village',
