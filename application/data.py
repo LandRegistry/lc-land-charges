@@ -1491,7 +1491,8 @@ def get_search_details(search_details_id):
         results = []
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
 
-        for res_id in row['result']:
+        res_id_list = sorted(set(row['result'])) #  workaround to remove duplicates in search_results.result
+        for res_id in res_id_list:
             details = get_registration_details_from_register_id(res_id)
 
             results.append(details)
