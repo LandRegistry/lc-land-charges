@@ -791,6 +791,18 @@ def validate_county_council(county_name):
         complete(cursor)
 
 
+def get_most_recent_revealable(cursor, reg_no, date):
+    history = get_registration_history(cursor, reg_no, date)
+    for item in history:
+        if item['expired_date'] is None:
+            return item
+
+        if item['expired_date'] > date:
+            return item
+
+    return None
+
+
 # Get details of a request for printing
 @app.route('/request_details/<request_id>', methods=["GET"])
 def get_request_details(request_id):
@@ -802,7 +814,12 @@ def get_request_details(request_id):
         else:  # not a search - reg register details
             data = get_register_request_details(request_id)
             for row in data:  # Each AKA registration needs populating
-                details = get_registration_details(cursor, row["registration_no"], row["registration_date"])
+
+                revealable = get_most_recent_revealable(cursor, row["registration_no"], row["registration_date"])
+                details = get_registration_details(cursor, revealable['registrations'][0]['number'],
+                                                   revealable['registrations'][0]['date'])
+
+                #details = get_registration_details(cursor, row["registration_no"], row["registration_date"])
                 if details is not None:
                     if 'particulars' in details:
                         if 'counties' in details['particulars']:
