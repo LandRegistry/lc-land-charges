@@ -816,10 +816,11 @@ def get_request_details(request_id):
             for row in data:  # Each AKA registration needs populating
 
                 revealable = get_most_recent_revealable(cursor, row["registration_no"], row["registration_date"])
-                details = get_registration_details(cursor, revealable['registrations'][0]['number'],
+                if revealable:
+                    details = get_registration_details(cursor, revealable['registrations'][0]['number'],
                                                    revealable['registrations'][0]['date'])
-
-                #details = get_registration_details(cursor, row["registration_no"], row["registration_date"])
+                else:  # if nothing came back from revealable
+                    details = get_registration_details(cursor, row["registration_no"], row["registration_date"])
                 if details is not None:
                     if 'particulars' in details:
                         if 'counties' in details['particulars']:
@@ -873,8 +874,8 @@ def get_search_request_ids():
     sql = " select a.id as request_id, b.search_timestamp, c.name_type, c.forenames, c.surname, c.complex_name, " \
           " c.complex_number, c.local_authority_name, c.local_authority_area, c.other_name, c.company_name," \
           " c.year_from, c.year_to " \
-          " from request a, search_details b, search_name c where a.key_number =  %(key_number)s" \
-          " and a.id = b.request_id and b.search_timestamp >= %(date_from)s and b.search_timestamp <= %(date_to)s " \
+          " from request a, search_details b, search_name c " \
+          " where a.id = b.request_id and b.search_timestamp >= %(date_from)s and b.search_timestamp <= %(date_to)s " \
           " and b.id = c.details_id "
     date_from = datetime.datetime.strptime(data['date_from'], '%Y-%m-%d')
     date_from = date_from + datetime.timedelta(days=-1)
@@ -884,7 +885,10 @@ def get_search_request_ids():
     logging.audit(format_message("Retrieve search results in range %s - %s"),
                   date_from.strftime('%Y-%m-%d'), date_to.strftime('%Y-%m-%d'))
 
-    params = {"key_number": data['key_number'], "date_from": date_from, "date_to": date_to}
+    params = {"date_from": date_from, "date_to": date_to}
+    if data['key_number'] != '' and data['key_number'] != ' ':
+        sql += " and a.key_number = %(key_number)s "
+    params['key_number'] = data['key_number']
     if data['estate_owner_ind'].lower() == "privateindividual":
         forenames = ""
         for forename in data['estate_owner']['private']['forenames']:
