@@ -601,7 +601,7 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
 
     if alter_type == 1:
         mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
-        updated_names, updated_details_id = insert_details(cursor, request_id, data, rect_reg_date, original_details_id)
+        updated_names, updated_details_id = insert_details(cursor, request_id, data, rect_reg_date, None)
         pseudo_names, pseudo_details_id = insert_details(cursor, request_id, data, date_today, updated_details_id)
 
     elif alter_type == 2:
