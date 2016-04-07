@@ -816,10 +816,11 @@ def get_request_details(request_id):
             for row in data:  # Each AKA registration needs populating
 
                 revealable = get_most_recent_revealable(cursor, row["registration_no"], row["registration_date"])
-                details = get_registration_details(cursor, revealable['registrations'][0]['number'],
+                if revealable:
+                    details = get_registration_details(cursor, revealable['registrations'][0]['number'],
                                                    revealable['registrations'][0]['date'])
-
-                #details = get_registration_details(cursor, row["registration_no"], row["registration_date"])
+                else:  # if nothing came back from revealable
+                    details = get_registration_details(cursor, row["registration_no"], row["registration_date"])
                 if details is not None:
                     if 'particulars' in details:
                         if 'counties' in details['particulars']:
