@@ -1062,17 +1062,22 @@ def get_details_from_rows(cursor, rows):
 
     legal_ref = rows[0]['legal_body_ref']
     if rows[0]['amends'] is not None:
-        data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
-        data['amends_registration']['type'] = rows[0]['amendment_type']
+        amend_of = get_registration_no_from_details_id(cursor, rows[0]['amends'])
+        if amend_of['number'] == data['registration']['number'] and amend_of['date'] == data['registration']['date']:
+            pass # Don't show 'amends_registration' where its an update to an existing regn
 
-        ait = rows[0]['amend_info_type']
-        if ait in ['instrument', 'chargee']:
-            data['amends_registration'][ait] = {
-                'original': rows[0]['amend_info_details_orig'],
-                'current': rows[0]['amend_info_details']
-            }
         else:
-            data['amends_registration'][ait] = rows[0]['amend_info_details']
+            data['amends_registration'] = amend_of
+            data['amends_registration']['type'] = rows[0]['amendment_type']
+
+            ait = rows[0]['amend_info_type']
+            if ait in ['instrument', 'chargee']:
+                data['amends_registration'][ait] = {
+                    'original': rows[0]['amend_info_details_orig'],
+                    'current': rows[0]['amend_info_details']
+                }
+            else:
+                data['amends_registration'][ait] = rows[0]['amend_info_details']
 
     if rows[0]['cancelled_by'] is not None:
         cursor.execute("select amends, amendment_type from register_details where amends=%(id)s",
