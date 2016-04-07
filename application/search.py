@@ -17,6 +17,12 @@ def load_county_dictionary(cursor):
 
 def store_search_request(cursor, data):
     # row on request
+    logging.debug(data)
+
+    username = ''
+    if 'user_id' in data:
+        username = data['user_id']
+
     reference = data['customer']['reference']
     key_number = data['customer']['key_number']
     cust_name = data['customer']['name']
@@ -32,13 +38,14 @@ def store_search_request(cursor, data):
 
     app_time = datetime.datetime.now().strftime('%H:%M:%S')
     cursor.execute("INSERT INTO request (key_number, application_type, application_reference, application_date, application_time, " +
-                   "ins_request_id, customer_name, customer_address, customer_addr_type) " +
+                   "ins_request_id, customer_name, customer_address, customer_addr_type, caseworker_uid) " +
                    "VALUES ( %(key)s, %(app_type)s, %(app_ref)s, %(app_date)s, %(app_time)s, %(ins_id)s, "
-                   " %(name)s, %(addr)s , %(addr_type)s ) RETURNING id",
+                   " %(name)s, %(addr)s , %(addr_type)s, %(cwuid)s ) RETURNING id",
                    {
                        "key": key_number, "app_type": "SEARCH", "app_ref": reference,
                        "app_date": date, "app_time": app_time, "ins_id": ins_request_id,
-                       "name": cust_name, "addr": cust_address, "addr_type": cust_address_type
+                       "name": cust_name, "addr": cust_address, "addr_type": cust_address_type,
+                       'cwuid': username
                    })
     request_id = cursor.fetchone()[0]
 

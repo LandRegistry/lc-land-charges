@@ -443,6 +443,8 @@ def create_search():
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
         # Store the search request
+        if 'X-LC-Username' in request.headers:
+            data['user_id'] = request.headers['X-LC-Username']
         search_request_id, search_details_id, search_data = store_search_request(cursor, data)
 
         # Run the queries
