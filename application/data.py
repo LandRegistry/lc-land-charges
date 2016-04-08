@@ -601,7 +601,7 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
 
     if alter_type == 1:
         mark_as_no_reveal(cursor, rect_reg_no, rect_reg_date)
-        updated_names, updated_details_id = insert_details(cursor, request_id, data, rect_reg_date, None)
+        updated_names, updated_details_id = insert_details(cursor, request_id, data, rect_reg_date, original_details_id)
         pseudo_names, pseudo_details_id = insert_details(cursor, request_id, data, date_today, updated_details_id)
 
     elif alter_type == 2:
@@ -1009,7 +1009,7 @@ def get_lc_counties(cursor, details_id, lead_county_id):
     return counties
 
 
-def get_details_from_rows(cursor, rows):
+def get_details_from_rows(cursor, rows, fetch_amend_detail=False):
     assert len(rows) > 0
     details_id = rows[0]['id']
     lead_county = rows[0]['county_id']
@@ -1062,17 +1062,22 @@ def get_details_from_rows(cursor, rows):
 
     legal_ref = rows[0]['legal_body_ref']
     if rows[0]['amends'] is not None:
-        data['amends_registration'] = get_registration_no_from_details_id(cursor, rows[0]['amends'])
-        data['amends_registration']['type'] = rows[0]['amendment_type']
+        amend_of = get_registration_no_from_details_id(cursor, rows[0]['amends'])
+        if not fetch_amend_detail and (amend_of['number'] == data['registration']['number'] and amend_of['date'] == data['registration']['date']):
+            pass  # Don't show 'amends_registration' where its an update to an existing regn
 
-        ait = rows[0]['amend_info_type']
-        if ait in ['instrument', 'chargee']:
-            data['amends_registration'][ait] = {
-                'original': rows[0]['amend_info_details_orig'],
-                'current': rows[0]['amend_info_details']
-            }
         else:
-            data['amends_registration'][ait] = rows[0]['amend_info_details']
+            data['amends_registration'] = amend_of
+            data['amends_registration']['type'] = rows[0]['amendment_type']
+
+            ait = rows[0]['amend_info_type']
+            if ait in ['instrument', 'chargee']:
+                data['amends_registration'][ait] = {
+                    'original': rows[0]['amend_info_details_orig'],
+                    'current': rows[0]['amend_info_details']
+                }
+            else:
+                data['amends_registration'][ait] = rows[0]['amend_info_details']
 
     if rows[0]['cancelled_by'] is not None:
         cursor.execute("select amends, amendment_type from register_details where amends=%(id)s",
@@ -1127,7 +1132,7 @@ def get_details_from_rows(cursor, rows):
     return data
 
 
-def get_registration_details_by_id(cursor, details_id):
+def get_registration_details_by_id(cursor, details_id, fetch_amend_detail=False):
     cursor.execute("SELECT r.registration_no, r.date, r.expired_on, rd.class_of_charge, rd.id, r.id as register_id, "
                    "rd.legal_body_ref, rd.cancelled_by, rd.amends, rd.request_id, rd.additional_info, "
                    "rd.district, rd.short_description, r.county_id, r.debtor_reg_name_id, rd.amendment_type, "
@@ -1142,7 +1147,7 @@ def get_registration_details_by_id(cursor, details_id):
     if len(rows) == 0:
         return None
 
-    return get_details_from_rows(cursor, rows)
+    return get_details_from_rows(cursor, rows, fetch_amend_detail)
 
 
 def get_registration_details_by_register_id(cursor, register_id):
@@ -1486,7 +1491,8 @@ def get_search_details(search_details_id):
         results = []
         cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
 
-        for res_id in row['result']:
+        res_id_list = sorted(set(row['result'])) #  workaround to remove duplicates in search_results.result
+        for res_id in res_id_list:
             details = get_registration_details_from_register_id(res_id)
 
             results.append(details)
@@ -1679,11 +1685,20 @@ def get_rectification_additional_info_prev(cursor, details, next_details):
     if rect_type == 1:
         # In this case, prev and current have the same registration number; the amendment is recorded
         # by next, a non-revealed pseudo-entry (sigh)
+
+        # logging.debug(next_details)
+
         if 'amended_by' in next_details:
             # Because 'next' is the same registration, we need to know the number that amended next
             amend_details = next_details['amended_by']
         else:
+            logging.warning('Unable to proceed')
             return []  # not much we can do...
+
+        # logging.debug('XXXXXXXXXXXX')
+        # logging.debug(details)
+        # logging.debug(next_details)
+        # logging.debug('XXXXXXXXXXXX')
 
         if details['particulars']['description'].upper() != next_details['particulars']['description'].upper():
             infos.append('SHORT DESCRIPTION RECTIFIED FROM {} BY {} REGD {}.'.format(
@@ -1918,12 +1933,12 @@ def get_additional_info(cursor, details):
                                         details['registration']['date'], True)
     logging.debug('Head is ' + str(head_details_id))
     history = get_registration_history_from_details(cursor, head_details_id)
-    logging.debug(len(history))
-    logging.debug(history)
+    # logging.debug(len(history))
+    # logging.debug(history)
 
     register = []
     for record in history:
-        register.append(get_registration_details_by_id(cursor, record['id']))
+        register.append(get_registration_details_by_id(cursor, record['id'], True))
 
     logging.debug(len(register))
 
@@ -1934,11 +1949,18 @@ def get_additional_info(cursor, details):
         this = register[index]
         prev = register[index + 1] if index < len(register) - 1 else None
         next = register[index - 1] if index > 0 else None
-        logging.info('------->')
-        logging.debug(this)
+        # logging.info('------->')
+        # logging.debug(this)
+        # logging.debug(prev)
+        # logging.debug(next)
+        # logging.info('<------')
 
         if entry['entered_addl_info'] is not None and entry['entered_addl_info'] != '':
             addl_info.insert(0, entry['entered_addl_info'].upper())
+
+        # if next is not None and 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
+        #     addl_info = get_rectification_additional_info_prev(cursor, this, next) + addl_info
+
 
         if entry['details_id'] == details['details_id']:  # This is the record of interest
             logging.info('Switch')
