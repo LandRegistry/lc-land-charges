@@ -141,6 +141,7 @@ def insert_party_name(cursor, party_id, name):
 
 def insert_registration(cursor, details_id, name_id, date, county_id, orig_reg_no=None, expires_date=None):
     logging.debug('Insert registration')
+    cursor.execute('LOCK TABLE register in ACCESS EXCLUSIVE MODE;')
     if orig_reg_no is None:
         # Get the next registration number
         year = date[:4]  # date is a string
