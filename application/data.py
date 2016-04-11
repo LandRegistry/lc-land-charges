@@ -955,6 +955,10 @@ def read_addresses(cursor, party, party_id):
             'address_string': row['address_string']
         }
         get_address_detail(cursor, address, row['detail_id'])
+
+        if 'address_lines' not in address:
+            address['address_lines'] = [address['address_string']]
+
         party['addresses'].append(address)
 
 
