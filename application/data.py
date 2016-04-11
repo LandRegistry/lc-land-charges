@@ -959,9 +959,9 @@ def read_addresses(cursor, party, party_id):
 
 
 def read_parties(cursor, data, details_id, legal_ref, lead_debtor_id):
-    cursor.execute('SELECT id, party_type, occupation, date_of_birth, residence_withheld '
-                   'FROM party '
-                   'WHERE register_detl_id = %(id)s', {
+    cursor.execute("SELECT id, party_type, occupation, date_of_birth, residence_withheld "
+                   "FROM party "
+                   "WHERE register_detl_id = %(id)s and party_type != 'Court' ", {
                        'id': details_id
                    })
     rows = cursor.fetchall()
