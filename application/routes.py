@@ -813,12 +813,14 @@ def get_request_details(request_id):
             data = get_search_request_details(request_id)
         else:  # not a search - reg register details
             data = get_register_request_details(request_id)
-            for row in data:  # Each AKA registration needs populating
+
+            for index, row in enumerate(data):  # Each AKA registration needs populating
 
                 revealable = get_most_recent_revealable(cursor, row["registration_no"], row["registration_date"])
                 if revealable:
-                    details = get_registration_details(cursor, revealable['registrations'][0]['number'],
-                                                   revealable['registrations'][0]['date'])
+                    if index < len(revealable['registrations']):
+                        details = get_registration_details(cursor, revealable['registrations'][index]['number'],
+                                                                   revealable['registrations'][index]['date'])
                 else:  # if nothing came back from revealable
                     details = get_registration_details(cursor, row["registration_no"], row["registration_date"])
                 if details is not None:
