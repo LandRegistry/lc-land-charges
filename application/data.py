@@ -955,13 +955,17 @@ def read_addresses(cursor, party, party_id):
             'address_string': row['address_string']
         }
         get_address_detail(cursor, address, row['detail_id'])
+
+        if 'address_lines' not in address:
+            address['address_lines'] = [address['address_string']]
+
         party['addresses'].append(address)
 
 
 def read_parties(cursor, data, details_id, legal_ref, lead_debtor_id):
-    cursor.execute('SELECT id, party_type, occupation, date_of_birth, residence_withheld '
-                   'FROM party '
-                   'WHERE register_detl_id = %(id)s', {
+    cursor.execute("SELECT id, party_type, occupation, date_of_birth, residence_withheld "
+                   "FROM party "
+                   "WHERE register_detl_id = %(id)s and party_type != 'Court' ", {
                        'id': details_id
                    })
     rows = cursor.fetchall()
