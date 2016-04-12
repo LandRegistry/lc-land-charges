@@ -1071,9 +1071,11 @@ def get_details_from_rows(cursor, rows, fetch_amend_detail=False):
     legal_ref = rows[0]['legal_body_ref']
     logging.debug(legal_ref)
     logging.debug(add_info)
-    if re.search("^\d+ OF \d{4}$", legal_ref, re.IGNORECASE) and re.search("\d+ OF \d{4}", add_info, re.IGNORECASE):
-        # loading migration record
-        legal_ref = add_info
+
+    if legal_ref is not None and add_info is not None:
+        if re.search("^\d+ OF \d{4}$", legal_ref, re.IGNORECASE) and re.search("\d+ OF \d{4}", add_info, re.IGNORECASE):
+            # loading migration record
+            legal_ref = add_info
 
     if rows[0]['amends'] is not None:
         amend_of = get_registration_no_from_details_id(cursor, rows[0]['amends'])
