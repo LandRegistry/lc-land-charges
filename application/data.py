@@ -1,4 +1,5 @@
 from application import app
+from application import app
 import psycopg2
 import json
 import datetime
@@ -705,7 +706,7 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
         # A combined PAB/WOB amendment... we need to mark the PAB as no-reveal and cancelled by the incoming request
         logging.debug(data['update_registration'])
         if 'pab' in data['update_registration']:
-            matcher = re.match("(\d+)\((\d{4}\-\d\d\-\d\d)\)", data['update_registration']['pab'])
+            matcher = re.match("(\d+)\((\d{4}\-\d{1,2}\-\d{1,2})\)", data['update_registration']['pab'])
 
             pab_reg_no = matcher.group(1)
             pab_date = matcher.group(2)
@@ -1065,7 +1066,15 @@ def get_details_from_rows(cursor, rows, fetch_amend_detail=False):
         for row in rows[1:]:
             data['alternate_register_ids'].append(row['register_id'])
 
+    logging.debug('------------------')
+
     legal_ref = rows[0]['legal_body_ref']
+    logging.debug(legal_ref)
+    logging.debug(add_info)
+    if re.search("^\d+ OF \d{4}$", legal_ref, re.IGNORECASE) and re.search("\d+ OF \d{4}", add_info, re.IGNORECASE):
+        # loading migration record
+        legal_ref = add_info
+
     if rows[0]['amends'] is not None:
         amend_of = get_registration_no_from_details_id(cursor, rows[0]['amends'])
         if not fetch_amend_detail and (amend_of['number'] == data['registration']['number'] and amend_of['date'] == data['registration']['date']):
@@ -1817,16 +1826,15 @@ def get_court_additional_info(cursor, details):
         caseref = ''
     else:
         caseref = debtor['case_reference'].upper()
-        m = re.match("^(.*\s*)?(\d+ OF \d{4})$", caseref)
+        m = re.match("^(.+)\s(\d+ OF \d{4})$", caseref)
         if m:
-            if m.group(1) is None:
-                g1 = ""
-            else:
-                g1 = m.group(1)
-
-            caseref = "{}NO {}".format(g1, m.group(2))
+            caseref = "{} NO {}".format(m.group(1), m.group(2))
         else:
-            caseref = 'ADJUDICATOR REF ' + caseref
+            m = re.match("^(\d+ OF \d{4})$", caseref)
+            if m:
+                caseref = "NO {}".format(m.group(1))
+            else:
+                caseref = 'ADJUDICATOR REF ' + caseref
 
     return caseref
 
@@ -1856,7 +1864,7 @@ def get_amendment_additional_info(cursor, details, next_details):
 
     pab_fragment = ""
     if 'amends_registration' in next_details and 'PAB' in next_details['amends_registration']:
-        matcher = re.match("(\d+)\((\d{4}\-\d\d\-\d\d)\)", next_details['amends_registration']['PAB'])
+        matcher = re.match("(\d+)\((\d{4}\-\d{1,2}\-\d{1,2})\)", next_details['amends_registration']['PAB'])
         pab_reg_no = matcher.group(1)
         pab_date = matcher.group(2)
         pab_fragment = " & {} DATED {}".format(pab_reg_no, reformat_date_string(pab_date))
@@ -1954,6 +1962,7 @@ def get_additional_info(cursor, details):
 
     addl_info = []
     forward = True
+    court_added = False
 
     for index, entry in enumerate(register):
         this = register[index]
@@ -1965,12 +1974,15 @@ def get_additional_info(cursor, details):
         # logging.debug(next)
         # logging.info('<------')
 
+
         if entry['entered_addl_info'] is not None and entry['entered_addl_info'] != '':
-            addl_info.insert(0, entry['entered_addl_info'].upper())
+            a_info = entry['entered_addl_info'].upper()
 
-        # if next is not None and 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
-        #     addl_info = get_rectification_additional_info_prev(cursor, this, next) + addl_info
-
+            logging.debug(a_info)
+            if re.search("NO \d+ OF \d{4}", a_info):
+                pass  # Don't put on entered addl info if its a court reference
+            else:
+                addl_info.insert(0, a_info)
 
         if entry['details_id'] == details['details_id']:  # This is the record of interest
             logging.info('Switch')
