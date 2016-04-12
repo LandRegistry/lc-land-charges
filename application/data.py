@@ -1940,11 +1940,11 @@ def get_migration_info(cursor, reg_no, date):
 
 def get_additional_info(cursor, details):
     migrated = get_migration_info(cursor, details['registration']['number'], details['registration']['date'])
-    if migrated is not None:
-        if 'amend_info' in migrated:
-            return migrated['amend_info']
-        else:
-            return ''
+    # if migrated is not None:
+    #     if 'amend_info' in migrated:
+    #         return migrated['amend_info']
+    #     else:
+    #         return ''
 
     # details is being passed in...
     head_details_id = get_head_of_chain(cursor, details['registration']['number'],
