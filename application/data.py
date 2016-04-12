@@ -1817,9 +1817,14 @@ def get_court_additional_info(cursor, details):
         caseref = ''
     else:
         caseref = debtor['case_reference'].upper()
-        m = re.match("^(.+) (\d+ OF \d{4})$", caseref)
+        m = re.match("^(.*\s*)?(\d+ OF \d{4})$", caseref)
         if m:
-            caseref = "{} NO {}".format(m.group(1), m.group(2))
+            if m.group(1) is None:
+                g1 = ""
+            else:
+                g1 = m.group(1)
+
+            caseref = "{}NO {}".format(g1, m.group(2))
         else:
             caseref = 'ADJUDICATOR REF ' + caseref
 
