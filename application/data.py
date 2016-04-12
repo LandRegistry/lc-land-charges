@@ -2027,12 +2027,17 @@ def get_additional_info(cursor, details):
                         'Amendment':
                     addl_info.append(get_amend_additional_info_next(cursor, this, prev))
 
+    uniques = []
+    for item in addl_info:
+        if not item in uniques:
+            uniques.append(item)
+
     logging.info({
-        "array": addl_info,
-        "text": get_additional_info_text(addl_info)
+        "array": uniques,
+        "text": get_additional_info_text(uniques)
     })
 
-    return get_additional_info_text(addl_info)
+    return get_additional_info_text(uniques)
     # Convienient debug array:
     # return {
     #     "array": addl_info,
