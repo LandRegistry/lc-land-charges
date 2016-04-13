@@ -136,7 +136,7 @@ def perform_bankruptcy_search_complex_name(cursor, name_type, keys, number, cert
     name_results = perform_bankruptcy_search(cursor, name_type, keys, cert_date)
 
     cursor.execute("SELECT r.id, r.date, rd.class_of_charge "
-                   "FROM party_name n, register r, register_details rd "
+                   "FROM party_name n, register r, register_details rd, party p, party_name_rel pnr "
                    "WHERE n.complex_number = %(number)s "
                    "  AND n.id = pnr.party_name_id "
                    "  AND pnr.party_id = p.id "
