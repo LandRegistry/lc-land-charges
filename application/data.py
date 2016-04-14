@@ -592,7 +592,7 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
     if 'dev_registration' in data:
         date_today = data['dev_registration']['date']
 
-    request_id = insert_request(cursor, user_id, data['applicant'], data['update_registration']['type'], rect_reg_date)
+    request_id = insert_request(cursor, user_id, data['applicant'], data['update_registration']['type'], datetime.datetime.today())
 
     new_details_id = None
     pseudo_details_id = None
@@ -817,6 +817,41 @@ def get_all_registrations(cursor):
         })
     return results
 
+
+def get_corrections_by_date(cursor, date):
+    cursor.execute("select r.registration_no, r.date, d.class_of_charge, d.amends, d.cancelled_by, d.request_id, d.amendment_type "
+                   "from register r, register_details d, request q "
+                   "where r.details_id = d.id and d.request_id = q.id and q.application_type='Correction' "
+                   "and q.application_date=%(date)s", {'date': date})
+    rows = cursor.fetchall()
+    results = []
+    for row in rows:
+        request_id = row['request_id']
+        item = None
+        for r in results:
+            if r['id'] == request_id:
+                item = r
+                break
+        if item is None:
+            item = {
+                'application': '',
+                'id': request_id,
+                'data': []
+            }
+            results.append(item)
+
+        if row['amends'] is None:
+            item['application'] = 'new'
+        else:
+            item['application'] = row['amendment_type']  # 'amend'
+
+        item['data'].append({
+            'number': row['registration_no'],
+            'date': row['date'].strftime('%Y-%m-%d'),
+            'class_of_charge': row['class_of_charge']
+        })
+    return results
+
         
 def get_registrations_by_date(cursor, date):
     cursor.execute('select r.registration_no, r.date, d.class_of_charge, d.amends, d.cancelled_by, d.request_id, '
@@ -851,7 +886,7 @@ def get_registrations_by_date(cursor, date):
             'date': row['date'].strftime('%Y-%m-%d'),
             'class_of_charge': row['class_of_charge']
         })
-    return results
+    return results + get_corrections_by_date(cursor, date)
 
 
 def read_names(cursor, party, party_id, lead_debtor_id):
