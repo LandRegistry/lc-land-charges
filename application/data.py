@@ -994,6 +994,8 @@ def read_addresses(cursor, party, party_id):
 
         if 'address_lines' not in address:
             address['address_lines'] = [address['address_string']]
+            address['postcode'] = ''
+            address['county'] = ''
 
         party['addresses'].append(address)
 
