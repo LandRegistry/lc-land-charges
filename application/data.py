@@ -2030,7 +2030,7 @@ def get_additional_info(cursor, details):
             if entry['class_of_charge'] in ['PAB', 'WOB']:
                 addl_info.insert(0, get_court_additional_info(cursor, entry))
 
-        else:
+        elif migrated is None:
             if not forward:
                 logging.debug('BACKWARD')
 
