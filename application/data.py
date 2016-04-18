@@ -643,13 +643,38 @@ def insert_rectification(cursor, user_id, rect_reg_no, rect_reg_date, data, pab_
                 upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'county': county['name']})
 
         else:
-            for index, reg in enumerate(original_regs):  # TODO: account for name added? or is that in sync?
-                name = updated_names[index]
+            #logging.debug(updated_names)
+            #logging.debug(original_details)
+            #logging.debug(original_regs)
+            # logging.debug('vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv')
+            # logging.debug("Link {} to {}".format(rect_reg_no, updated_names[0]['name']['private']['forenames'][0]))
+            insert_registration(cursor, updated_details_id, updated_names[0]['id'], rect_reg_date, None, rect_reg_no)
+            remaining_names = updated_names[1:]  # Assumes the order returned from DB is consistent... which it now is...
+
+            ni = 0
+            for index, reg in enumerate(original_regs):  # For the AKAs...
+                if reg['number'] == rect_reg_no:
+                    continue
+
+                name = remaining_names[ni]
+                ni += 1
+
+                # logging.debug(name)
+                # logging.debug(name['id'])
+                # logging.debug(name['name'])
+                # logging.debug(name['name']['private'])
+                # logging.debug(name['name']['private']['forenames'])
+                # logging.debug(name['name']['private']['forenames'][0])
+                # logging.debug(reg['number'])
+                #
+                # logging.debug("Link {} to {}".format(reg['number'], name['name']['private']['forenames'][0]))
                 reg_no, reg_id = insert_registration(cursor, updated_details_id, name['id'], rect_reg_date, None, reg['number'])
                 if 'forenames' in name:
                     upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'forenames': name['forenames'], 'surname': name['surname']})
                 else:
                     upd_reg_nos.append({'number': reg_no, 'date': rect_reg_date, 'name': name['name']})
+            logging.debug('^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^')
+
 
 
     if new_details_id is not None:
@@ -750,7 +775,7 @@ def get_register_details_id(cursor, reg_no, date, class_of_charge=None):
 
 def get_all_registration_nos(cursor, details_id):
     logging.debug("Get reg nos for {}".format(details_id))
-    cursor.execute("SELECT registration_no, date, reg_sequence_no FROM register WHERE details_id = %(details)s",
+    cursor.execute("SELECT registration_no, date, reg_sequence_no, debtor_reg_name_id FROM register WHERE details_id = %(details)s order by registration_no",
                    {"details": details_id})
     rows = cursor.fetchall()
     results = []
@@ -758,7 +783,8 @@ def get_all_registration_nos(cursor, details_id):
         results.append({
             'number': str(row['registration_no']),
             'date': row['date'].strftime('%Y-%m-%d'),
-            'sequence': row['reg_sequence_no']
+            'sequence': row['reg_sequence_no'],
+            'name_id': row['debtor_reg_name_id']
         })
     logging.debug(results)
     return results
@@ -894,7 +920,7 @@ def read_names(cursor, party, party_id, lead_debtor_id):
                    'name_type_ind, company_name, local_authority_name, local_authority_area, '
                    'other_name, searchable_string, subtype '
                    'from party_name n, party_name_rel pn '
-                   'where n.id = pn.party_name_id and pn.party_id = %(id)s', {
+                   'where n.id = pn.party_name_id and pn.party_id = %(id)s order by n.id', {
                        'id': party_id
                    })
     rows = cursor.fetchall()
