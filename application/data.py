@@ -2059,9 +2059,12 @@ def get_additional_info(cursor, details):
         elif migrated is None:
             if not forward:
                 logging.debug('BACKWARD')
-
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Rectification':
-                    addl_info = get_rectification_additional_info_prev(cursor, this, next) + addl_info
+                    next_migrated = get_migration_info(cursor,
+                                                       next['amends_registration']['number'],
+                                                       next['amends_registration']['date'])
+                    if next_migrated is None:  # if the 'next' rectification was migrated don't build additional info.
+                        addl_info = get_rectification_additional_info_prev(cursor, this, next) + addl_info
                     # addl_info.insert(0, get_rectification_additional_info_prev(cursor, this, next))
 
                 if 'amends_registration' in next and next['amends_registration']['type'] == 'Amendment':
