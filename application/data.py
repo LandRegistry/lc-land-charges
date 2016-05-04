@@ -1229,6 +1229,31 @@ def get_registration_details_by_id(cursor, details_id, fetch_amend_detail=False)
     return get_details_from_rows(cursor, rows, fetch_amend_detail)
 
 
+def get_addl_class(cursor, data):
+    # Determing whether to use new reg no or original...
+    if 'migrated' in data and data['migrated']['original_number'] != data['registration']['number']:
+        cursor.execute("SELECT class_of_charge FROM addl_class_of_charge WHERE "
+                       "orig_number =%(no)s AND date=%(date)s ",
+                       {
+                           "no": data['migrated']['original_number'],
+                           "date": data['registration']['date']
+                       })
+    else:
+        cursor.execute("SELECT class_of_charge FROM addl_class_of_charge WHERE "
+                       "number=%(no)s AND date=%(date)s ",
+                       {
+                           "no": data['registration']['number'],
+                           "date": data['registration']['date']
+                       })
+    rows = cursor.fetchall()
+    classes = []
+    for row in rows:
+        classes.append(row['class_of_charge'])
+
+    if len(classes) > 0:
+        data['additional_classes'] = classes
+
+
 def get_registration_details_by_register_id(cursor, register_id):
 
     sql = "SELECT r.registration_no, r.date, r.expired_on, rd.class_of_charge, rd.id, r.id as register_id, " \
@@ -1244,7 +1269,9 @@ def get_registration_details_by_register_id(cursor, register_id):
     if len(rows) == 0:
         return None
 
-    return get_details_from_rows(cursor, rows)
+    data = get_details_from_rows(cursor, rows)
+    get_addl_class(cursor, data)
+    return data
 
 
 def get_registration_details(cursor, reg_no, date, class_of_charge=None):
@@ -1268,7 +1295,9 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
     if len(rows) == 0:
         return None
 
-    return get_details_from_rows(cursor, rows)
+    data = get_details_from_rows(cursor, rows)
+    get_addl_class(cursor, data)
+    return data
 
 
 def get_head_of_chain(cursor, reg_no, date, follow_part_cans=False):
