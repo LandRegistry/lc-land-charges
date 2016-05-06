@@ -1,5 +1,4 @@
 from application import app
-from application import app
 import psycopg2
 import json
 import datetime
@@ -1229,6 +1228,35 @@ def get_registration_details_by_id(cursor, details_id, fetch_amend_detail=False)
     return get_details_from_rows(cursor, rows, fetch_amend_detail)
 
 
+def get_addl_class(cursor, data):
+    # Determing whether to use new reg no or original...
+
+    if data['registration']['sequence'] > 1:  # This data can only exist for migrated records
+        return
+
+    if 'migrated' in data and data['migrated']['original_number'] != data['registration']['number']:
+        cursor.execute("SELECT class_of_charge FROM addl_class_of_charge WHERE "
+                       "orig_number =%(no)s AND date=%(date)s ",
+                       {
+                           "no": data['migrated']['original_number'],
+                           "date": data['registration']['date']
+                       })
+    else:
+        cursor.execute("SELECT class_of_charge FROM addl_class_of_charge WHERE "
+                       "number=%(no)s AND date=%(date)s ",
+                       {
+                           "no": data['registration']['number'],
+                           "date": data['registration']['date']
+                       })
+    rows = cursor.fetchall()
+    classes = []
+    for row in rows:
+        classes.append(row['class_of_charge'])
+
+    if len(classes) > 0:
+        data['additional_classes'] = classes
+
+
 def get_registration_details_by_register_id(cursor, register_id):
 
     sql = "SELECT r.registration_no, r.date, r.expired_on, rd.class_of_charge, rd.id, r.id as register_id, " \
@@ -1244,7 +1272,9 @@ def get_registration_details_by_register_id(cursor, register_id):
     if len(rows) == 0:
         return None
 
-    return get_details_from_rows(cursor, rows)
+    data = get_details_from_rows(cursor, rows)
+    get_addl_class(cursor, data)
+    return data
 
 
 def get_registration_details(cursor, reg_no, date, class_of_charge=None):
@@ -1268,7 +1298,9 @@ def get_registration_details(cursor, reg_no, date, class_of_charge=None):
     if len(rows) == 0:
         return None
 
-    return get_details_from_rows(cursor, rows)
+    data = get_details_from_rows(cursor, rows)
+    get_addl_class(cursor, data)
+    return data
 
 
 def get_head_of_chain(cursor, reg_no, date, follow_part_cans=False):
@@ -2115,8 +2147,8 @@ def get_additional_info(cursor, details):
 
 def get_multi_registrations(cursor, registration_date, registration_no):
     # when multiple registrations exist for the same reg no and date return the relevant data
-    cursor.execute("select r.registration_no, r.date, d.class_of_charge, d.amends, d.cancelled_by, d.request_id, "
-                   "d.amendment_type, r.id as register_id "
+    cursor.execute("select r.registration_no, r.date, r.reg_sequence_no, d.class_of_charge, d.amends, d.cancelled_by, "
+                   "d.request_id, d.amendment_type, r.id as register_id "
                    " from register r, register_details d where r.details_id = d.id and "
                    "r.date=%(date)s and r.registration_no=%(registration_no)s and cancelled_by is null ",
                    {'date': registration_date, 'registration_no': registration_no})
@@ -2125,7 +2157,11 @@ def get_multi_registrations(cursor, registration_date, registration_no):
         return []
 
     results = []
+    max_seq = -1
     for row in rows:
+        if row['reg_sequence_no'] > max_seq:
+            max_seq = row['reg_sequence_no']
+
         request_id = row['request_id']
         item = None
         for r in results:
@@ -2151,6 +2187,41 @@ def get_multi_registrations(cursor, registration_date, registration_no):
             'class_of_charge': row['class_of_charge'],
             'register_id': row["register_id"]
         })
+
+    logging.debug('GET ADDITIONAL CLASSES')
+    if max_seq == 1:
+        cursor.execute("select r.registration_no, r.date, d.amends, "
+                       "d.cancelled_by, d.request_id, d.amendment_type, r.id as register_id, a.class_of_charge "
+                       "from register r, addl_class_of_charge a, register_details d "
+                       "where r.details_id = d.id "
+                       "and r.date = a.date and r.registration_no = a.number "
+                       "and cancelled_by is null "
+                       "and r.date=%(date)s and r.registration_no=%(no)s ",
+                       {'no': registration_no, 'date': registration_date})
+        rows = cursor.fetchall()
+        for row in rows:
+            request_id = row['request_id']
+
+            item = {
+                'application': '',
+                'id': request_id,
+                'data': []
+            }
+            results.append(item)
+
+            if row['amends'] is None:
+                item['application'] = 'new'
+            else:
+                item['application'] = row['amendment_type']  # 'amend'
+
+            item['data'].append({
+                'number': row['registration_no'],
+                'date': row['date'].strftime('%Y-%m-%d'),
+                'class_of_charge': row['class_of_charge'],
+                'register_id': row["register_id"]
+            })
+
+    logging.debug(results)
     return results
 
 
