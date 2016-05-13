@@ -1522,11 +1522,16 @@ def get_register_request_details(request_id):
     registrations = []
     for row in rows:
         registration = {"request_id": row["request_id"], "registration_date": str(row["registration_date"]),
-                        "registration_no": row["registration_no"], "transaction_fee": row["transaction_fee"],
+                        "registration_no": row["registration_no"],
                         'application_type': row['application_type'], 'application_date': str(row['application_date']),
                         'applicant': {'name': row['customer_name'], 'address': row['customer_address'],
                                       'key_number': row['key_number'], 'address_type': row['customer_addr_type'],
                                       'reference': row['application_reference']}}
+
+        # Def causes an issue in test... result printer is happy for it to be absent, but not happy for it to be null
+        if row['transaction_fee'] is not None:
+            registration['transaction_fee'] = row['transaction_fee']
+
         registrations.append(registration)
     return registrations
 
