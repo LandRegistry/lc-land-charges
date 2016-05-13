@@ -2239,7 +2239,7 @@ def get_multi_registrations(cursor, registration_date, registration_no):
 
 
 def get_county_by_reg_id(cursor, reg_id):
-    sql = "select a.name from county a, register b where id=%(reg)s " \
+    sql = "select a.name from county a, register b where b.id=%(reg)s " \
           " and b.county_id = a.id;"
     cursor.execute(sql, {"reg": reg_id})
     row = cursor.fetchone()
