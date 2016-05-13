@@ -1506,6 +1506,18 @@ def get_county_id(cursor, county):
     return rows[0]['id']
 
 
+def get_request_audit(cursor, request_id):
+    cursor.execute('SELECT application_type, application_date, application_time, caseworker_uid FROM request where id=%(id)s',
+                   {'id': request_id})
+    row = cursor.fetchone()
+    return {
+        "application_type": row['application_type'],
+        "application_date": row['application_date'].strftime('%Y-%m-%d'),
+        "application_time": row['application_time'].strftime('%H:%M:%S'),
+        "caseworker_uid": row['caseworker_uid']
+    }
+
+
 def get_register_request_details(request_id):
     cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
     try:
@@ -1681,7 +1693,7 @@ def get_k22_request_id(registration_no, registration_date):
 
 def get_entry_summary(cursor, details_id):
     cursor.execute('SELECT r.registration_no, r.date, r.reg_sequence_no, r.expired_on, d.amendment_type, d.amends, '
-                   ' d.class_of_charge '
+                   ' d.class_of_charge, d.request_id '
                    'FROM register r, register_details d '
                    'WHERE r.details_id = d.id AND d.id = %(did)s', {
                        'did': details_id
@@ -1706,7 +1718,8 @@ def get_entry_summary(cursor, details_id):
         'id': details_id,
         'class_of_charge': rows[0]['class_of_charge'],
         'application': "New Registration" if rows[0]['amendment_type'] is None else rows[0]['amendment_type'],
-        'amends': rows[0]['amends']
+        'amends': rows[0]['amends'],
+        'request_id': rows[0]['request_id']
     }
 
     if rows[0]['expired_on'] is None:

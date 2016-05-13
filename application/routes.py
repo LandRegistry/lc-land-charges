@@ -14,7 +14,8 @@ from application.data import connect, get_registration_details, complete, \
     get_registration, insert_cancellation,  \
     insert_rectification, insert_new_registration, get_register_request_details, get_search_request_details, rollback, \
     get_registrations_by_date, get_all_registrations, get_k22_request_id, get_registration_history, \
-    get_additional_info, get_multi_registrations, insert_renewal, get_county, get_applicant_detl, get_registration_details_by_register_id
+    get_additional_info, get_multi_registrations, insert_renewal, get_county, get_applicant_detl, get_registration_details_by_register_id, \
+    get_request_audit
 from application.schema import SEARCH_SCHEMA, validate, validate_registration, validate_migration, validate_update
 from application.search import store_search_request, perform_search, store_search_result, read_searches, \
     get_search_by_request_id, get_search_ids_by_date
@@ -163,6 +164,29 @@ def registration(date, reg_no):
         complete(cursor)
     if details is None:
         logging.warning(format_message("Returning 404 for /registrations/{}/{}".format(date, reg_no)))
+        return Response(status=404)
+    else:
+        return Response(json.dumps(details), status=200, mimetype='application/json')
+
+
+@app.route('/audit/<date>/<int:reg_no>', methods=['GET'])
+def audit_history(date, reg_no):
+    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        logging.audit(format_message("Retrieve entry audit history for %s, %s"), reg_no, date)
+        details = get_registration_history(cursor, reg_no, date)
+
+        for item in details:
+            req = get_request_audit(cursor, item['request_id'])
+            del(item['request_id'])
+            item['request'] = req
+
+
+        logging.debug(details)
+    finally:
+        complete(cursor)
+    if details is None:
+        logging.warning("Returning 404")
         return Response(status=404)
     else:
         return Response(json.dumps(details), status=200, mimetype='application/json')
