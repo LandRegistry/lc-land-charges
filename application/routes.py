@@ -546,84 +546,6 @@ def retrieve_office_copy():
 @app.route('/migrated_record', methods=['POST'])
 def insert():
     return Response(status=403)
-    # if request.headers['Content-Type'] != "application/json":
-    #     logging.error(format_message('Content-Type is not JSON'))
-    #     return Response(status=415)
-    #
-    # data = request.get_json(force=True)
-    # errors = validate_migration(data)
-    # if len(errors) > 0:
-    #     raise_error({
-    #         "type": "E",
-    #         "message": "Input data failed validation",
-    #         "stack": ""
-    #     })
-    #     logging.error(format_message("Input data failed validation"))
-    #     return Response(json.dumps(errors), status=400, mimetype='application/json')
-    #
-    # previous_id = None
-    # first_record = data[0]
-    #
-    # failed_inserts = []
-    #
-    # cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    # for reg in data:
-    #     try:
-    #         if reg['type'] == 'CN':
-    #             details_id, request_id = insert_migrated_cancellation(cursor, data)
-    #         else:
-    #             details_id, request_id = insert_migrated_record(cursor, reg)
-    #             if reg['type'] in ['AM', 'CN', 'CP', 'RN', 'RC']:
-    #                 if details_id is not None:
-    #                     cursor.execute("UPDATE register_details SET cancelled_by = %(canc)s WHERE " +
-    #                                    "id = %(id)s AND cancelled_by IS NULL",
-    #                                    {
-    #                                        "canc": request_id, "id": previous_id
-    #                                    })
-    #                 else:
-    #                     pass
-    #
-    #                 # TODO repeating code is bad.
-    #                 if reg['type'] == 'AM':
-    #                     cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
-    #                                    "id = %(id)s",
-    #                                    {
-    #                                        "amend": previous_id, "id": details_id, "type": "Amendment"
-    #                                    })
-    #
-    #                 if reg['type'] == 'RN':
-    #                     cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
-    #                                    "id = %(id)s",
-    #                                    {
-    #                                        "amend": previous_id, "id": details_id, "type": "Renewal"
-    #                                    })
-    #
-    #                 if reg['type'] == 'RC':
-    #                     cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s WHERE "
-    #                                    " id = %(id)s",
-    #                                    {
-    #                                        "amend": previous_id, "id": details_id, "type": "Rectification"
-    #                                    })
-    #
-    #                 if reg['type'] == 'CP':
-    #                     cursor.execute("UPDATE register_details SET amends = %(amend)s, amendment_type=%(type)s "
-    #                                    "WHERE id = %(id)s",
-    #                                    {
-    #                                        "amend": previous_id, "id": details_id, "type": "Part Cancellation"
-    #                                    })
-    #
-    #         previous_id = details_id
-    #     except Exception as e:
-    #         failed_inserts.append({
-    #             "number": reg['registration']['registration_no'],
-    #             "date": reg['registration']['date'],
-    #             "class_of_charge": reg['class_of_charge'],
-    #             "message": str(e)
-    #         })
-    #
-    # complete(cursor)
-    #
-    # return Response(json.dumps(failed_inserts), status=200)
 
 
 # ============= Dev routes ===============
@@ -652,23 +574,6 @@ def delete_all_regs():  # pragma: no cover
                        "party, migration_status, register, detl_county_rel, register_details, audit_log, "
                        "search_results, search_name, search_details, request, ins_bankruptcy_request, "
                        "party_name, county")
-        # cursor.execute("TRUNCATE address")
-        # cursor.execute("TRUNCATE address_detail")
-        # cursor.execute("TRUNCATE party_trading")
-        # cursor.execute("TRUNCATE party_name_rel")
-        # cursor.execute("TRUNCATE party")
-        # cursor.execute("TRUNCATE migration_status")
-        # cursor.execute("TRUNCATE register")
-        # cursor.execute("TRUNCATE detl_county_rel")
-        # cursor.execute("TRUNCATE register_details")
-        # cursor.execute("TRUNCATE audit_log")
-        # cursor.execute("TRUNCATE search_results")
-        # cursor.execute("TRUNCATE search_name")
-        # cursor.execute("TRUNCATE search_details")
-        # cursor.execute("TRUNCATE request")
-        # cursor.execute("TRUNCATE ins_bankruptcy_request")
-        # cursor.execute("TRUNCATE party_name")
-        # cursor.execute("TRUNCATE county")
         complete(cursor)
     except:
         rollback(cursor)
@@ -942,30 +847,6 @@ def get_search_request_ids():
         results['results'].append(res)
         request_ids.append(row['request_id'])
     return Response(json.dumps(results), status=200, mimetype='application/json')
-
-
-# Route exists purely for testing purposes - get some valid request ids for test data
-# count is the amount of ids to return
-@app.route('/request_ids/<count>', methods=["GET"])
-def get_request_ids(count):
-    if not app.config['ALLOW_DEV_ROUTES']:  # and is_dev_VM()):
-        return Response(status=403)
-
-    cursor = connect(cursor_factory=psycopg2.extras.DictCursor)
-    try:
-        sql = "Select id as request_id from request fetch first " + str(count) + " rows only"
-        cursor.execute(sql)
-        rows = cursor.fetchall()
-    finally:
-        complete(cursor)
-    data = []
-    if len(rows) == 0:
-        data = None
-    else:
-        for row in rows:
-            job = {'request_id': row['request_id']}
-            data.append(job)
-    return Response(json.dumps(data), status=200, mimetype='application/json')
 
 
 @app.route('/search_type/<request_id>', methods=["GET"])
