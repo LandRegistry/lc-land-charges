@@ -391,7 +391,10 @@ def insert_details(cursor, request_id, data, date, amends_id):
 
 def calc_five_year_expiry(date):
     cdate = datetime.datetime.strptime(date, "%Y-%m-%d")
-    cdate = datetime.datetime(cdate.year + 5, cdate.month, cdate.day)
+    if cdate.month == 2 and cdate.day == 29: # leap year fix
+        cdate = datetime.datetime(cdate.year + 5, 3, 1)
+    else:
+        cdate = datetime.datetime(cdate.year + 5, cdate.month, cdate.day)
     cdate += datetime.timedelta(days=10)
     return cdate
 

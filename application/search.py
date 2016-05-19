@@ -109,6 +109,14 @@ def merge_lists(a, b):
     return result
 
 
+def get_name_type_clause(name_type):
+    if name_type == 'Private Individual':
+        return "  and pn.name_type_ind in ('Private Individual', 'Other')"
+    else:
+        return "  and pn.name_type_ind=%(nametype)s"
+
+
+
 def perform_bankruptcy_search(cursor, name_type, keys, cert_date):
     cursor.execute("SELECT r.id, r.date, rd.class_of_charge "
                    "FROM party_name n, register r, register_details rd, party p, party_name_rel pnr "
@@ -163,7 +171,8 @@ def perform_full_search_all_counties(cursor, name_type, keys, year_from, year_to
                    "  and pnr.party_name_id = pn.id and pnr.party_id=p.id "
                    "  and p.party_type != 'Court' "
                    "  and p.register_detl_id=rd.id "
-                   "  and rd.id=r.details_id "
+                   "  and rd.id=r.details_id " +
+                   get_name_type_clause(name_type) +
                    #"  and pn.name_type_ind = %(nametype)s "
                    "  and (r.debtor_reg_name_id is null or r.debtor_reg_name_id = pn.id) "
                    "  and ("
@@ -196,7 +205,8 @@ def perform_full_search(cursor, name_type, keys, counties, year_from, year_to, c
                    "  and pnr.party_name_id = pn.id and pnr.party_id=p.id "
                    "  and p.party_type != 'Court' "
                    "  and p.register_detl_id=rd.id "
-                   "  and rd.id=r.details_id "
+                   "  and rd.id=r.details_id " +
+                   get_name_type_clause(name_type) +
                    #"  and pn.name_type_ind = %(nametype)s "
                    "  and (r.debtor_reg_name_id is null or r.debtor_reg_name_id = pn.id) "
                    "  and ("
