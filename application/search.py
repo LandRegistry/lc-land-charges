@@ -113,7 +113,7 @@ def get_name_type_clause(name_type):
     if name_type == 'Private Individual':
         return "  and pn.name_type_ind in ('Private Individual', 'Other')"
     else:
-        return "  and pn.name_type_ind=%(name_type)s"
+        return "  and pn.name_type_ind=%(nametype)s"
 
 
 
