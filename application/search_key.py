@@ -287,6 +287,10 @@ def create_pi_search_keys(name):
         keys.append((inits + name['surname'].replace(" ", "")).upper())
 
     keys.append(name['surname'].replace(" ", "").upper())
+
+    for i, key in enumerate(keys):
+        keys[i] = remove_non_alphanumeric(key)
+
     return keys
 
 
