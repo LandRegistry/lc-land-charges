@@ -277,16 +277,16 @@ def create_pi_search_keys(name):
             break
 
     if not initials and len(name['forenames']) > 0:
-        keys.append((''.join(name['forenames']) + name['surname']).upper())
+        keys.append((''.join(name['forenames']) + name['surname'].replace(" ", "")).upper())
 
     if len(name['forenames']) > 0:
         inits = ''
         for forename in name['forenames']:
             if len(forename) > 0:
                 inits += forename[0]
-        keys.append((inits + name['surname']).upper())
+        keys.append((inits + name['surname'].replace(" ", "")).upper())
 
-    keys.append(name['surname'].upper())
+    keys.append(name['surname'].replace(" ", "").upper())
     return keys
 
 
